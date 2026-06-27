@@ -739,6 +739,7 @@ export function HomeView({
           }
           totalAmount={renewalsTotal > 0 ? renewalsTotal : undefined}
           totalSuffix="/mese"
+          onSeeAll={onGoToEvents}
           onShare={shareSectionRenewals}
         >
           <ul className="space-y-1">
