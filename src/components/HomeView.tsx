@@ -24,6 +24,10 @@ import {
   noteInCurrentMonth,
 } from '../utils/monthFilter'
 import {
+  computeMonthPaidTotal,
+  computeMonthPlannedTotal,
+} from '../utils/monthExpenseTotals'
+import {
   isOverdueEvent,
   isOverdueNoteImpegno,
   tasksForNote,
@@ -335,9 +339,12 @@ export function HomeView({
   const noteCount = displayNotes.length
   const expenseCount = displayExpenses.length
 
-  const monthExpensesTotal = monthExpensesList
-    .filter((e) => e.amount > 0)
-    .reduce((s, e) => s + e.amount, 0)
+  const monthExpensesTotal = computeMonthPaidTotal(expenses ?? [])
+
+  const monthPlannedTotal = useMemo(
+    () => computeMonthPlannedTotal(events ?? []),
+    [events],
+  )
 
   const { start: prevStart, end: prevEnd } = prevMonthRange()
   const prevMonthExpenses = (expenses ?? [])
@@ -547,11 +554,11 @@ export function HomeView({
       )}
 
       {!areaFilterActive && (
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,0.7fr)_minmax(0,1.45fr)] gap-1.5">
           <button
             type="button"
             onClick={onGoToNotes}
-            className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-left shadow-sm hover:border-amber-200"
+            className="rounded-lg border border-slate-100 bg-white px-2 py-2 text-left shadow-sm hover:border-amber-200"
           >
             <p className="text-[9px] font-medium text-slate-400">Note</p>
             <p className="mt-0.5 text-xs font-bold text-amber-700">{noteCount}</p>
@@ -559,7 +566,7 @@ export function HomeView({
           <button
             type="button"
             onClick={onGoToEvents}
-            className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-left shadow-sm hover:border-indigo-200"
+            className="flex flex-col items-center justify-center rounded-lg border border-slate-100 bg-white px-1.5 py-2 text-center shadow-sm hover:border-indigo-200"
           >
             <p className="text-[9px] font-medium text-slate-400">Impegni</p>
             <p className="mt-0.5 text-xs font-bold text-indigo-600">
@@ -571,18 +578,36 @@ export function HomeView({
             onClick={onGoToExpenses}
             className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-left shadow-sm hover:border-rose-200"
           >
-            <p className="text-[9px] font-medium text-slate-400">Spese</p>
-            <p className="mt-0.5 text-[10px] font-medium leading-tight text-rose-500">
-              {sentenceCase(monthLabel)}
+            <p className="text-[9px] font-medium leading-tight text-slate-400">
+              Spese
+              <span className="font-normal text-rose-400">
+                {' '}
+                · {sentenceCase(monthLabel)}
+              </span>
             </p>
-            <p className="mt-0.5 text-xs font-bold text-rose-600">
-              {formatAmount(monthExpensesTotal)}
-            </p>
+            <div className="mt-1.5 grid grid-cols-2 gap-2">
+              <div className="min-w-0">
+                <p className="text-[8px] font-medium uppercase tracking-wide text-slate-400">
+                  Pagato
+                </p>
+                <p className="mt-0.5 truncate text-[11px] font-bold leading-tight text-rose-600">
+                  {formatAmount(monthExpensesTotal)}
+                </p>
+              </div>
+              <div className="min-w-0 border-l border-rose-100 pl-2">
+                <p className="text-[8px] font-medium uppercase tracking-wide text-slate-400">
+                  Previsto
+                </p>
+                <p className="mt-0.5 truncate text-[11px] font-bold leading-tight text-orange-600">
+                  {formatAmount(monthPlannedTotal)}
+                </p>
+              </div>
+            </div>
             {prevMonthExpenses > 0 && (
               <p
-                className={`mt-0.5 text-[9px] font-medium leading-tight ${expenseDelta > 0 ? 'text-rose-400' : expenseDelta < 0 ? 'text-emerald-500' : 'text-slate-400'}`}
+                className={`mt-1 text-[8px] font-medium leading-tight ${expenseDelta > 0 ? 'text-rose-400' : expenseDelta < 0 ? 'text-emerald-500' : 'text-slate-400'}`}
               >
-                {expenseDelta > 0 ? '+' : ''}
+                Pagato: {expenseDelta > 0 ? '+' : ''}
                 {formatAmount(expenseDelta)} vs scorso
               </p>
             )}
