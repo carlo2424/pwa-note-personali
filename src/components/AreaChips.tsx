@@ -42,6 +42,7 @@ function AreaChipButton({
   onManage,
   chipBase,
   countBadge,
+  showCount = true,
 }: {
   area: Area
   count: number
@@ -52,6 +53,7 @@ function AreaChipButton({
   onManage: () => void
   chipBase: string
   countBadge: (count: number, active: boolean) => ReactNode
+  showCount?: boolean
 }) {
   const press = useChipPress(onSelect, onManage)
 
@@ -68,7 +70,7 @@ function AreaChipButton({
       }`}
     >
       <span>{area.name}</span>
-      {countBadge(count, active)}
+      {showCount ? countBadge(count, active) : null}
     </button>
   )
 }
@@ -101,8 +103,8 @@ export function AreaChips({
     'flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition active:scale-[0.98]'
 
   const { standalone, groups } = useMemo(
-    () => buildAreaChipLayout(areas, counts),
-    [areas, counts],
+    () => buildAreaChipLayout(areas),
+    [areas],
   )
 
   const existingGroups = useMemo(() => groupNamesFromAreas(areas), [areas])
@@ -445,7 +447,7 @@ export function AreaChips({
               }`}
             >
               <span>{group.name}</span>
-              {countBadge(group.totalCount, active)}
+              {countBadge(group.memberCount, active)}
               <ChevronDown
                 className={`h-3.5 w-3.5 transition ${expanded ? 'rotate-180' : ''}`}
               />
@@ -474,6 +476,7 @@ export function AreaChips({
                   active={active}
                   inGroup={inGroup}
                   compact
+                  showCount={false}
                   chipBase={chipBase}
                   countBadge={countBadge}
                   onSelect={() =>

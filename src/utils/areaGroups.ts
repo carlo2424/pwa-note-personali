@@ -4,7 +4,8 @@ import { sentenceCase } from './format'
 export interface AreaGroupChip {
   name: string
   areas: Area[]
-  totalCount: number
+  /** Numero di persone/aree nel gruppo */
+  memberCount: number
 }
 
 export function normalizeGroupName(name: string): string {
@@ -23,7 +24,6 @@ export function groupNamesFromAreas(areas: Area[]): string[] {
 
 export function buildAreaChipLayout(
   areas: Area[],
-  counts: Map<number, number>,
 ): {
   standalone: Area[]
   groups: AreaGroupChip[]
@@ -48,10 +48,7 @@ export function buildAreaChipLayout(
     .map(([name, members]) => ({
       name,
       areas: members.sort((a, b) => a.name.localeCompare(b.name, 'it')),
-      totalCount: members.reduce(
-        (sum, area) => sum + (counts.get(area.id!) ?? 0),
-        0,
-      ),
+      memberCount: members.length,
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'it'))
 
