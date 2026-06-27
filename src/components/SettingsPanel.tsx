@@ -7,6 +7,7 @@ import {
   requestNotificationPermission,
   setRenewalNotifEnabled,
 } from '../utils/renewalNotifications'
+import { FileImportPanel } from './FileImportPanel'
 
 export function SettingsPanel() {
   const [notifEnabled, setNotifEnabled] = useState(isRenewalNotifEnabled())
@@ -38,34 +39,38 @@ export function SettingsPanel() {
           : 'Permesso non ancora richiesto'
 
   return (
-    <section className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-      <div className="mb-3 flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
-          <Bell className="h-4 w-4" />
+    <div className="space-y-4">
+      <FileImportPanel />
+
+      <section className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+        <div className="mb-3 flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+            <Bell className="h-4 w-4" />
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-slate-800">
+              Promemoria rinnovi
+            </h4>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Avviso 3 giorni prima, 1 giorno prima e il giorno del rinnovo.
+            </p>
+          </div>
         </div>
-        <div>
-          <h4 className="text-sm font-semibold text-slate-800">
-            Promemoria rinnovi
-          </h4>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Avviso 3 giorni prima, 1 giorno prima e il giorno del rinnovo.
-          </p>
-        </div>
-      </div>
-      <label className="flex cursor-pointer items-center justify-between gap-3">
-        <span className="text-sm text-slate-700">Attiva promemoria</span>
-        <input
-          type="checkbox"
-          checked={notifEnabled}
-          onChange={(e) => handleNotifToggle(e.target.checked)}
-          className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-        />
-      </label>
-      <p className="mt-2 text-xs text-slate-400">{permissionLabel}</p>
-      <p className="mt-1 text-xs text-slate-400">
-        Le notifiche funzionano quando l&apos;app è aperta o installata come
-        PWA.
-      </p>
-    </section>
+        <label className="flex cursor-pointer items-center justify-between gap-3">
+          <span className="text-sm text-slate-700">Attiva promemoria</span>
+          <input
+            type="checkbox"
+            checked={notifEnabled}
+            onChange={(e) => handleNotifToggle(e.target.checked)}
+            className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+          />
+        </label>
+        <p className="mt-2 text-xs text-slate-400">{permissionLabel}</p>
+        <p className="mt-1 text-xs text-slate-400">
+          Le notifiche funzionano quando l&apos;app è aperta o installata come
+          PWA.
+        </p>
+      </section>
+    </div>
   )
 }

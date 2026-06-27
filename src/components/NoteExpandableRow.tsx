@@ -27,6 +27,7 @@ export function NoteExpandableRow({
   compact = false,
 }: NoteExpandableRowProps) {
   const displayContent = note.content ? sentenceCase(note.content) : ''
+  const photoUrl = note.photoBlob ? URL.createObjectURL(note.photoBlob) : null
   const overdue = isPastDue(note.endDate)
   const dateRange = formatDateRange(note.startDate, note.endDate)
 
@@ -71,6 +72,13 @@ export function NoteExpandableRow({
         <ItemActions onEdit={onEdit} onArchive={() => archiveNote(note)} />
       }
     >
+      {photoUrl && (
+        <img
+          src={photoUrl}
+          alt=""
+          className={`w-full object-cover ${compact ? 'max-h-24 rounded-lg' : 'max-h-40 rounded-xl'}`}
+        />
+      )}
       {displayContent && (
         <p className={`whitespace-pre-wrap text-slate-600 ${compact ? 'text-xs' : 'text-sm'}`}>
           {displayContent}

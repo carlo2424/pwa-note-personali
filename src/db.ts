@@ -7,6 +7,7 @@ export interface Note {
   title: string
   content: string
   color?: string
+  photoBlob?: Blob
   startDate?: string
   endDate?: string
   areaId?: number
@@ -213,6 +214,18 @@ class PersonalNotesDB extends Dexie {
 
     // v10: frequenza ripetizione impegni ricorrenti
     this.version(10).stores({
+      notes: '++id, title, createdAt, updatedAt, startDate, endDate, areaId',
+      expenses: '++id, amount, category, date, createdAt, cardId, eventId, areaId',
+      archive: '++id, type, originalId, archivedAt',
+      events: '++id, title, startDate, renewalDate, createdAt, updatedAt, cardId, areaId',
+      tasks: '++id, done, createdAt, eventId, listId, dueDate',
+      taskLists: '++id, createdAt, dueDate',
+      paymentCards: '++id, name, expiry',
+      areas: '++id, name, createdAt',
+    })
+
+    // v11: foto allegata alle note
+    this.version(11).stores({
       notes: '++id, title, createdAt, updatedAt, startDate, endDate, areaId',
       expenses: '++id, amount, category, date, createdAt, cardId, eventId, areaId',
       archive: '++id, type, originalId, archivedAt',

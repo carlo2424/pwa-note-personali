@@ -4,6 +4,7 @@ import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { resolveAreaId, areaNameById } from '../utils/areas'
 import { sentenceCase } from '../utils/format'
 import { AreaInput } from './AreaInput'
+import { CameraCapture } from './CameraCapture'
 import { SpeechDictation } from './SpeechDictation'
 
 const inputClass =
@@ -31,6 +32,7 @@ export function NoteForm({ note, onSave, onClose }: NoteFormProps) {
   const [startDate, setStartDate] = useState(note?.startDate ?? '')
   const [endDate, setEndDate] = useState(note?.endDate ?? '')
   const [color, setColor] = useState(note?.color ?? 'indigo')
+  const [photoBlob, setPhotoBlob] = useState<Blob | undefined>(note?.photoBlob)
   const [areaName, setAreaName] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -59,6 +61,7 @@ export function NoteForm({ note, onSave, onClose }: NoteFormProps) {
         title: sentenceCase(title),
         content: sentenceCase(content),
         color,
+        photoBlob,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         areaId,
@@ -140,6 +143,8 @@ export function NoteForm({ note, onSave, onClose }: NoteFormProps) {
           className={inputClass}
         />
       </div>
+
+      <CameraCapture photo={photoBlob} onCapture={setPhotoBlob} />
 
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-700">

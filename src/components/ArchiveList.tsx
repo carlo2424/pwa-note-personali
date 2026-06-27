@@ -29,6 +29,7 @@ async function restoreItem(item: ArchiveItem) {
       title: note.title,
       content: note.content,
       color: note.color,
+      photoBlob: item.photoBlob,
       startDate: note.startDate,
       endDate: note.endDate,
       areaId: note.areaId,

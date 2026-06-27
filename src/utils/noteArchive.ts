@@ -8,6 +8,7 @@ export async function archiveNote(note: Note): Promise<void> {
     type: 'note',
     title: note.title,
     data: JSON.stringify(note),
+    photoBlob: note.photoBlob,
     archivedAt: Date.now(),
   })
   await db.notes.delete(note.id)
