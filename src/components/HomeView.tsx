@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { db, type Event, type Expense, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
@@ -79,6 +79,7 @@ export function HomeView({
   onGoToEvents,
   onGoToExpenses,
   onGoToNotes,
+  onAddInArea,
 }: {
   onEditEvent: (event: Event) => void
   onEditNote: (note: Note) => void
@@ -87,6 +88,7 @@ export function HomeView({
   onGoToEvents: () => void
   onGoToExpenses: () => void
   onGoToNotes: () => void
+  onAddInArea: (areaName: string) => void
 }) {
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null)
   const { label: monthLabel } = currentMonthBounds()
@@ -238,9 +240,19 @@ export function HomeView({
     <div className="space-y-3">
       {areaFilterActive && selectedAreaName && (
         <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2.5">
-          <h3 className="text-sm font-semibold text-indigo-900">
-            {selectedAreaName}
-          </h3>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm font-semibold text-indigo-900">
+              {selectedAreaName}
+            </h3>
+            <button
+              type="button"
+              onClick={() => onAddInArea(selectedAreaName)}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 active:scale-95"
+              aria-label={`Aggiungi in ${selectedAreaName}`}
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          </div>
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-medium text-indigo-700">
             <span>
               {noteCount} {noteCount === 1 ? 'nota' : 'note'}
@@ -444,6 +456,9 @@ export function HomeView({
         <p className="py-4 text-center text-sm text-slate-400">
           Nessun elemento in{' '}
           <span className="font-medium">{selectedAreaName}</span> questo mese.
+          <br />
+          Usa il pulsante{' '}
+          <span className="font-semibold text-indigo-600">+</span> in alto.
         </p>
       )}
 

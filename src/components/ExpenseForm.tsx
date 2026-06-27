@@ -13,11 +13,12 @@ const CATEGORIES = ['Cibo', 'Trasporti', 'Svago', 'Casa', 'Salute', 'Altro']
 
 interface ExpenseFormProps {
   expense?: Expense
+  defaultAreaName?: string
   onSave: () => void
   onClose: () => void
 }
 
-export function ExpenseForm({ expense, onSave, onClose }: ExpenseFormProps) {
+export function ExpenseForm({ expense, defaultAreaName, onSave, onClose }: ExpenseFormProps) {
   const today = new Date().toISOString().slice(0, 10)
 
   const [description, setDescription] = useState(
@@ -42,8 +43,12 @@ export function ExpenseForm({ expense, onSave, onClose }: ExpenseFormProps) {
   const areas = useDexieLiveQuery(() => db.areas.toArray())
 
   useEffect(() => {
-    setAreaName(areaNameById(areas ?? [], expense?.areaId) ?? '')
-  }, [expense?.id, expense?.areaId, areas])
+    if (expense?.id) {
+      setAreaName(areaNameById(areas ?? [], expense.areaId) ?? '')
+    } else if (defaultAreaName) {
+      setAreaName(defaultAreaName)
+    }
+  }, [expense?.id, expense?.areaId, areas, defaultAreaName])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

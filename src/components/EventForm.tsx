@@ -19,6 +19,7 @@ import { AreaInput } from './AreaInput'
 
 interface EventFormProps {
   event?: Event
+  defaultAreaName?: string
   onSave: () => void
   onClose: () => void
 }
@@ -26,7 +27,7 @@ interface EventFormProps {
 const inputClass =
   'w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
 
-export function EventForm({ event, onSave, onClose }: EventFormProps) {
+export function EventForm({ event, defaultAreaName, onSave, onClose }: EventFormProps) {
   const today = new Date().toISOString().slice(0, 10)
   const cards = useDexieLiveQuery(() => db.paymentCards.toArray())
 
@@ -66,8 +67,12 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
   const areas = useDexieLiveQuery(() => db.areas.toArray())
 
   useEffect(() => {
-    setAreaName(areaNameById(areas ?? [], event?.areaId) ?? '')
-  }, [event?.id, event?.areaId, areas])
+    if (event?.id) {
+      setAreaName(areaNameById(areas ?? [], event.areaId) ?? '')
+    } else if (defaultAreaName) {
+      setAreaName(defaultAreaName)
+    }
+  }, [event?.id, event?.areaId, areas, defaultAreaName])
 
   useEffect(() => {
     if (!event?.id) {

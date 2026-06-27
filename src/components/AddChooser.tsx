@@ -4,6 +4,7 @@ interface AddChooserProps {
   onAddNote: () => void
   onAddEvent: () => void
   onAddExpense: () => void
+  areaName?: string
 }
 
 const options = [
@@ -35,6 +36,7 @@ export function AddChooser({
   onAddNote,
   onAddEvent,
   onAddExpense,
+  areaName,
 }: AddChooserProps) {
   const handlers = {
     note: onAddNote,
@@ -45,7 +47,9 @@ export function AddChooser({
   return (
     <div className="space-y-2">
       <p className="mb-3 text-sm text-slate-500">
-        Scegli cosa vuoi aggiungere
+        {areaName
+          ? `Aggiungi qualcosa in ${areaName}`
+          : 'Scegli cosa vuoi aggiungere'}
       </p>
       {options.map((opt) => {
         const Icon = opt.icon

@@ -20,11 +20,12 @@ const NOTE_COLORS = [
 
 interface NoteFormProps {
   note?: Note
+  defaultAreaName?: string
   onSave: () => void
   onClose: () => void
 }
 
-export function NoteForm({ note, onSave, onClose }: NoteFormProps) {
+export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormProps) {
   const [title, setTitle] = useState(note?.title ? sentenceCase(note.title) : '')
   const [content, setContent] = useState(
     note?.content ? sentenceCase(note.content) : '',
@@ -39,8 +40,12 @@ export function NoteForm({ note, onSave, onClose }: NoteFormProps) {
   const areas = useDexieLiveQuery(() => db.areas.toArray())
 
   useEffect(() => {
-    setAreaName(areaNameById(areas ?? [], note?.areaId) ?? '')
-  }, [note?.id, note?.areaId, areas])
+    if (note?.id) {
+      setAreaName(areaNameById(areas ?? [], note.areaId) ?? '')
+    } else if (defaultAreaName) {
+      setAreaName(defaultAreaName)
+    }
+  }, [note?.id, note?.areaId, areas, defaultAreaName])
 
   function appendContent(text: string) {
     setContent((prev) =>

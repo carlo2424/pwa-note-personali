@@ -81,9 +81,14 @@ function App() {
   const [editingEvent, setEditingEvent] = useState<Event | undefined>()
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>()
   const [editingNote, setEditingNote] = useState<Note | undefined>()
+  const [defaultAreaName, setDefaultAreaName] = useState<string | undefined>()
 
   const current = sections[activeSection]
   const CurrentIcon = current.icon
+
+  function clearDefaultArea() {
+    setDefaultAreaName(undefined)
+  }
 
   function openNewEvent() {
     setEditingEvent(undefined)
@@ -121,13 +126,39 @@ function App() {
 
   function closeAddChooser() {
     setShowAddChooser(false)
+    if (!showNoteForm && !showEventForm && !showExpenseForm) {
+      clearDefaultArea()
+    }
+  }
+
+  function openAddChooserForArea(areaName: string) {
+    setDefaultAreaName(areaName)
+    setShowAddChooser(true)
   }
 
   function addFromChooser(kind: 'note' | 'event' | 'expense') {
-    closeAddChooser()
+    setShowAddChooser(false)
     if (kind === 'note') openNewNote()
     else if (kind === 'event') openNewEvent()
     else openNewExpense()
+  }
+
+  function closeNoteForm() {
+    setShowNoteForm(false)
+    setEditingNote(undefined)
+    clearDefaultArea()
+  }
+
+  function closeEventForm() {
+    setShowEventForm(false)
+    setEditingEvent(undefined)
+    clearDefaultArea()
+  }
+
+  function closeExpenseForm() {
+    setShowExpenseForm(false)
+    setEditingExpense(undefined)
+    clearDefaultArea()
   }
 
   function handleAddClick() {
@@ -237,6 +268,7 @@ function App() {
               onGoToEvents={() => setActiveSection('events')}
               onGoToExpenses={() => setActiveSection('expenses')}
               onGoToNotes={() => setActiveSection('notes')}
+              onAddInArea={openAddChooserForArea}
             />
           )}
           {activeSection === 'notes' && (
@@ -293,8 +325,12 @@ function App() {
       </div>
 
       {showAddChooser && (
-        <Modal title="Aggiungi" onClose={closeAddChooser}>
+        <Modal
+          title={defaultAreaName ? `Aggiungi in ${defaultAreaName}` : 'Aggiungi'}
+          onClose={closeAddChooser}
+        >
           <AddChooser
+            areaName={defaultAreaName}
             onAddNote={() => addFromChooser('note')}
             onAddEvent={() => addFromChooser('event')}
             onAddExpense={() => addFromChooser('expense')}
@@ -305,12 +341,13 @@ function App() {
       {showEventForm && (
         <Modal
           title={editingEvent ? 'Modifica impegno' : 'Nuovo impegno'}
-          onClose={() => setShowEventForm(false)}
+          onClose={closeEventForm}
         >
           <EventForm
             event={editingEvent}
-            onSave={() => setShowEventForm(false)}
-            onClose={() => setShowEventForm(false)}
+            defaultAreaName={editingEvent ? undefined : defaultAreaName}
+            onSave={closeEventForm}
+            onClose={closeEventForm}
           />
         </Modal>
       )}
@@ -324,12 +361,13 @@ function App() {
       {showNoteForm && (
         <Modal
           title={editingNote ? 'Modifica nota' : 'Nuova nota'}
-          onClose={() => setShowNoteForm(false)}
+          onClose={closeNoteForm}
         >
           <NoteForm
             note={editingNote}
-            onSave={() => setShowNoteForm(false)}
-            onClose={() => setShowNoteForm(false)}
+            defaultAreaName={editingNote ? undefined : defaultAreaName}
+            onSave={closeNoteForm}
+            onClose={closeNoteForm}
           />
         </Modal>
       )}
@@ -337,12 +375,13 @@ function App() {
       {showExpenseForm && (
         <Modal
           title={editingExpense ? 'Modifica spesa' : 'Nuova spesa'}
-          onClose={() => setShowExpenseForm(false)}
+          onClose={closeExpenseForm}
         >
           <ExpenseForm
             expense={editingExpense}
-            onSave={() => setShowExpenseForm(false)}
-            onClose={() => setShowExpenseForm(false)}
+            defaultAreaName={editingExpense ? undefined : defaultAreaName}
+            onSave={closeExpenseForm}
+            onClose={closeExpenseForm}
           />
         </Modal>
       )}
