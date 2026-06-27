@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Safe zone ~80% for maskable icons -->
+  <rect width="512" height="512" fill="#4f46e5"/>
+  <rect x="64" y="64" width="384" height="384" rx="72" fill="#ffffff" fill-opacity="0.12"/>
+  <path
+    fill="#ffffff"
+    d="M176 160h160c13.3 0 24 10.7 24 24v144c0 13.3-10.7 24-24 24H176c-13.3 0-24-10.7-24-24V184c0-13.3 10.7-24 24-24zm24 40v96l72-48-72-48z"
+  />
+</svg>

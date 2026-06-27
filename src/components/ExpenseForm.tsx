@@ -1,0 +1,238 @@
+import { useEffect, useState } from 'react'
+import { PAYMENT_METHODS } from '../constants/events'
+import { db, type Expense, type PaymentMethod } from '../db'
+import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
+import { sentenceCase } from '../utils/format'
+import { resolveAreaId, areaNameById } from '../utils/areas'
+import { AreaInput } from './AreaInput'
+
+const inputClass =
+  'w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
+
+const CATEGORIES = ['Cibo', 'Trasporti', 'Svago', 'Casa', 'Salute', 'Altro']
+
+interface ExpenseFormProps {
+  expense?: Expense
+  onSave: () => void
+  onClose: () => void
+}
+
+export function ExpenseForm({ expense, onSave, onClose }: ExpenseFormProps) {
+  const today = new Date().toISOString().slice(0, 10)
+
+  const [description, setDescription] = useState(
+    expense?.description ? sentenceCase(expense.description) : '',
+  )
+  const [amount, setAmount] = useState(
+    expense ? String(expense.amount) : '',
+  )
+  const [category, setCategory] = useState(expense?.category ?? 'Cibo')
+  const [date, setDate] = useState(expense?.date ?? today)
+  const [isIncome, setIsIncome] = useState(expense ? expense.amount < 0 : false)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    expense?.paymentMethod ?? 'carta',
+  )
+  const [cardId, setCardId] = useState(
+    expense?.cardId ? String(expense.cardId) : '',
+  )
+  const [areaName, setAreaName] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const cards = useDexieLiveQuery(() => db.paymentCards.toArray())
+  const areas = useDexieLiveQuery(() => db.areas.toArray())
+
+  useEffect(() => {
+    setAreaName(areaNameById(areas ?? [], expense?.areaId) ?? '')
+  }, [expense?.id, expense?.areaId, areas])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const parsed = parseFloat(amount.replace(',', '.'))
+    if (!description.trim() || isNaN(parsed) || parsed <= 0) return
+
+    setSaving(true)
+    const now = Date.now()
+    const areaId = await resolveAreaId(areaName)
+    // Positivo = spesa, negativo = entrata
+    const finalAmount = isIncome ? -parsed : parsed
+
+    try {
+      if (expense?.id) {
+        await db.expenses.update(expense.id, {
+          description: sentenceCase(description),
+          amount: finalAmount,
+          category,
+          date,
+          paymentMethod,
+          cardId: cardId ? parseInt(cardId, 10) : undefined,
+          areaId,
+        })
+      } else {
+        await db.expenses.add({
+          description: sentenceCase(description),
+          amount: finalAmount,
+          category,
+          date,
+          paymentMethod,
+          cardId: cardId ? parseInt(cardId, 10) : undefined,
+          areaId,
+          createdAt: now,
+        })
+      }
+      onSave()
+      onClose()
+    } catch (err) {
+      console.error('Errore salvataggio spesa:', err)
+      alert('Errore nel salvataggio della spesa.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setIsIncome(false)}
+          className={`flex-1 rounded-xl py-2 text-sm font-medium transition ${
+            !isIncome
+              ? 'bg-rose-100 text-rose-700'
+              : 'bg-slate-100 text-slate-500'
+          }`}
+        >
+          Spesa
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsIncome(true)}
+          className={`flex-1 rounded-xl py-2 text-sm font-medium transition ${
+            isIncome
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-slate-100 text-slate-500'
+          }`}
+        >
+          Entrata
+        </button>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700">
+          Descrizione
+        </label>
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onBlur={(e) => setDescription(sentenceCase(e.target.value))}
+          placeholder="Es. Pranzo, Benzina..."
+          className={inputClass}
+          required
+        />
+      </div>
+
+      <AreaInput value={areaName} onChange={setAreaName} disabled={saving} />
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Importo (€)
+          </label>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0,00"
+            className={inputClass}
+            required
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Data
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className={inputClass}
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700">
+          Categoria
+        </label>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className={inputClass}
+        >
+          {CATEGORIES.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700">
+          Metodo pagamento
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {PAYMENT_METHODS.map((m) => (
+            <button
+              key={m.value}
+              type="button"
+              onClick={() => setPaymentMethod(m.value)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                paymentMethod === m.value
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {paymentMethod === 'carta' && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Carta utilizzata
+          </label>
+          <select
+            value={cardId}
+            onChange={(e) => setCardId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">— Seleziona carta —</option>
+            {cards?.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div className="flex gap-3 pt-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        >
+          Annulla
+        </button>
+        <button
+          type="submit"
+          disabled={saving || !description.trim() || !amount}
+          className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {saving ? 'Salvataggio...' : expense ? 'Aggiorna' : 'Aggiungi'}
+        </button>
+      </div>
+    </form>
+  )
+}
