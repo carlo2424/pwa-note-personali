@@ -23,6 +23,7 @@ import {
 } from '../utils/overdue'
 import { AreaSidebar } from './AreaSidebar'
 import { EventExpandableRow } from './EventExpandableRow'
+import { ExpenseExpandableRow } from './ExpenseExpandableRow'
 import { MonthExpenseSummary } from './MonthExpenseSummary'
 import { NoteExpandableRow } from './NoteExpandableRow'
 
@@ -44,28 +45,65 @@ function SectionHeader({
   title,
   count,
   onSeeAll,
+  alwaysShow = false,
+  onAdd,
 }: {
   title: string
   count: number
   onSeeAll?: () => void
+  alwaysShow?: boolean
+  onAdd?: () => void
 }) {
-  if (count === 0) return null
+  if (!alwaysShow && count === 0) return null
   return (
-    <div className="mb-1 flex items-center justify-between">
+    <div className="mb-1 flex items-center justify-between gap-2">
       <h3 className="text-[10px] font-semibold text-slate-600">
         {sentenceCase(title)}
-        <span className="ml-1 font-normal text-slate-400">
-          ({count})
-        </span>
+        <span className="ml-1 font-normal text-slate-400">({count})</span>
       </h3>
-      {onSeeAll && count > 0 && (
+      <div className="flex shrink-0 items-center gap-1">
+        {onAdd && (
+          <button
+            type="button"
+            onClick={onAdd}
+            className="flex h-5 w-5 items-center justify-center rounded-md bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
+            aria-label={`Aggiungi ${title.toLowerCase()}`}
+          >
+            <Plus className="h-3 w-3" strokeWidth={2.5} />
+          </button>
+        )}
+        {onSeeAll && count > 0 && (
+          <button
+            type="button"
+            onClick={onSeeAll}
+            className="flex items-center gap-0.5 text-[9px] font-medium text-indigo-600"
+          >
+            Vedi tutti
+            <ChevronRight className="h-2.5 w-2.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function EmptySectionHint({
+  label,
+  onAdd,
+}: {
+  label: string
+  onAdd?: () => void
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-3 text-center">
+      <p className="text-[10px] text-slate-400">Nessun elemento</p>
+      {onAdd && (
         <button
           type="button"
-          onClick={onSeeAll}
-          className="flex items-center gap-0.5 text-[9px] font-medium text-indigo-600"
+          onClick={onAdd}
+          className="mt-1.5 text-[10px] font-medium text-indigo-600 hover:text-indigo-800"
         >
-          Vedi tutti
-          <ChevronRight className="h-2.5 w-2.5" />
+          + Aggiungi {label}
         </button>
       )}
     </div>
@@ -93,7 +131,10 @@ export function HomeView({
   onGoToEvents: () => void
   onGoToExpenses: () => void
   onGoToNotes: () => void
-  onAddInArea: (areaName: string) => void
+  onAddInArea: (
+    areaName: string,
+    kind?: 'note' | 'event' | 'expense',
+  ) => void
 }) {
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null)
   const { label: monthLabel } = currentMonthBounds()
@@ -204,6 +245,42 @@ export function HomeView({
     [expenses, selectedAreaId],
   )
 
+  const areaEvents = useMemo(
+    () =>
+      filterEventImpegni(events ?? []).filter(
+        (e) =>
+          matchesArea(e, selectedAreaId) && !overdueEventIds.has(e.id!),
+      ),
+    [events, selectedAreaId, overdueEventIds],
+  )
+
+  const areaNoteImpegni = useMemo(
+    () =>
+      filterNoteImpegni(notes ?? []).filter(
+        (n) =>
+          matchesArea(n, selectedAreaId) && !overdueNoteIds.has(n.id!),
+      ),
+    [notes, selectedAreaId, overdueNoteIds],
+  )
+
+  const areaPlainNotes = useMemo(
+    () =>
+      filterPlainNotes(notes ?? []).filter((n) =>
+        matchesArea(n, selectedAreaId),
+      ),
+    [notes, selectedAreaId],
+  )
+
+  const areaExpensesList = useMemo(
+    () =>
+      [...(expenses ?? [])]
+        .filter((e) => matchesArea(e, selectedAreaId))
+        .sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        ),
+    [expenses, selectedAreaId],
+  )
+
   const impegnoRows = useMemo((): ImpegnoRow[] => {
     const rows: ImpegnoRow[] = [
       ...monthEvents.map((item) => ({
@@ -219,6 +296,22 @@ export function HomeView({
     ]
     return rows.sort((a, b) => b.sortKey.localeCompare(a.sortKey))
   }, [monthEvents, monthNoteImpegni])
+
+  const areaImpegniRows = useMemo((): ImpegnoRow[] => {
+    const rows: ImpegnoRow[] = [
+      ...areaEvents.map((item) => ({
+        kind: 'event' as const,
+        item,
+        sortKey: item.startDate,
+      })),
+      ...areaNoteImpegni.map((item) => ({
+        kind: 'note' as const,
+        item,
+        sortKey: item.startDate!,
+      })),
+    ]
+    return rows.sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+  }, [areaEvents, areaNoteImpegni])
 
   const areaCounts = useMemo(() => {
     const counts = new Map<number, number>()
@@ -241,9 +334,13 @@ export function HomeView({
     (expenses ?? []).filter((e) => expenseInCurrentMonth(e)),
   )
 
-  const impegnoCount = impegnoRows.length
-  const noteCount = monthPlainNotes.length
-  const expenseCount = monthExpensesList.length
+  const displayImpegni = areaFilterActive ? areaImpegniRows : impegnoRows
+  const displayNotes = areaFilterActive ? areaPlainNotes : monthPlainNotes
+  const displayExpenses = areaFilterActive ? areaExpensesList : monthExpensesList
+
+  const impegnoCount = displayImpegni.length
+  const noteCount = displayNotes.length
+  const expenseCount = displayExpenses.length
 
   const monthExpensesTotal = monthExpensesList
     .filter((e) => e.amount > 0)
@@ -264,13 +361,18 @@ export function HomeView({
 
   const expenseDelta = monthExpensesTotal - prevMonthExpenses
 
-  const monthlySubs = monthEvents
+  const monthlySubs = (areaFilterActive ? areaEvents : monthEvents)
     .filter((e) => e.cost != null && e.cost > 0)
     .reduce((s, e) => s + e.cost!, 0)
 
-  const urgentRenewals = monthEvents
+  const renewalSource = areaFilterActive ? areaEvents : monthEvents
+  const urgentRenewals = renewalSource
     .filter((e) => e.renewalDate && !overdueEventIds.has(e.id!))
     .sort((a, b) => a.renewalDate!.localeCompare(b.renewalDate!))
+
+  const areaExpensesTotal = areaExpensesList
+    .filter((e) => e.amount > 0)
+    .reduce((s, e) => s + e.amount, 0)
 
   const selectedAreaName =
     selectedAreaId != null
@@ -289,16 +391,96 @@ export function HomeView({
     expenseCount === 0 &&
     !areaFilterActive
 
-  const areaIsEmpty =
-    !loading &&
-    areaFilterActive &&
-    impegnoCount === 0 &&
-    noteCount === 0 &&
-    expenseCount === 0
-
   if (loading) {
     return <p className="text-sm text-slate-400">Caricamento...</p>
   }
+
+  const addInArea = selectedAreaName
+    ? (kind: 'note' | 'event' | 'expense') => () => onAddInArea(selectedAreaName, kind)
+    : undefined
+
+  const impegnoList = (
+    <ul className="space-y-1">
+      {displayImpegni.map((row) =>
+        row.kind === 'event' ? (
+          <li key={`e-${row.item.id}`}>
+            <EventExpandableRow
+              compact
+              event={row.item}
+              areaName={
+                areaFilterActive
+                  ? undefined
+                  : areaNameById(areas ?? [], row.item.areaId)
+              }
+              containerClassName={
+                row.item.renewalDate
+                  ? URGENCY_CONTAINER[countdownUrgency(row.item.renewalDate)]
+                  : undefined
+              }
+              onEdit={() => onEditEvent(row.item)}
+            />
+          </li>
+        ) : (
+          <li key={`n-${row.item.id}`}>
+            <NoteExpandableRow
+              compact
+              note={row.item}
+              areaName={
+                areaFilterActive
+                  ? undefined
+                  : areaNameById(areas ?? [], row.item.areaId)
+              }
+              onEdit={() => onEditNote(row.item)}
+            />
+          </li>
+        ),
+      )}
+    </ul>
+  )
+
+  const noteList = (
+    <ul className="space-y-1">
+      {displayNotes.map((note) => (
+        <li key={note.id}>
+          <NoteExpandableRow
+            compact
+            note={note}
+            areaName={
+              areaFilterActive
+                ? undefined
+                : areaNameById(areas ?? [], note.areaId)
+            }
+            onEdit={() => onEditNote(note)}
+          />
+        </li>
+      ))}
+    </ul>
+  )
+
+  const expenseList = areaFilterActive ? (
+    <ul className="space-y-1">
+      {displayExpenses.map((expense) => (
+        <li key={expense.id}>
+          <ExpenseExpandableRow
+            compact
+            expense={expense}
+            onEdit={() => onEditExpense(expense)}
+            onOpenEvent={onOpenEventFromExpense}
+          />
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <MonthExpenseSummary
+      compact
+      monthLabel={monthLabel}
+      expenses={displayExpenses}
+      areas={areas ?? []}
+      onEdit={onEditExpense}
+      onOpenEvent={onOpenEventFromExpense}
+      hideAreaName={false}
+    />
+  )
 
   const mainContent = (
     <div className="space-y-3">
@@ -317,6 +499,9 @@ export function HomeView({
               <Plus className="h-4 w-4" strokeWidth={2.5} />
             </button>
           </div>
+          <p className="mt-0.5 text-[10px] text-indigo-600/80">
+            Riepilogo completo
+          </p>
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-medium text-indigo-700">
             <span>
               {noteCount} {noteCount === 1 ? 'nota' : 'note'}
@@ -329,20 +514,12 @@ export function HomeView({
             </span>
           </div>
           <div className="mt-2 space-y-0.5 border-t border-indigo-100/80 pt-2">
-            {monthExpensesTotal > 0 && (
+            {areaExpensesTotal > 0 && (
               <p className="text-xs text-slate-600">
-                Spese mese:{' '}
+                Spese totali:{' '}
                 <span className="font-bold text-rose-600">
-                  {formatAmount(monthExpensesTotal)}
+                  {formatAmount(areaExpensesTotal)}
                 </span>
-                {prevMonthExpenses > 0 && (
-                  <span
-                    className={`ml-1 text-[10px] font-medium ${expenseDelta > 0 ? 'text-rose-400' : expenseDelta < 0 ? 'text-emerald-500' : 'text-slate-400'}`}
-                  >
-                    ({expenseDelta > 0 ? '+' : ''}
-                    {formatAmount(expenseDelta)} vs scorso)
-                  </span>
-                )}
               </p>
             )}
             {monthlySubs > 0 && (
@@ -470,101 +647,85 @@ export function HomeView({
         </section>
       )}
 
-      {impegnoRows.length > 0 && (
-        <section>
-          <SectionHeader
-            title="Impegni"
-            count={impegnoCount}
-            onSeeAll={onGoToEvents}
-          />
-          <ul className="space-y-1">
-            {impegnoRows.map((row) =>
-              row.kind === 'event' ? (
-                <li key={`e-${row.item.id}`}>
-                  <EventExpandableRow
-                    compact
-                    event={row.item}
-                    areaName={
-                      areaFilterActive
-                        ? undefined
-                        : areaNameById(areas ?? [], row.item.areaId)
-                    }
-                    containerClassName={
-                      row.item.renewalDate
-                        ? URGENCY_CONTAINER[countdownUrgency(row.item.renewalDate)]
-                        : undefined
-                    }
-                    onEdit={() => onEditEvent(row.item)}
-                  />
-                </li>
-              ) : (
-                <li key={`n-${row.item.id}`}>
-                  <NoteExpandableRow
-                    compact
-                    note={row.item}
-                    areaName={
-                      areaFilterActive
-                        ? undefined
-                        : areaNameById(areas ?? [], row.item.areaId)
-                    }
-                    onEdit={() => onEditNote(row.item)}
-                  />
-                </li>
-              ),
+      {areaFilterActive ? (
+        <>
+          <section>
+            <SectionHeader
+              title="Note"
+              count={noteCount}
+              alwaysShow
+              onAdd={addInArea?.('note')}
+            />
+            {displayNotes.length > 0 ? (
+              noteList
+            ) : (
+              <EmptySectionHint label="nota" onAdd={addInArea?.('note')} />
             )}
-          </ul>
-        </section>
-      )}
+          </section>
 
-      {monthPlainNotes.length > 0 && (
-        <section>
-          <SectionHeader title="Note" count={noteCount} onSeeAll={onGoToNotes} />
-          <ul className="space-y-1">
-            {monthPlainNotes.map((note) => (
-              <li key={note.id}>
-                <NoteExpandableRow
-                  compact
-                  note={note}
-                  areaName={
-                    areaFilterActive
-                      ? undefined
-                      : areaNameById(areas ?? [], note.areaId)
-                  }
-                  onEdit={() => onEditNote(note)}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+          <section>
+            <SectionHeader
+              title="Impegni"
+              count={impegnoCount}
+              alwaysShow
+              onAdd={addInArea?.('event')}
+            />
+            {displayImpegni.length > 0 ? (
+              impegnoList
+            ) : (
+              <EmptySectionHint label="impegno" onAdd={addInArea?.('event')} />
+            )}
+          </section>
 
-      {monthExpensesList.length > 0 && (
-        <section>
-          <SectionHeader
-            title="Spese"
-            count={expenseCount}
-            onSeeAll={onGoToExpenses}
-          />
-          <MonthExpenseSummary
-            compact
-            monthLabel={monthLabel}
-            expenses={monthExpensesList}
-            areas={areas ?? []}
-            onEdit={onEditExpense}
-            onOpenEvent={onOpenEventFromExpense}
-            hideAreaName={areaFilterActive}
-          />
-        </section>
-      )}
+          <section>
+            <SectionHeader
+              title="Spese"
+              count={expenseCount}
+              alwaysShow
+              onAdd={addInArea?.('expense')}
+            />
+            {displayExpenses.length > 0 ? (
+              expenseList
+            ) : (
+              <EmptySectionHint label="spesa" onAdd={addInArea?.('expense')} />
+            )}
+          </section>
+        </>
+      ) : (
+        <>
+          {displayImpegni.length > 0 && (
+            <section>
+              <SectionHeader
+                title="Impegni"
+                count={impegnoCount}
+                onSeeAll={onGoToEvents}
+              />
+              {impegnoList}
+            </section>
+          )}
 
-      {areaIsEmpty && (
-        <p className="py-4 text-center text-sm text-slate-400">
-          Nessun elemento in{' '}
-          <span className="font-medium">{selectedAreaName}</span> questo mese.
-          <br />
-          Usa il pulsante{' '}
-          <span className="font-semibold text-indigo-600">+</span> in alto.
-        </p>
+          {displayNotes.length > 0 && (
+            <section>
+              <SectionHeader
+                title="Note"
+                count={noteCount}
+                onSeeAll={onGoToNotes}
+              />
+              {noteList}
+            </section>
+          )}
+
+          {displayExpenses.length > 0 && (
+            <section>
+              <SectionHeader
+                title="Spese"
+                count={expenseCount}
+                onSeeAll={onGoToExpenses}
+              />
+              {expenseList}
+            </section>
+          )}
+        </>
       )}
 
       {isEmpty && (

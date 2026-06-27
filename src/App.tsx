@@ -139,9 +139,15 @@ function App() {
     }
   }
 
-  function openAddChooserForArea(areaName: string) {
+  function openAddInArea(
+    areaName: string,
+    kind?: 'note' | 'event' | 'expense',
+  ) {
     setDefaultAreaName(areaName)
-    setShowAddChooser(true)
+    if (kind === 'note') openNewNote()
+    else if (kind === 'event') openNewEvent()
+    else if (kind === 'expense') openNewExpense()
+    else setShowAddChooser(true)
   }
 
   function addFromChooser(kind: 'note' | 'event' | 'expense') {
@@ -276,7 +282,7 @@ function App() {
               onGoToEvents={() => setActiveSection('events')}
               onGoToExpenses={() => setActiveSection('expenses')}
               onGoToNotes={() => setActiveSection('notes')}
-              onAddInArea={openAddChooserForArea}
+              onAddInArea={openAddInArea}
             />
           )}
           {activeSection === 'notes' && (
