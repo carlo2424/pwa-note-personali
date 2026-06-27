@@ -14,6 +14,8 @@ interface MonthExpenseSummaryProps {
   defaultExpanded?: boolean
   hideAreaName?: boolean
   compact?: boolean
+  /** Solo contenuto interno, senza macro-card (per CollapsibleSection) */
+  nested?: boolean
 }
 
 export function MonthExpenseSummary({
@@ -25,6 +27,7 @@ export function MonthExpenseSummary({
   defaultExpanded = false,
   hideAreaName = false,
   compact = false,
+  nested = false,
 }: MonthExpenseSummaryProps) {
   const totalSpese = expenses
     .filter((e) => e.amount > 0)
@@ -34,28 +37,8 @@ export function MonthExpenseSummary({
     .reduce((s, e) => s + Math.abs(e.amount), 0)
   const bilancio = totalEntrate - totalSpese
 
-  return (
-    <ExpandableCard
-      compact={compact}
-      defaultExpanded={defaultExpanded}
-      containerClassName="border-slate-100 bg-white"
-      icon={
-        <div
-          className={`flex shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600 ${compact ? 'h-7 w-7' : 'h-9 w-9 rounded-xl'}`}
-        >
-          <Wallet className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
-        </div>
-      }
-      title={monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
-      subtitle={`${expenses.length} ${expenses.length === 1 ? 'movimento' : 'movimenti'}`}
-      trailing={
-        <span
-          className={`shrink-0 font-bold text-rose-600 ${compact ? 'text-[10px]' : 'text-xs'}`}
-        >
-          {formatAmount(totalSpese)}
-        </span>
-      }
-    >
+  const body = (
+    <>
       {(totalEntrate > 0 || expenses.length > 0) && (
         <div
           className={`flex flex-wrap gap-x-3 text-slate-500 ${compact ? 'px-0.5 pb-1 text-[10px]' : 'pb-1.5 text-xs'}`}
@@ -96,6 +79,34 @@ export function MonthExpenseSummary({
           </li>
         ))}
       </ul>
+    </>
+  )
+
+  if (nested) return body
+
+  return (
+    <ExpandableCard
+      compact={compact}
+      defaultExpanded={defaultExpanded}
+      containerClassName="border-slate-100 bg-white"
+      icon={
+        <div
+          className={`flex shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600 ${compact ? 'h-7 w-7' : 'h-9 w-9 rounded-xl'}`}
+        >
+          <Wallet className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+        </div>
+      }
+      title={monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
+      subtitle={`${expenses.length} ${expenses.length === 1 ? 'movimento' : 'movimenti'}`}
+      trailing={
+        <span
+          className={`shrink-0 font-bold text-rose-600 ${compact ? 'text-[10px]' : 'text-xs'}`}
+        >
+          {formatAmount(totalSpese)}
+        </span>
+      }
+    >
+      {body}
     </ExpandableCard>
   )
 }

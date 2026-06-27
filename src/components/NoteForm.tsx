@@ -3,6 +3,7 @@ import { db, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { resolveAreaId, areaNameById } from '../utils/areas'
 import { sentenceCase } from '../utils/format'
+import { clampEndDateToStart } from '../utils/recurring'
 import { syncChecklistForNote } from '../utils/noteTasks'
 import { AreaInput } from './AreaInput'
 import { CameraCapture } from './CameraCapture'
@@ -33,6 +34,7 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
   )
   const [startDate, setStartDate] = useState(note?.startDate ?? '')
   const [endDate, setEndDate] = useState(note?.endDate ?? '')
+  const [endManual, setEndManual] = useState(!!note?.endDate)
   const [color, setColor] = useState(note?.color ?? 'indigo')
   const [photoBlob, setPhotoBlob] = useState<Blob | undefined>(note?.photoBlob)
   const [areaName, setAreaName] = useState('')
@@ -47,6 +49,26 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
       setAreaName(defaultAreaName)
     }
   }, [note?.id, note?.areaId, areas, defaultAreaName])
+
+  function handleStartDateChange(date: string) {
+    setStartDate(date)
+    if (!date) {
+      if (!endManual) setEndDate('')
+      return
+    }
+    if (!endDate && !endManual) {
+      setEndDate(date)
+      return
+    }
+    if (!endManual) {
+      setEndDate(clampEndDateToStart(date, endDate))
+    }
+  }
+
+  function handleEndDateChange(date: string) {
+    setEndManual(true)
+    setEndDate(startDate ? clampEndDateToStart(startDate, date) : date)
+  }
 
   function appendContent(text: string) {
     setContent((prev) =>
@@ -116,7 +138,7 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
           <input
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => handleStartDateChange(e.target.value)}
             className={inputClass}
           />
         </div>
@@ -125,8 +147,9 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
           <input
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(e) => handleEndDateChange(e.target.value)}
             className={inputClass}
+            min={startDate || undefined}
           />
         </div>
       </div>

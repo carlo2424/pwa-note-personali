@@ -14,7 +14,7 @@ import { VoiceRecorder } from './VoiceRecorder'
 import { syncExpensesForEvent } from '../utils/eventExpenses'
 import { syncTasksForEvent, type TodoInput } from '../utils/eventTasks'
 import { resolveAreaId, areaNameById } from '../utils/areas'
-import { RECURRENCE_OPTIONS } from '../utils/recurring'
+import { RECURRENCE_OPTIONS, deriveImpegnoPeriodFields, computeDurationFromRange, computeEndDateFromDuration, clampEndDateToStart } from '../utils/recurring'
 import { AreaInput } from './AreaInput'
 
 interface EventFormProps {
@@ -43,6 +43,9 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
     event?.durationDays ? String(event.durationDays) : '',
   )
   const [renewalDate, setRenewalDate] = useState(event?.renewalDate ?? '')
+  const [renewalManual, setRenewalManual] = useState(!!event?.renewalDate)
+  const [endManual, setEndManual] = useState(!!event?.endDate)
+  const [durationManual, setDurationManual] = useState(!!event?.durationDays)
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<
     RecurrenceFrequency | ''
   >(event?.recurrenceFrequency ?? '')
@@ -93,6 +96,85 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
         ),
       )
   }, [event?.id])
+
+  useEffect(() => {
+    const start = event?.startDate ?? today
+    const freq = event?.recurrenceFrequency
+    if (!freq || !start) return
+
+    if (!event?.renewalDate) {
+      const patch = deriveImpegnoPeriodFields(start, freq, durationDays, {
+        renewal: false,
+        end: !!event?.endDate,
+        duration: !!event?.durationDays,
+      })
+      if (patch.renewalDate) setRenewalDate(patch.renewalDate)
+      if (patch.endDate && !event?.endDate) setEndDate(patch.endDate)
+      if (patch.durationDays && !event?.durationDays) {
+        setDurationDays(patch.durationDays)
+      }
+    }
+  }, [event?.id, event?.startDate, event?.recurrenceFrequency, event?.renewalDate, event?.endDate, event?.durationDays, today, durationDays])
+
+  function periodManual() {
+    return {
+      renewal: renewalManual,
+      end: endManual,
+      duration: durationManual,
+    }
+  }
+
+  function applyDerivedPeriod(
+    start: string,
+    freq: RecurrenceFrequency | '',
+    duration: string,
+    manual = periodManual(),
+  ) {
+    const patch = deriveImpegnoPeriodFields(start, freq, duration, manual)
+    if (patch.renewalDate !== undefined) setRenewalDate(patch.renewalDate)
+    if (patch.endDate !== undefined) setEndDate(patch.endDate)
+    if (patch.durationDays !== undefined) setDurationDays(patch.durationDays)
+    if (!freq && !manual.renewal) setRenewalDate('')
+  }
+
+  function handleRecurrenceChange(freq: RecurrenceFrequency | '') {
+    setRecurrenceFrequency(freq)
+    applyDerivedPeriod(startDate, freq, durationDays)
+  }
+
+  function handleStartDateChange(date: string) {
+    setStartDate(date)
+    if (endDate && !endManual) {
+      setEndDate(clampEndDateToStart(date, endDate))
+    }
+    applyDerivedPeriod(date, recurrenceFrequency, durationDays)
+  }
+
+  function handleEndDateChange(date: string) {
+    setEndManual(true)
+    const clamped = startDate ? clampEndDateToStart(startDate, date) : date
+    setEndDate(clamped)
+    if (!durationManual && startDate && clamped) {
+      const days = computeDurationFromRange(startDate, clamped)
+      if (days != null) setDurationDays(String(days))
+    }
+  }
+
+  function handleDurationChange(value: string) {
+    setDurationManual(true)
+    setDurationDays(value)
+    if (!endManual && startDate && value) {
+      const parsed = parseInt(value, 10)
+      if (!isNaN(parsed) && parsed > 0) {
+        setEndDate(computeEndDateFromDuration(startDate, parsed))
+      }
+    }
+  }
+
+  function handleRenewalDateChange(date: string) {
+    setRenewalDate(date)
+    setRenewalManual(true)
+  }
 
   function toggleLabel(label: string) {
     setLabels((prev) =>
@@ -378,7 +460,7 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
           <select
             value={recurrenceFrequency}
             onChange={(e) =>
-              setRecurrenceFrequency(e.target.value as RecurrenceFrequency | '')
+              handleRecurrenceChange(e.target.value as RecurrenceFrequency | '')
             }
             className={inputClass}
           >
@@ -393,13 +475,13 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-xs text-slate-600">Data inizio</label>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} required />
+            <input type="date" value={startDate} onChange={(e) => handleStartDateChange(e.target.value)} className={inputClass} required />
           </div>
           <div>
             <label className="mb-1 block text-xs text-slate-600">
               Data fine *
             </label>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} min={startDate || undefined} />
+            <input type="date" value={endDate} onChange={(e) => handleEndDateChange(e.target.value)} className={inputClass} min={startDate || undefined} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -409,14 +491,14 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
               type="number"
               min="1"
               value={durationDays}
-              onChange={(e) => setDurationDays(e.target.value)}
+              onChange={(e) => handleDurationChange(e.target.value)}
               placeholder="Opzionale"
               className={inputClass}
             />
           </div>
           <div>
             <label className="mb-1 block text-xs text-slate-600">Prossimo addebito</label>
-            <input type="date" value={renewalDate} onChange={(e) => setRenewalDate(e.target.value)} className={inputClass} />
+            <input type="date" value={renewalDate} onChange={(e) => handleRenewalDateChange(e.target.value)} className={inputClass} />
           </div>
         </div>
         {renewalDate && (

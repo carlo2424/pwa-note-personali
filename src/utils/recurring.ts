@@ -1,6 +1,17 @@
 import type { Event, RecurrenceFrequency } from '../db'
 import { isEventImpegno } from './impegno'
 
+export {
+  addRecurrence,
+  computeNextRenewalDate,
+  computeEndDateFromDuration,
+  computeDurationFromRange,
+  computeEndDateFromFrequency,
+  deriveImpegnoPeriodFields,
+  clampEndDateToStart,
+} from './impegnoDates'
+export type { ImpegnoPeriodManual, ImpegnoPeriodPatch } from './impegnoDates'
+
 export const RECURRENCE_OPTIONS: {
   value: RecurrenceFrequency
   label: string

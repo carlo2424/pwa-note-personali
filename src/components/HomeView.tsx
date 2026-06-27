@@ -1,4 +1,11 @@
-import { ChevronRight, Plus } from 'lucide-react'
+import {
+  AlertTriangle,
+  CalendarDays,
+  Plus,
+  RefreshCw,
+  StickyNote,
+  Wallet,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { db, type Event, type Expense, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
@@ -22,6 +29,7 @@ import {
   tasksForNote,
 } from '../utils/overdue'
 import { AreaSidebar } from './AreaSidebar'
+import { CollapsibleSection, sectionIcon } from './CollapsibleSection'
 import { EventExpandableRow } from './EventExpandableRow'
 import { ExpenseExpandableRow } from './ExpenseExpandableRow'
 import { MonthExpenseSummary } from './MonthExpenseSummary'
@@ -34,6 +42,15 @@ const URGENCY_CONTAINER = {
   ok: 'border-slate-100 bg-white',
 }
 
+/** Macro-sezioni in vista area: sfondo pastello + contorno più leggibile */
+const AREA_SECTION_STYLE = {
+  note: 'border-amber-200/90 bg-amber-50/90 ring-1 ring-amber-100 shadow-sm',
+  impegno: 'border-indigo-200/90 bg-indigo-50/80 ring-1 ring-indigo-100 shadow-sm',
+  spesa: 'border-rose-200/90 bg-rose-50/80 ring-1 ring-rose-100 shadow-sm',
+  rinnovi: 'border-emerald-200/90 bg-emerald-50/80 ring-1 ring-emerald-100 shadow-sm',
+  ritardo: 'border-rose-300/80 bg-rose-50/90 ring-1 ring-rose-100 shadow-sm',
+} as const
+
 function prevMonthRange(): { start: number; end: number } {
   const now = new Date()
   const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
@@ -41,50 +58,26 @@ function prevMonthRange(): { start: number; end: number } {
   return { start, end }
 }
 
-function SectionHeader({
-  title,
-  count,
-  onSeeAll,
-  alwaysShow = false,
-  onAdd,
-}: {
-  title: string
-  count: number
-  onSeeAll?: () => void
-  alwaysShow?: boolean
-  onAdd?: () => void
-}) {
-  if (!alwaysShow && count === 0) return null
-  return (
-    <div className="mb-1 flex items-center justify-between gap-2">
-      <h3 className="text-[10px] font-semibold text-slate-600">
-        {sentenceCase(title)}
-        <span className="ml-1 font-normal text-slate-400">({count})</span>
-      </h3>
-      <div className="flex shrink-0 items-center gap-1">
-        {onAdd && (
-          <button
-            type="button"
-            onClick={onAdd}
-            className="flex h-5 w-5 items-center justify-center rounded-md bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
-            aria-label={`Aggiungi ${title.toLowerCase()}`}
-          >
-            <Plus className="h-3 w-3" strokeWidth={2.5} />
-          </button>
-        )}
-        {onSeeAll && count > 0 && (
-          <button
-            type="button"
-            onClick={onSeeAll}
-            className="flex items-center gap-0.5 text-[9px] font-medium text-indigo-600"
-          >
-            Vedi tutti
-            <ChevronRight className="h-2.5 w-2.5" />
-          </button>
-        )}
-      </div>
-    </div>
+function sumEventCosts(events: Event[]): number {
+  return events.reduce(
+    (s, e) => s + (e.cost != null && e.cost > 0 ? e.cost : 0),
+    0,
   )
+}
+
+function sumImpegnoCosts(rows: ImpegnoRow[]): number {
+  return rows.reduce((s, row) => {
+    if (row.kind === 'event' && row.item.cost != null && row.item.cost > 0) {
+      return s + row.item.cost
+    }
+    return s
+  }, 0)
+}
+
+function sumPositiveExpenses(expenses: Expense[]): number {
+  return expenses
+    .filter((e) => e.amount > 0)
+    .reduce((s, e) => s + e.amount, 0)
 }
 
 function EmptySectionHint({
@@ -472,6 +465,7 @@ export function HomeView({
     </ul>
   ) : (
     <MonthExpenseSummary
+      nested
       compact
       monthLabel={monthLabel}
       expenses={displayExpenses}
@@ -480,6 +474,24 @@ export function HomeView({
       onOpenEvent={onOpenEventFromExpense}
       hideAreaName={false}
     />
+  )
+
+  const renewalsTotal = sumEventCosts(urgentRenewals)
+  const overdueTotal = sumImpegnoCosts(overdueRows)
+  const impegnoTotal = sumImpegnoCosts(displayImpegni)
+  const speseTotal = sumPositiveExpenses(displayExpenses)
+
+  const noteSectionIcon = sectionIcon(
+    'bg-amber-100 text-amber-700',
+    <StickyNote className="h-3.5 w-3.5" />,
+  )
+  const impegnoSectionIcon = sectionIcon(
+    'bg-indigo-100 text-indigo-700',
+    <CalendarDays className="h-3.5 w-3.5" />,
+  )
+  const speseSectionIcon = sectionIcon(
+    'bg-rose-100 text-rose-600',
+    <Wallet className="h-3.5 w-3.5" />,
   )
 
   const mainContent = (
@@ -579,12 +591,21 @@ export function HomeView({
       )}
 
       {overdueRows.length > 0 && (
-        <section>
-          <SectionHeader
-            title="In ritardo"
-            count={overdueRows.length}
-            onSeeAll={onGoToEvents}
-          />
+        <CollapsibleSection
+          title="In ritardo"
+          count={overdueRows.length}
+          icon={sectionIcon(
+            'bg-rose-100 text-rose-700',
+            <AlertTriangle className="h-3.5 w-3.5" />,
+          )}
+          containerClassName={
+            areaFilterActive
+              ? AREA_SECTION_STYLE.ritardo
+              : 'border-rose-200 bg-rose-50/40'
+          }
+          totalAmount={overdueTotal > 0 ? overdueTotal : undefined}
+          onSeeAll={onGoToEvents}
+        >
           <ul className="space-y-1">
             {overdueRows.map((row) =>
               row.kind === 'event' ? (
@@ -617,12 +638,25 @@ export function HomeView({
               ),
             )}
           </ul>
-        </section>
+        </CollapsibleSection>
       )}
 
       {urgentRenewals.length > 0 && (
-        <section>
-          <SectionHeader title="Rinnovi in arrivo" count={urgentRenewals.length} />
+        <CollapsibleSection
+          title="Rinnovi in arrivo"
+          count={urgentRenewals.length}
+          icon={sectionIcon(
+            'bg-emerald-100 text-emerald-700',
+            <RefreshCw className="h-3.5 w-3.5" />,
+          )}
+          containerClassName={
+            areaFilterActive
+              ? AREA_SECTION_STYLE.rinnovi
+              : 'border-slate-100 bg-white'
+          }
+          totalAmount={renewalsTotal > 0 ? renewalsTotal : undefined}
+          totalSuffix="/mese"
+        >
           <ul className="space-y-1">
             {urgentRenewals.map((event) => (
               <li key={event.id}>
@@ -644,86 +678,91 @@ export function HomeView({
               </li>
             ))}
           </ul>
-        </section>
+        </CollapsibleSection>
       )}
 
       {areaFilterActive ? (
-        <>
-          <section>
-            <SectionHeader
-              title="Note"
-              count={noteCount}
-              alwaysShow
-              onAdd={addInArea?.('note')}
-            />
-            {displayNotes.length > 0 ? (
-              noteList
-            ) : (
+        <div className="space-y-2.5">
+          <CollapsibleSection
+            title="Note"
+            count={noteCount}
+            alwaysShow
+            icon={noteSectionIcon}
+            containerClassName={AREA_SECTION_STYLE.note}
+            onAdd={addInArea?.('note')}
+            emptyContent={
               <EmptySectionHint label="nota" onAdd={addInArea?.('note')} />
-            )}
-          </section>
+            }
+          >
+            {noteList}
+          </CollapsibleSection>
 
-          <section>
-            <SectionHeader
-              title="Impegni"
-              count={impegnoCount}
-              alwaysShow
-              onAdd={addInArea?.('event')}
-            />
-            {displayImpegni.length > 0 ? (
-              impegnoList
-            ) : (
+          <CollapsibleSection
+            title="Impegni"
+            count={impegnoCount}
+            alwaysShow
+            icon={impegnoSectionIcon}
+            containerClassName={AREA_SECTION_STYLE.impegno}
+            totalAmount={impegnoTotal > 0 ? impegnoTotal : undefined}
+            onAdd={addInArea?.('event')}
+            emptyContent={
               <EmptySectionHint label="impegno" onAdd={addInArea?.('event')} />
-            )}
-          </section>
+            }
+          >
+            {impegnoList}
+          </CollapsibleSection>
 
-          <section>
-            <SectionHeader
-              title="Spese"
-              count={expenseCount}
-              alwaysShow
-              onAdd={addInArea?.('expense')}
-            />
-            {displayExpenses.length > 0 ? (
-              expenseList
-            ) : (
+          <CollapsibleSection
+            title="Spese"
+            count={expenseCount}
+            alwaysShow
+            icon={speseSectionIcon}
+            containerClassName={AREA_SECTION_STYLE.spesa}
+            totalAmount={speseTotal > 0 ? speseTotal : undefined}
+            onAdd={addInArea?.('expense')}
+            emptyContent={
               <EmptySectionHint label="spesa" onAdd={addInArea?.('expense')} />
-            )}
-          </section>
-        </>
+            }
+          >
+            {expenseList}
+          </CollapsibleSection>
+        </div>
       ) : (
         <>
           {displayImpegni.length > 0 && (
-            <section>
-              <SectionHeader
-                title="Impegni"
-                count={impegnoCount}
-                onSeeAll={onGoToEvents}
-              />
+            <CollapsibleSection
+              title="Impegni"
+              count={impegnoCount}
+              icon={impegnoSectionIcon}
+              totalAmount={impegnoTotal > 0 ? impegnoTotal : undefined}
+              onSeeAll={onGoToEvents}
+            >
               {impegnoList}
-            </section>
+            </CollapsibleSection>
           )}
 
           {displayNotes.length > 0 && (
-            <section>
-              <SectionHeader
-                title="Note"
-                count={noteCount}
-                onSeeAll={onGoToNotes}
-              />
+            <CollapsibleSection
+              title="Note"
+              count={noteCount}
+              icon={noteSectionIcon}
+              onSeeAll={onGoToNotes}
+            >
               {noteList}
-            </section>
+            </CollapsibleSection>
           )}
 
           {displayExpenses.length > 0 && (
-            <section>
-              <SectionHeader
-                title="Spese"
-                count={expenseCount}
-                onSeeAll={onGoToExpenses}
-              />
+            <CollapsibleSection
+              title="Spese"
+              count={expenseCount}
+              icon={speseSectionIcon}
+              subtitle={`${sentenceCase(monthLabel)} · ${expenseCount} ${expenseCount === 1 ? 'movimento' : 'movimenti'}`}
+              totalAmount={speseTotal > 0 ? speseTotal : undefined}
+              onSeeAll={onGoToExpenses}
+            >
               {expenseList}
-            </section>
+            </CollapsibleSection>
           )}
         </>
       )}
