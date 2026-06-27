@@ -1,7 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Check, ChevronDown, Plus, X } from 'lucide-react'
 import { type Area } from '../db'
-import { resolveAreaId } from '../utils/areas'
+import { useChipPress } from '../hooks/useChipPress'
+import {
+  countItemsLinkedToArea,
+  deleteArea,
+  resolveAreaId,
+  updateArea,
+} from '../utils/areas'
 import {
   buildAreaChipLayout,
   groupNamesFromAreas,
@@ -11,7 +17,10 @@ import {
   type AreaSelection,
   isGroupSelected,
 } from '../utils/areaSelection'
+import { deleteAreaConfirmCopy } from '../utils/confirmMessages'
 import { sentenceCase } from '../utils/format'
+import { AreaActionSheet } from './AreaActionSheet'
+import { ConfirmDialog } from './ConfirmDialog'
 
 interface AreaChipsProps {
   areas: Area[]
@@ -20,6 +29,48 @@ interface AreaChipsProps {
   counts: Map<number, number>
   totalCount: number
   headerTrailing?: ReactNode
+  onAreaDeleted?: (areaId: number) => void
+}
+
+function AreaChipButton({
+  area,
+  count,
+  active,
+  inGroup,
+  compact,
+  onSelect,
+  onManage,
+  chipBase,
+  countBadge,
+}: {
+  area: Area
+  count: number
+  active: boolean
+  inGroup?: boolean
+  compact?: boolean
+  onSelect: () => void
+  onManage: () => void
+  chipBase: string
+  countBadge: (count: number, active: boolean) => ReactNode
+}) {
+  const press = useChipPress(onSelect, onManage)
+
+  return (
+    <button
+      type="button"
+      {...press}
+      className={`${chipBase} ${compact ? 'text-xs' : ''} ${
+        active
+          ? 'bg-indigo-600 text-white shadow-sm'
+          : inGroup
+            ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100'
+            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+      }`}
+    >
+      <span>{area.name}</span>
+      {countBadge(count, active)}
+    </button>
+  )
 }
 
 export function AreaChips({
@@ -29,12 +80,22 @@ export function AreaChips({
   counts,
   totalCount,
   headerTrailing,
+  onAreaDeleted,
 }: AreaChipsProps) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [groupName, setGroupName] = useState('')
   const [saving, setSaving] = useState(false)
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null)
+  const [menuArea, setMenuArea] = useState<Area | null>(null)
+  const [editingArea, setEditingArea] = useState<Area | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editGroupName, setEditGroupName] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<{
+    area: Area
+    linkedCount: number
+  } | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const chipBase =
     'flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition active:scale-[0.98]'
@@ -92,6 +153,59 @@ export function AreaChips({
     onSelect({ kind: 'group', groupName: normalized })
   }
 
+  function openManage(area: Area) {
+    setMenuArea(area)
+  }
+
+  function startEdit(area: Area) {
+    setEditingArea(area)
+    setEditName(area.name)
+    setEditGroupName(area.groupName ?? '')
+  }
+
+  async function submitEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingArea?.id || !editName.trim() || saving) return
+    setSaving(true)
+    try {
+      await updateArea(editingArea.id, {
+        name: editName,
+        groupName: editGroupName,
+      })
+      setEditingArea(null)
+      if (editGroupName.trim()) {
+        setExpandedGroup(normalizeGroupName(editGroupName))
+      }
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : 'Impossibile aggiornare l\'area.',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function prepareDelete(area: Area) {
+    if (!area.id) return
+    const linkedCount = await countItemsLinkedToArea(area.id)
+    setDeleteTarget({ area, linkedCount })
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget?.area.id || deleting) return
+    setDeleting(true)
+    try {
+      await deleteArea(deleteTarget.area.id)
+      onAreaDeleted?.(deleteTarget.area.id)
+      setDeleteTarget(null)
+      setMenuArea(null)
+    } catch {
+      alert('Impossibile eliminare l\'area. Riprova.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   function countBadge(count: number, active: boolean) {
     if (count <= 0) return null
     return (
@@ -115,7 +229,7 @@ export function AreaChips({
         </p>
         <div className="flex shrink-0 items-center gap-1">
           {headerTrailing}
-          {!adding && (
+          {!adding && !editingArea && (
             <button
               type="button"
               onClick={() => setAdding(true)}
@@ -127,6 +241,10 @@ export function AreaChips({
           )}
         </div>
       </div>
+
+      <p className="mb-1.5 text-[10px] text-slate-400">
+        Tieni premuto un chip per modificarlo o eliminarlo
+      </p>
 
       {adding && (
         <form
@@ -196,6 +314,73 @@ export function AreaChips({
         </form>
       )}
 
+      {editingArea && (
+        <form
+          className="mb-2 space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3"
+          onSubmit={(e) => void submitEdit(e)}
+        >
+          <p className="text-xs font-semibold text-indigo-800">
+            Modifica area
+          </p>
+          <input
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onBlur={(e) => setEditName(sentenceCase(e.target.value))}
+            placeholder="Nome area"
+            autoFocus
+            disabled={saving}
+            className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
+          <input
+            type="text"
+            value={editGroupName}
+            onChange={(e) => setEditGroupName(e.target.value)}
+            onBlur={(e) => setEditGroupName(sentenceCase(e.target.value))}
+            placeholder="Gruppo (lascia vuoto per nessun gruppo)"
+            disabled={saving}
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
+          {existingGroups.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {existingGroups.map((group) => (
+                <button
+                  key={group}
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setEditGroupName(group)}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                    normalizeGroupName(editGroupName) === group
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {group}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={!editName.trim() || saving}
+              className="flex flex-1 rounded-xl bg-indigo-600 py-2 text-sm font-medium text-white disabled:opacity-40"
+            >
+              {saving ? 'Salvataggio…' : 'Aggiorna'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingArea(null)}
+              disabled={saving}
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-white"
+              aria-label="Annulla modifica"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </form>
+      )}
+
       <div
         className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="tablist"
@@ -225,24 +410,19 @@ export function AreaChips({
           const active =
             selection.kind === 'area' && selection.areaId === area.id
           return (
-            <button
+            <AreaChipButton
               key={area.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => {
+              area={area}
+              count={count}
+              active={active}
+              chipBase={chipBase}
+              countBadge={countBadge}
+              onSelect={() => {
                 setExpandedGroup(null)
                 onSelect({ kind: 'area', areaId: area.id! })
               }}
-              className={`${chipBase} ${
-                active
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <span>{area.name}</span>
-              {countBadge(count, active)}
-            </button>
+              onManage={() => openManage(area)}
+            />
           )
         })}
 
@@ -287,26 +467,44 @@ export function AreaChips({
                 selection.kind === 'group' &&
                 isGroupSelected(selection, activeExpandedGroup)
               return (
-                <button
+                <AreaChipButton
                   key={area.id}
-                  type="button"
-                  onClick={() =>
+                  area={area}
+                  count={count}
+                  active={active}
+                  inGroup={inGroup}
+                  compact
+                  chipBase={chipBase}
+                  countBadge={countBadge}
+                  onSelect={() =>
                     onSelect({ kind: 'area', areaId: area.id! })
                   }
-                  className={`${chipBase} text-xs ${
-                    active
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : inGroup
-                        ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100'
-                        : 'bg-white text-slate-700 ring-1 ring-slate-200'
-                  }`}
-                >
-                  <span>{area.name}</span>
-                  {countBadge(count, active)}
-                </button>
+                  onManage={() => openManage(area)}
+                />
               )
             })}
         </div>
+      )}
+
+      {menuArea && (
+        <AreaActionSheet
+          areaName={menuArea.name}
+          onEdit={() => startEdit(menuArea)}
+          onDelete={() => void prepareDelete(menuArea)}
+          onClose={() => setMenuArea(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          {...deleteAreaConfirmCopy(
+            deleteTarget.area.name,
+            deleteTarget.linkedCount,
+          )}
+          variant="danger"
+          onConfirm={() => void confirmDelete()}
+          onClose={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   )

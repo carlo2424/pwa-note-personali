@@ -25,3 +25,16 @@ export function deletePermanentlyConfirmCopy(title: string) {
     confirmLabel: 'Elimina',
   }
 }
+
+export function deleteAreaConfirmCopy(name: string, linkedCount: number) {
+  const label = sentenceCase(name)
+  const linked =
+    linkedCount > 0
+      ? ` ${linkedCount} ${linkedCount === 1 ? 'elemento resterà' : 'elementi resteranno'} senza area.`
+      : ''
+  return {
+    title: `Eliminare l'area "${label}"?`,
+    message: `L'area verrà rimossa.${linked} Potrai riassegnare un'area modificando ogni voce.`,
+    confirmLabel: 'Elimina',
+  }
+}

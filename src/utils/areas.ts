@@ -43,6 +43,55 @@ export async function setAreaGroupName(
   })
 }
 
+export async function countItemsLinkedToArea(areaId: number): Promise<number> {
+  const [noteCount, eventCount, expenseCount] = await Promise.all([
+    db.notes.where('areaId').equals(areaId).count(),
+    db.events.where('areaId').equals(areaId).count(),
+    db.expenses.where('areaId').equals(areaId).count(),
+  ])
+  return noteCount + eventCount + expenseCount
+}
+
+export async function updateArea(
+  areaId: number,
+  fields: { name: string; groupName?: string },
+): Promise<void> {
+  const trimmed = fields.name.trim()
+  if (!trimmed) return
+
+  const normalized = sentenceCase(trimmed)
+  const existing = await db.areas.toArray()
+  const duplicate = existing.find(
+    (a) => a.id !== areaId && a.name.toLowerCase() === normalized.toLowerCase(),
+  )
+  if (duplicate) {
+    throw new Error('Esiste già un\'area con questo nome.')
+  }
+
+  const groupTrimmed = fields.groupName?.trim()
+  await db.areas.update(areaId, {
+    name: normalized,
+    groupName: groupTrimmed ? sentenceCase(groupTrimmed) : undefined,
+  })
+}
+
+/** Elimina l'area; le voci collegate restano senza area. */
+export async function deleteArea(areaId: number): Promise<void> {
+  await db.transaction(
+    'rw',
+    [db.notes, db.events, db.expenses, db.areas],
+    async () => {
+      await db.notes.where('areaId').equals(areaId).modify({ areaId: undefined })
+      await db.events.where('areaId').equals(areaId).modify({ areaId: undefined })
+      await db.expenses
+        .where('areaId')
+        .equals(areaId)
+        .modify({ areaId: undefined })
+      await db.areas.delete(areaId)
+    },
+  )
+}
+
 export function matchesArea<T extends { areaId?: number }>(
   item: T,
   selectedAreaId: number | null,

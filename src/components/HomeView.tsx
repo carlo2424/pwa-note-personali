@@ -894,6 +894,14 @@ export function HomeView({
         counts={areaCounts}
         totalCount={totalAreaItems}
         headerTrailing={<MiniMonthCalendar compact />}
+        onAreaDeleted={(areaId) => {
+          if (
+            areaSelection.kind === 'area' &&
+            areaSelection.areaId === areaId
+          ) {
+            setAreaSelection({ kind: 'all' })
+          }
+        }}
       />
       {mainContent}
     </div>
