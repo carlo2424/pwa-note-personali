@@ -86,6 +86,7 @@ export function EventExpandableRow({
         event={event}
         onEdit={onEdit}
         onArchived={onArchived}
+        areaName={areaName}
         compact={compact}
       />
     </ExpandableCard>

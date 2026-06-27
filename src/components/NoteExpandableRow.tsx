@@ -9,6 +9,7 @@ import { formatDate, formatDateRange, sentenceCase } from '../utils/format'
 import { isNoteImpegno } from '../utils/impegno'
 import { isNoteChecklistContent } from '../utils/noteTasks'
 import { archiveNote } from '../utils/noteArchive'
+import { shareNote } from '../utils/share'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ExpandableCard } from './ExpandableCard'
 import { ItemActions } from './ItemActions'
@@ -114,6 +115,7 @@ export function NoteExpandableRow({
       actions={
         <ItemActions
           onEdit={onEdit}
+          onShare={() => void shareNote(note, areaName)}
           onArchive={() => setShowArchiveConfirm(true)}
         />
       }

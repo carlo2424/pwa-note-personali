@@ -5,7 +5,9 @@ import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { archiveConfirmCopy } from '../utils/confirmMessages'
 import { archiveExpense } from '../utils/expenseArchive'
 import { formatAmount, formatDate, sentenceCase } from '../utils/format'
+import { shareExpense } from '../utils/share'
 import { ConfirmDialog } from './ConfirmDialog'
+import { ShareButton } from './ShareButton'
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   carta: 'Carta',
@@ -26,6 +28,7 @@ interface ExpenseDetailBodyProps {
   onEdit: () => void
   onOpenEvent?: (event: Event) => void
   onArchived?: () => void
+  areaName?: string
   compact?: boolean
 }
 
@@ -34,6 +37,7 @@ export function ExpenseDetailBody({
   onEdit,
   onOpenEvent,
   onArchived,
+  areaName,
   compact = false,
 }: ExpenseDetailBodyProps) {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
@@ -113,6 +117,11 @@ export function ExpenseDetailBody({
           Generata da un impegno. Modifica il costo dall&apos;impegno collegato.
         </p>
       )}
+
+      <ShareButton
+        compact={compact}
+        onClick={() => shareExpense(expense, areaName)}
+      />
 
       <div className={`flex gap-2 border-t border-slate-100 ${compact ? 'pt-2' : 'pt-3'}`}>
         <button

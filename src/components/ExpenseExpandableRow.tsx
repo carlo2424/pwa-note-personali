@@ -75,6 +75,7 @@ export function ExpenseExpandableRow({
         expense={expense}
         onEdit={onEdit}
         onOpenEvent={onOpenEvent}
+        areaName={areaName}
         compact={compact}
       />
     </ExpandableCard>

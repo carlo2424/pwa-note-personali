@@ -9,8 +9,10 @@ import { toggleTask } from '../utils/eventTasks'
 import { archiveEvent } from '../utils/eventArchive'
 import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
 import { recurrenceLabel, recurrenceShort } from '../utils/recurring'
+import { shareEvent } from '../utils/share'
 import { OVERDUE_ACCENT, taskAccentById } from '../constants/tasks'
 import { ConfirmDialog } from './ConfirmDialog'
+import { ShareButton } from './ShareButton'
 import { TaskListCard } from './TaskListCard'
 
 const URGENCY_STYLE = {
@@ -24,6 +26,7 @@ interface EventDetailBodyProps {
   event: Event
   onEdit: () => void
   onArchived?: () => void
+  areaName?: string
   compact?: boolean
 }
 
@@ -31,6 +34,7 @@ export function EventDetailBody({
   event,
   onEdit,
   onArchived,
+  areaName,
   compact = false,
 }: EventDetailBodyProps) {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
@@ -195,6 +199,11 @@ export function EventDetailBody({
           <audio src={audioUrl} controls className="w-full" />
         </div>
       )}
+
+      <ShareButton
+        compact={compact}
+        onClick={() => shareEvent(event, areaName)}
+      />
 
       <button
         type="button"
