@@ -880,12 +880,8 @@ export function HomeView({
         onSelect={setSelectedAreaId}
         counts={areaCounts}
         totalCount={totalAreaItems}
+        headerTrailing={<MiniMonthCalendar compact />}
       />
-      {!areaFilterActive && (
-        <div className="mb-3 flex justify-end">
-          <MiniMonthCalendar />
-        </div>
-      )}
       {mainContent}
     </div>
   )

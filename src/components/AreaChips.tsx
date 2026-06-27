@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Check, Plus, X } from 'lucide-react'
 import { type Area } from '../db'
 import { resolveAreaId } from '../utils/areas'
@@ -10,6 +10,7 @@ interface AreaChipsProps {
   onSelect: (areaId: number | null) => void
   counts: Map<number, number>
   totalCount: number
+  headerTrailing?: ReactNode
 }
 
 export function AreaChips({
@@ -18,6 +19,7 @@ export function AreaChips({
   onSelect,
   counts,
   totalCount,
+  headerTrailing,
 }: AreaChipsProps) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
@@ -49,21 +51,24 @@ export function AreaChips({
   }
 
   return (
-    <div className="mb-4">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className="mb-2">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Aree
         </p>
-        {!adding && (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-indigo-50 hover:text-indigo-600"
-            aria-label="Nuova area"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {headerTrailing}
+          {!adding && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-indigo-50 hover:text-indigo-600"
+              aria-label="Nuova area"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          )}
+        </div>
       </div>
 
       {adding && (

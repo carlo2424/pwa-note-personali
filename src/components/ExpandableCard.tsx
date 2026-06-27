@@ -63,7 +63,7 @@ export function ExpandableCard({
       className={`overflow-hidden border ${dense ? 'rounded-lg shadow-none' : comfortable ? 'rounded-xl shadow-sm' : compact ? 'rounded-lg shadow-none' : 'rounded-xl shadow-sm'} ${containerClassName}`}
     >
       <div
-        className={`flex items-center ${
+        className={`flex min-w-0 items-center ${
           dense
             ? 'gap-1 px-2 py-1.5'
             : comfortable
@@ -114,7 +114,6 @@ export function ExpandableCard({
             )}
           </div>
           {badge}
-          {trailing}
           {hasBody &&
             (expanded ? (
               <ChevronDown
@@ -130,7 +129,8 @@ export function ExpandableCard({
               />
             ))}
         </button>
-        {actions}
+        {trailing ? <div className="shrink-0">{trailing}</div> : null}
+        {actions ? <div className="flex shrink-0 items-center">{actions}</div> : null}
       </div>
 
       {expanded && hasBody && (

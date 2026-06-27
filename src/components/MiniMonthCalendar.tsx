@@ -27,7 +27,7 @@ function DayDots({ types }: { types: CalendarMarkerType[] }) {
 }
 
 /** Vista mensile read-only con pallini colorati per eventi, note, attività e spese */
-export function MiniMonthCalendar() {
+export function MiniMonthCalendar({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false)
   const [view, setView] = useState(() => {
     const now = new Date()
@@ -88,7 +88,9 @@ export function MiniMonthCalendar() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
+        className={`flex items-center justify-center rounded-full transition ${
+          compact ? 'h-8 w-8' : 'h-10 w-10'
+        } ${
           open
             ? 'bg-indigo-100 text-indigo-700'
             : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
@@ -96,7 +98,7 @@ export function MiniMonthCalendar() {
         aria-label="Calendario mensile"
         aria-expanded={open}
       >
-        <CalendarDays className="h-5 w-5" />
+        <CalendarDays className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
       </button>
 
       {open && (
