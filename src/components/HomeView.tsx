@@ -446,7 +446,6 @@ export function HomeView({
             areas={areas ?? []}
             onEdit={onEditExpense}
             onOpenEvent={onOpenEventFromExpense}
-            defaultExpanded
             hideAreaName={areaFilterActive}
           />
         </section>

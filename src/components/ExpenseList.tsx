@@ -64,7 +64,7 @@ export function ExpenseList({ onEdit, onOpenEvent }: ExpenseListProps) {
         </p>
       ) : (
         <ul className="space-y-2">
-          {monthGroups.map((group, index) => (
+          {monthGroups.map((group) => (
             <li key={group.key}>
               <MonthExpenseSummary
                 monthLabel={group.label}
@@ -72,7 +72,6 @@ export function ExpenseList({ onEdit, onOpenEvent }: ExpenseListProps) {
                 areas={areas ?? []}
                 onEdit={onEdit}
                 onOpenEvent={onOpenEvent}
-                defaultExpanded={index === 0}
               />
             </li>
           ))}
