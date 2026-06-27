@@ -25,6 +25,8 @@ import { Modal } from './components/Modal'
 import { NoteForm } from './components/NoteForm'
 import { NoteList } from './components/NoteList'
 import { SettingsPanel } from './components/SettingsPanel'
+import { NavBadge } from './components/NavBadge'
+import { useOverdueCounts } from './hooks/useOverdueCounts'
 import { resetDB, type Event, type Expense, type Note } from './db'
 
 type Section = 'home' | 'notes' | 'events' | 'expenses' | 'cards' | 'archive'
@@ -85,6 +87,12 @@ function App() {
 
   const current = sections[activeSection]
   const CurrentIcon = current.icon
+  const overdueCounts = useOverdueCounts()
+
+  function navBadgeCount(section: Section): number {
+    if (section === 'home' || section === 'events') return overdueCounts.impegni
+    return 0
+  }
 
   function clearDefaultArea() {
     setDefaultAreaName(undefined)
@@ -312,9 +320,12 @@ function App() {
                     }`}
                     aria-current={isActive ? 'page' : undefined}
                   >
-                    <Icon
-                      className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : ''}`}
-                    />
+                    <span className="relative">
+                      <Icon
+                        className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : ''}`}
+                      />
+                      <NavBadge count={navBadgeCount(key)} />
+                    </span>
                     {section.label}
                   </button>
                 </li>

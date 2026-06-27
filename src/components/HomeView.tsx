@@ -16,6 +16,11 @@ import {
   expenseInCurrentMonth,
   noteInCurrentMonth,
 } from '../utils/monthFilter'
+import {
+  isOverdueEvent,
+  isOverdueNoteImpegno,
+  tasksForNote,
+} from '../utils/overdue'
 import { AreaSidebar } from './AreaSidebar'
 import { EventExpandableRow } from './EventExpandableRow'
 import { MonthExpenseSummary } from './MonthExpenseSummary'
@@ -101,23 +106,82 @@ export function HomeView({
     () => db.notes.orderBy('updatedAt').reverse().toArray(),
   )
   const areas = useDexieLiveQuery(() => db.areas.orderBy('name').toArray())
+  const tasks = useDexieLiveQuery(() => db.tasks.toArray())
 
   const areaFilterActive = selectedAreaId !== null
+
+  const overdueRows = useMemo((): ImpegnoRow[] => {
+    const rows: ImpegnoRow[] = []
+    const taskList = tasks ?? []
+
+    for (const note of filterNoteImpegni(notes ?? [])) {
+      if (!matchesArea(note, selectedAreaId)) continue
+      const linked = tasksForNote(taskList, note.id)
+      if (isOverdueNoteImpegno(note, linked)) {
+        rows.push({
+          kind: 'note',
+          item: note,
+          sortKey: note.endDate!,
+        })
+      }
+    }
+
+    for (const event of filterEventImpegni(events ?? [])) {
+      if (!matchesArea(event, selectedAreaId)) continue
+      if (isOverdueEvent(event)) {
+        rows.push({
+          kind: 'event',
+          item: event,
+          sortKey: event.endDate ?? event.renewalDate ?? event.startDate,
+        })
+      }
+    }
+
+    return rows.sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+  }, [events, notes, tasks, selectedAreaId])
+
+  const overdueEventIds = useMemo(
+    () =>
+      new Set(
+        overdueRows
+          .filter((r) => r.kind === 'event')
+          .map((r) => r.item.id)
+          .filter((id): id is number => id != null),
+      ),
+    [overdueRows],
+  )
+
+  const overdueNoteIds = useMemo(
+    () =>
+      new Set(
+        overdueRows
+          .filter((r) => r.kind === 'note')
+          .map((r) => r.item.id)
+          .filter((id): id is number => id != null),
+      ),
+    [overdueRows],
+  )
 
   const monthEvents = useMemo(
     () =>
       filterEventImpegni(events ?? []).filter(
-        (e) => matchesArea(e, selectedAreaId) && eventInCurrentMonth(e),
+        (e) =>
+          matchesArea(e, selectedAreaId) &&
+          eventInCurrentMonth(e) &&
+          !overdueEventIds.has(e.id!),
       ),
-    [events, selectedAreaId],
+    [events, selectedAreaId, overdueEventIds],
   )
 
   const monthNoteImpegni = useMemo(
     () =>
       filterNoteImpegni(notes ?? []).filter(
-        (n) => matchesArea(n, selectedAreaId) && noteInCurrentMonth(n),
+        (n) =>
+          matchesArea(n, selectedAreaId) &&
+          noteInCurrentMonth(n) &&
+          !overdueNoteIds.has(n.id!),
       ),
-    [notes, selectedAreaId],
+    [notes, selectedAreaId, overdueNoteIds],
   )
 
   const monthPlainNotes = useMemo(
@@ -205,7 +269,7 @@ export function HomeView({
     .reduce((s, e) => s + e.cost!, 0)
 
   const urgentRenewals = monthEvents
-    .filter((e) => e.renewalDate)
+    .filter((e) => e.renewalDate && !overdueEventIds.has(e.id!))
     .sort((a, b) => a.renewalDate!.localeCompare(b.renewalDate!))
 
   const selectedAreaName =
@@ -335,6 +399,48 @@ export function HomeView({
             )}
           </button>
         </div>
+      )}
+
+      {overdueRows.length > 0 && (
+        <section>
+          <SectionHeader
+            title="In ritardo"
+            count={overdueRows.length}
+            onSeeAll={onGoToEvents}
+          />
+          <ul className="space-y-1">
+            {overdueRows.map((row) =>
+              row.kind === 'event' ? (
+                <li key={`od-e-${row.item.id}`}>
+                  <EventExpandableRow
+                    compact
+                    event={row.item}
+                    areaName={
+                      areaFilterActive
+                        ? undefined
+                        : areaNameById(areas ?? [], row.item.areaId)
+                    }
+                    containerClassName={URGENCY_CONTAINER.expired}
+                    onEdit={() => onEditEvent(row.item)}
+                  />
+                </li>
+              ) : (
+                <li key={`od-n-${row.item.id}`}>
+                  <NoteExpandableRow
+                    compact
+                    note={row.item}
+                    areaName={
+                      areaFilterActive
+                        ? undefined
+                        : areaNameById(areas ?? [], row.item.areaId)
+                    }
+                    onEdit={() => onEditNote(row.item)}
+                  />
+                </li>
+              ),
+            )}
+          </ul>
+        </section>
       )}
 
       {urgentRenewals.length > 0 && (
