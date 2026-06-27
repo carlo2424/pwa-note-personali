@@ -8,6 +8,7 @@ import {
   setRenewalNotifEnabled,
 } from '../utils/renewalNotifications'
 import { FileImportPanel } from './FileImportPanel'
+import { AreaGroupsSettings } from './AreaGroupsSettings'
 
 export function SettingsPanel() {
   const [notifEnabled, setNotifEnabled] = useState(isRenewalNotifEnabled())
@@ -41,6 +42,7 @@ export function SettingsPanel() {
   return (
     <div className="space-y-4">
       <FileImportPanel />
+      <AreaGroupsSettings />
 
       <section className="rounded-xl border border-slate-100 bg-slate-50 p-4">
         <div className="mb-3 flex items-start gap-3">

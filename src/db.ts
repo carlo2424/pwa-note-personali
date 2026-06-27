@@ -91,6 +91,8 @@ export interface PaymentCard {
 export interface Area {
   id?: number
   name: string
+  /** Raggruppa chip in Home (es. Lorenzo + Maria → gruppo Famiglia) */
+  groupName?: string
   createdAt: number
 }
 
@@ -277,6 +279,18 @@ class PersonalNotesDB extends Dexie {
           linked.length >= 2 || lineCount >= 2 ? 'checklist' : 'text'
         await tx.table('notes').update(note.id, { kind })
       }
+    })
+
+    // v14: gruppi aree (es. Famiglia → Lorenzo, Maria…)
+    this.version(14).stores({
+      notes: '++id, title, createdAt, updatedAt, startDate, endDate, areaId, kind',
+      expenses: '++id, amount, category, date, createdAt, cardId, eventId, areaId',
+      archive: '++id, type, originalId, archivedAt',
+      events: '++id, title, startDate, renewalDate, createdAt, updatedAt, cardId, areaId',
+      tasks: '++id, done, createdAt, eventId, noteId, listId, dueDate',
+      taskLists: '++id, createdAt, dueDate',
+      paymentCards: '++id, name, expiry',
+      areas: '++id, name, createdAt, groupName',
     })
   }
 }

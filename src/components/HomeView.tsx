@@ -9,7 +9,13 @@ import {
 import { useMemo, useState } from 'react'
 import { db, type Event, type Expense, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
-import { matchesArea, areaNameById, countDistinctAreaItems } from '../utils/areas'
+import { areaNameById, countDistinctAreaItems } from '../utils/areas'
+import {
+  type AreaSelection,
+  isAreaFilterActive,
+  matchesAreaSelection,
+  selectionLabel,
+} from '../utils/areaSelection'
 import { countdownUrgency } from '../utils/countdown'
 import { formatAmount, sentenceCase } from '../utils/format'
 import {
@@ -140,7 +146,9 @@ export function HomeView({
     kind?: 'note' | 'event' | 'expense',
   ) => void
 }) {
-  const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null)
+  const [areaSelection, setAreaSelection] = useState<AreaSelection>({
+    kind: 'all',
+  })
   const { label: monthLabel } = currentMonthBounds()
 
   const events = useDexieLiveQuery(
@@ -153,14 +161,15 @@ export function HomeView({
   const areas = useDexieLiveQuery(() => db.areas.orderBy('name').toArray())
   const tasks = useDexieLiveQuery(() => db.tasks.toArray())
 
-  const areaFilterActive = selectedAreaId !== null
+  const areaList = areas ?? []
+  const areaFilterActive = isAreaFilterActive(areaSelection)
 
   const overdueRows = useMemo((): ImpegnoRow[] => {
     const rows: ImpegnoRow[] = []
     const taskList = tasks ?? []
 
     for (const note of filterNoteImpegni(notes ?? [])) {
-      if (!matchesArea(note, selectedAreaId)) continue
+      if (!matchesAreaSelection(note, areaSelection, areaList)) continue
       const linked = tasksForNote(taskList, note.id)
       if (isOverdueNoteImpegno(note, linked)) {
         rows.push({
@@ -172,7 +181,7 @@ export function HomeView({
     }
 
     for (const event of filterEventImpegni(events ?? [])) {
-      if (!matchesArea(event, selectedAreaId)) continue
+      if (!matchesAreaSelection(event, areaSelection, areaList)) continue
       if (isOverdueEvent(event)) {
         rows.push({
           kind: 'event',
@@ -183,7 +192,7 @@ export function HomeView({
     }
 
     return rows.sort((a, b) => a.sortKey.localeCompare(b.sortKey))
-  }, [events, notes, tasks, selectedAreaId])
+  }, [events, notes, tasks, areaSelection, areaList])
 
   const overdueEventIds = useMemo(
     () =>
@@ -211,78 +220,78 @@ export function HomeView({
     () =>
       filterEventImpegni(events ?? []).filter(
         (e) =>
-          matchesArea(e, selectedAreaId) &&
+          matchesAreaSelection(e, areaSelection, areaList) &&
           eventInCurrentMonth(e) &&
           !overdueEventIds.has(e.id!),
       ),
-    [events, selectedAreaId, overdueEventIds],
+    [events, areaSelection, areaList, overdueEventIds],
   )
 
   const monthNoteImpegni = useMemo(
     () =>
       filterNoteImpegni(notes ?? []).filter(
         (n) =>
-          matchesArea(n, selectedAreaId) &&
+          matchesAreaSelection(n, areaSelection, areaList) &&
           noteInCurrentMonth(n) &&
           !overdueNoteIds.has(n.id!),
       ),
-    [notes, selectedAreaId, overdueNoteIds],
+    [notes, areaSelection, areaList, overdueNoteIds],
   )
 
   const monthPlainNotes = useMemo(
     () =>
       filterPlainNotes(notes ?? []).filter(
-        (n) => matchesArea(n, selectedAreaId) && noteInCurrentMonth(n),
+        (n) => matchesAreaSelection(n, areaSelection, areaList) && noteInCurrentMonth(n),
       ),
-    [notes, selectedAreaId],
+    [notes, areaSelection, areaList],
   )
 
   const monthExpensesList = useMemo(
     () =>
       [...(expenses ?? [])]
         .filter(
-          (e) => matchesArea(e, selectedAreaId) && expenseInCurrentMonth(e),
+          (e) => matchesAreaSelection(e, areaSelection, areaList) && expenseInCurrentMonth(e),
         )
         .sort(
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
         ),
-    [expenses, selectedAreaId],
+    [expenses, areaSelection, areaList],
   )
 
   const areaEvents = useMemo(
     () =>
       filterEventImpegni(events ?? []).filter(
         (e) =>
-          matchesArea(e, selectedAreaId) && !overdueEventIds.has(e.id!),
+          matchesAreaSelection(e, areaSelection, areaList) && !overdueEventIds.has(e.id!),
       ),
-    [events, selectedAreaId, overdueEventIds],
+    [events, areaSelection, areaList, overdueEventIds],
   )
 
   const areaNoteImpegni = useMemo(
     () =>
       filterNoteImpegni(notes ?? []).filter(
         (n) =>
-          matchesArea(n, selectedAreaId) && !overdueNoteIds.has(n.id!),
+          matchesAreaSelection(n, areaSelection, areaList) && !overdueNoteIds.has(n.id!),
       ),
-    [notes, selectedAreaId, overdueNoteIds],
+    [notes, areaSelection, areaList, overdueNoteIds],
   )
 
   const areaPlainNotes = useMemo(
     () =>
       filterPlainNotes(notes ?? []).filter((n) =>
-        matchesArea(n, selectedAreaId),
+        matchesAreaSelection(n, areaSelection, areaList),
       ),
-    [notes, selectedAreaId],
+    [notes, areaSelection, areaList],
   )
 
   const areaExpensesList = useMemo(
     () =>
       [...(expenses ?? [])]
-        .filter((e) => matchesArea(e, selectedAreaId))
+        .filter((e) => matchesAreaSelection(e, areaSelection, areaList))
         .sort(
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
         ),
-    [expenses, selectedAreaId],
+    [expenses, areaSelection, areaList],
   )
 
   const impegnoRows = useMemo((): ImpegnoRow[] => {
@@ -358,7 +367,7 @@ export function HomeView({
     .filter((e) => {
       const t = new Date(e.date).getTime()
       return (
-        matchesArea(e, selectedAreaId) &&
+        matchesAreaSelection(e, areaSelection, areaList) &&
         t >= prevStart &&
         t <= prevEnd &&
         e.amount > 0
@@ -381,10 +390,7 @@ export function HomeView({
     .filter((e) => e.amount > 0)
     .reduce((s, e) => s + e.amount, 0)
 
-  const selectedAreaName =
-    selectedAreaId != null
-      ? areas?.find((a) => a.id === selectedAreaId)?.name
-      : null
+  const selectedAreaName = selectionLabel(areaSelection, areaList)
 
   const loading =
     events === undefined ||
@@ -402,9 +408,11 @@ export function HomeView({
     return <p className="text-sm text-slate-400">Caricamento...</p>
   }
 
-  const addInArea = selectedAreaName
-    ? (kind: 'note' | 'event' | 'expense') => () => onAddInArea(selectedAreaName, kind)
-    : undefined
+  const addInArea =
+    selectedAreaName && areaSelection.kind === 'area'
+      ? (kind: 'note' | 'event' | 'expense') => () =>
+          onAddInArea(selectedAreaName, kind)
+      : undefined
 
   const shareAreaContext = areaFilterActive ? selectedAreaName ?? undefined : undefined
 
@@ -417,7 +425,7 @@ export function HomeView({
   const shareSectionImpegni = () =>
     void shareImpegnoRowsSection(displayImpegni, (id) => areaNameById(areas ?? [], id), {
       sectionTitle: shareAreaContext ? `Impegni · ${shareAreaContext}` : 'Impegni',
-      hideArea: areaFilterActive,
+      hideArea: areaSelection.kind === 'area',
       footer:
         impegnoTotal > 0 ? `Totale costi: ${formatAmount(impegnoTotal)}` : undefined,
     })
@@ -434,7 +442,7 @@ export function HomeView({
     void shareEventsSection(urgentRenewals, {
       sectionTitle: 'Rinnovi in arrivo',
       context: shareAreaContext ? `Area: ${shareAreaContext}` : undefined,
-      resolveArea: areaFilterActive
+      resolveArea: areaFilterActive && areaSelection.kind === 'area'
         ? undefined
         : (e) => areaNameById(areas ?? [], e.areaId),
       footer:
@@ -446,7 +454,7 @@ export function HomeView({
   const shareSectionOverdue = () =>
     void shareImpegnoRowsSection(overdueRows, (id) => areaNameById(areas ?? [], id), {
       sectionTitle: 'In ritardo',
-      hideArea: areaFilterActive,
+      hideArea: areaSelection.kind === 'area',
       footer:
         overdueTotal > 0 ? `Totale costi: ${formatAmount(overdueTotal)}` : undefined,
     })
@@ -460,7 +468,7 @@ export function HomeView({
               compact
               event={row.item}
               areaName={
-                areaFilterActive
+                areaSelection.kind === 'area'
                   ? undefined
                   : areaNameById(areas ?? [], row.item.areaId)
               }
@@ -478,7 +486,7 @@ export function HomeView({
               compact
               note={row.item}
               areaName={
-                areaFilterActive
+                areaSelection.kind === 'area'
                   ? undefined
                   : areaNameById(areas ?? [], row.item.areaId)
               }
@@ -498,7 +506,7 @@ export function HomeView({
             compact
             note={note}
             areaName={
-              areaFilterActive
+              areaSelection.kind === 'area'
                 ? undefined
                 : areaNameById(areas ?? [], note.areaId)
             }
@@ -563,17 +571,21 @@ export function HomeView({
             <h3 className="text-sm font-semibold text-indigo-900">
               {selectedAreaName}
             </h3>
-            <button
-              type="button"
-              onClick={() => onAddInArea(selectedAreaName)}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 active:scale-95"
-              aria-label={`Aggiungi in ${selectedAreaName}`}
-            >
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
-            </button>
+            {areaSelection.kind === 'area' && (
+              <button
+                type="button"
+                onClick={() => onAddInArea(selectedAreaName)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 active:scale-95"
+                aria-label={`Aggiungi in ${selectedAreaName}`}
+              >
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+            )}
           </div>
           <p className="mt-0.5 text-[10px] text-indigo-600/80">
-            Riepilogo completo
+            {areaSelection.kind === 'group'
+              ? 'Riepilogo gruppo'
+              : 'Riepilogo completo'}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-medium text-indigo-700">
             <span>
@@ -696,7 +708,7 @@ export function HomeView({
                     compact
                     event={row.item}
                     areaName={
-                      areaFilterActive
+                      areaSelection.kind === 'area'
                         ? undefined
                         : areaNameById(areas ?? [], row.item.areaId)
                     }
@@ -710,7 +722,7 @@ export function HomeView({
                     compact
                     note={row.item}
                     areaName={
-                      areaFilterActive
+                      areaSelection.kind === 'area'
                         ? undefined
                         : areaNameById(areas ?? [], row.item.areaId)
                     }
@@ -749,7 +761,7 @@ export function HomeView({
                   compact
                   event={event}
                   areaName={
-                    areaFilterActive
+                    areaSelection.kind === 'area'
                       ? undefined
                       : areaNameById(areas ?? [], event.areaId)
                   }
@@ -877,8 +889,8 @@ export function HomeView({
     <div className="min-w-0">
       <AreaChips
         areas={areas ?? []}
-        selectedAreaId={selectedAreaId}
-        onSelect={setSelectedAreaId}
+        selection={areaSelection}
+        onSelect={setAreaSelection}
         counts={areaCounts}
         totalCount={totalAreaItems}
         headerTrailing={<MiniMonthCalendar compact />}

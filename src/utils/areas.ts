@@ -6,18 +6,41 @@ import { filterEventImpegni, filterNoteImpegni, filterPlainNotes } from './impeg
 /** Trova o crea un'area dal nome digitato (case-insensitive) */
 export async function resolveAreaId(
   areaName: string,
+  groupName?: string,
 ): Promise<number | undefined> {
   const trimmed = areaName.trim()
   if (!trimmed) return undefined
 
   const normalized = sentenceCase(trimmed)
+  const normalizedGroup = groupName?.trim()
+    ? sentenceCase(groupName.trim())
+    : undefined
   const existing = await db.areas.toArray()
   const found = existing.find(
     (a) => a.name.toLowerCase() === normalized.toLowerCase(),
   )
-  if (found?.id) return found.id
+  if (found?.id) {
+    if (normalizedGroup && found.groupName !== normalizedGroup) {
+      await db.areas.update(found.id, { groupName: normalizedGroup })
+    }
+    return found.id
+  }
 
-  return db.areas.add({ name: normalized, createdAt: Date.now() })
+  return db.areas.add({
+    name: normalized,
+    groupName: normalizedGroup,
+    createdAt: Date.now(),
+  })
+}
+
+export async function setAreaGroupName(
+  areaId: number,
+  groupName: string,
+): Promise<void> {
+  const trimmed = groupName.trim()
+  await db.areas.update(areaId, {
+    groupName: trimmed ? sentenceCase(trimmed) : undefined,
+  })
 }
 
 export function matchesArea<T extends { areaId?: number }>(
