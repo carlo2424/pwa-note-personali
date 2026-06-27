@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import type { Note } from '../db'
 import { db } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
+import { archiveConfirmCopy } from '../utils/confirmMessages'
 import { isPastDue } from '../utils/countdown'
 import { toggleTask } from '../utils/eventTasks'
 import { formatDate, formatDateRange, sentenceCase } from '../utils/format'
+import { isNoteImpegno } from '../utils/impegno'
 import { isNoteChecklistContent } from '../utils/noteTasks'
 import { archiveNote } from '../utils/noteArchive'
+import { ConfirmDialog } from './ConfirmDialog'
 import { ExpandableCard } from './ExpandableCard'
 import { ItemActions } from './ItemActions'
 import { TaskRow } from './TaskRow'
@@ -31,6 +35,10 @@ export function NoteExpandableRow({
   areaName,
   compact = false,
 }: NoteExpandableRowProps) {
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
+  const archiveKind = isNoteImpegno(note) ? 'impegno' : 'nota'
+  const archiveCopy = archiveConfirmCopy(archiveKind, note.title)
+
   const checklistTasks = useDexieLiveQuery(
     async () => {
       if (!note.id) return []
@@ -58,6 +66,7 @@ export function NoteExpandableRow({
       : null
 
   return (
+    <>
     <ExpandableCard
       compact={compact}
       containerClassName={
@@ -103,7 +112,10 @@ export function NoteExpandableRow({
         ) : undefined
       }
       actions={
-        <ItemActions onEdit={onEdit} onArchive={() => archiveNote(note)} />
+        <ItemActions
+          onEdit={onEdit}
+          onArchive={() => setShowArchiveConfirm(true)}
+        />
       }
     >
       {photoUrl && (
@@ -148,5 +160,17 @@ export function NoteExpandableRow({
         Aggiornata {formatDate(note.updatedAt)}
       </p>
     </ExpandableCard>
+
+    {showArchiveConfirm && (
+      <ConfirmDialog
+        title={archiveCopy.title}
+        message={archiveCopy.message}
+        confirmLabel={archiveCopy.confirmLabel}
+        variant="danger"
+        onConfirm={() => void archiveNote(note)}
+        onClose={() => setShowArchiveConfirm(false)}
+      />
+    )}
+    </>
   )
 }

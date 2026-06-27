@@ -1,8 +1,11 @@
 import { Archive, Pencil } from 'lucide-react'
+import { useState } from 'react'
 import { db, type Event, type Expense, type PaymentMethod } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
+import { archiveConfirmCopy } from '../utils/confirmMessages'
 import { archiveExpense } from '../utils/expenseArchive'
 import { formatAmount, formatDate, sentenceCase } from '../utils/format'
+import { ConfirmDialog } from './ConfirmDialog'
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   carta: 'Carta',
@@ -33,6 +36,9 @@ export function ExpenseDetailBody({
   onArchived,
   compact = false,
 }: ExpenseDetailBodyProps) {
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
+  const archiveCopy = archiveConfirmCopy('spesa', expense.description)
+
   const cards = useDexieLiveQuery(() => db.paymentCards.toArray())
   const linkedEvent = useDexieLiveQuery(
     () => (expense.eventId ? db.events.get(expense.eventId) : undefined),
@@ -111,7 +117,7 @@ export function ExpenseDetailBody({
       <div className={`flex gap-2 border-t border-slate-100 ${compact ? 'pt-2' : 'pt-3'}`}>
         <button
           type="button"
-          onClick={() => archiveExpense(expense, onArchived)}
+          onClick={() => setShowArchiveConfirm(true)}
           className={`flex flex-1 items-center justify-center border border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-700 ${btn}`}
         >
           <Archive className={icon} /> Archivia
@@ -134,6 +140,17 @@ export function ExpenseDetailBody({
           </button>
         )}
       </div>
+
+      {showArchiveConfirm && (
+        <ConfirmDialog
+          title={archiveCopy.title}
+          message={archiveCopy.message}
+          confirmLabel={archiveCopy.confirmLabel}
+          variant="danger"
+          onConfirm={() => void archiveExpense(expense, onArchived)}
+          onClose={() => setShowArchiveConfirm(false)}
+        />
+      )}
     </div>
   )
 }

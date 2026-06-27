@@ -1,13 +1,16 @@
 import { Archive, CalendarPlus, Pencil } from 'lucide-react'
+import { useState } from 'react'
 import { db, type Event, type Task } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { addToCalendar } from '../utils/calendar'
+import { archiveConfirmCopy } from '../utils/confirmMessages'
 import { countdownLabel, countdownUrgency, isPastDue } from '../utils/countdown'
 import { toggleTask } from '../utils/eventTasks'
 import { archiveEvent } from '../utils/eventArchive'
 import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
 import { recurrenceLabel, recurrenceShort } from '../utils/recurring'
 import { OVERDUE_ACCENT, taskAccentById } from '../constants/tasks'
+import { ConfirmDialog } from './ConfirmDialog'
 import { TaskListCard } from './TaskListCard'
 
 const URGENCY_STYLE = {
@@ -30,6 +33,9 @@ export function EventDetailBody({
   onArchived,
   compact = false,
 }: EventDetailBodyProps) {
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
+  const archiveCopy = archiveConfirmCopy('impegno', event.title)
+
   const photoUrl = event.photoBlob ? URL.createObjectURL(event.photoBlob) : null
   const audioUrl = event.voiceBlob ? URL.createObjectURL(event.voiceBlob) : null
   const eventTasks = useDexieLiveQuery<Task[]>(
@@ -201,7 +207,7 @@ export function EventDetailBody({
       <div className={`flex gap-2 border-t border-slate-100 ${compact ? 'pt-2' : 'pt-3'}`}>
         <button
           type="button"
-          onClick={() => archiveEvent(event, onArchived)}
+          onClick={() => setShowArchiveConfirm(true)}
           className={`flex flex-1 items-center justify-center text-slate-600 hover:bg-amber-50 hover:text-amber-700 border border-slate-200 ${btn}`}
         >
           <Archive className={icon} /> Archivia
@@ -214,6 +220,17 @@ export function EventDetailBody({
           <Pencil className={icon} /> Modifica
         </button>
       </div>
+
+      {showArchiveConfirm && (
+        <ConfirmDialog
+          title={archiveCopy.title}
+          message={archiveCopy.message}
+          confirmLabel={archiveCopy.confirmLabel}
+          variant="danger"
+          onConfirm={() => void archiveEvent(event, onArchived)}
+          onClose={() => setShowArchiveConfirm(false)}
+        />
+      )}
     </div>
   )
 }

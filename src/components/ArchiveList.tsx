@@ -1,10 +1,13 @@
 import { RotateCcw, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { db, type ArchiveItem, type Expense, type Note, type Task } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
+import { deletePermanentlyConfirmCopy } from '../utils/confirmMessages'
 import { formatDate } from '../utils/format'
 import { syncExpensesForEvent } from '../utils/eventExpenses'
 import { syncChecklistForNote } from '../utils/noteTasks'
 import type { SerializedEventData } from '../utils/archive'
+import { ConfirmDialog } from './ConfirmDialog'
 import { ExpandableCard } from './ExpandableCard'
 
 const TYPE_LABELS: Record<ArchiveItem['type'], string> = {
@@ -108,6 +111,56 @@ async function deletePermanently(item: ArchiveItem) {
   if (item.id) await db.archive.delete(item.id)
 }
 
+function ArchiveRow({ item }: { item: ArchiveItem }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const deleteCopy = deletePermanentlyConfirmCopy(item.title)
+
+  return (
+    <ExpandableCard
+      icon={
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold ${TYPE_STYLE[item.type]}`}
+        >
+          {TYPE_LABELS[item.type].slice(0, 1)}
+        </span>
+      }
+      title={item.title}
+      subtitle={`${TYPE_LABELS[item.type]} · ${formatDate(item.archivedAt)}`}
+    >
+      <p className="text-xs text-slate-500">
+        Archiviato il {formatDate(item.archivedAt)}
+      </p>
+      <div className="flex gap-2 border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          onClick={() => restoreItem(item)}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+        >
+          <RotateCcw className="h-4 w-4" /> Ripristina
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowDeleteConfirm(true)}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 py-2 text-sm text-slate-600 hover:bg-rose-50 hover:text-rose-700"
+        >
+          <Trash2 className="h-4 w-4" /> Elimina
+        </button>
+      </div>
+
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title={deleteCopy.title}
+          message={deleteCopy.message}
+          confirmLabel={deleteCopy.confirmLabel}
+          variant="danger"
+          onConfirm={() => void deletePermanently(item)}
+          onClose={() => setShowDeleteConfirm(false)}
+        />
+      )}
+    </ExpandableCard>
+  )
+}
+
 export function ArchiveList() {
   const items = useDexieLiveQuery(async () => {
     const all = await db.archive.toArray()
@@ -135,37 +188,7 @@ export function ArchiveList() {
     <ul className="space-y-2">
       {items.map((item) => (
         <li key={item.id}>
-          <ExpandableCard
-            icon={
-              <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold ${TYPE_STYLE[item.type]}`}
-              >
-                {TYPE_LABELS[item.type].slice(0, 1)}
-              </span>
-            }
-            title={item.title}
-            subtitle={`${TYPE_LABELS[item.type]} · ${formatDate(item.archivedAt)}`}
-          >
-            <p className="text-xs text-slate-500">
-              Archiviato il {formatDate(item.archivedAt)}
-            </p>
-            <div className="flex gap-2 border-t border-slate-100 pt-3">
-              <button
-                type="button"
-                onClick={() => restoreItem(item)}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
-              >
-                <RotateCcw className="h-4 w-4" /> Ripristina
-              </button>
-              <button
-                type="button"
-                onClick={() => deletePermanently(item)}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 py-2 text-sm text-slate-600 hover:bg-rose-50 hover:text-rose-700"
-              >
-                <Trash2 className="h-4 w-4" /> Elimina
-              </button>
-            </div>
-          </ExpandableCard>
+          <ArchiveRow item={item} />
         </li>
       ))}
     </ul>
