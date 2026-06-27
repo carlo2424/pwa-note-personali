@@ -20,7 +20,6 @@ import { ExpenseList } from './components/ExpenseList'
 import { EventForm } from './components/EventForm'
 import { EventList } from './components/EventList'
 import { HomeView } from './components/HomeView'
-import { MiniMonthCalendar } from './components/MiniMonthCalendar'
 import { Modal } from './components/Modal'
 import { NoteForm } from './components/NoteForm'
 import { NoteList } from './components/NoteList'
@@ -250,25 +249,22 @@ function App() {
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-6">
-          <div className="mb-6 flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
-              <CurrentIcon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-semibold text-slate-900">
-                {current.title}
-              </h2>
-              {current.description ? (
-                <p className="text-sm text-slate-500">{current.description}</p>
-              ) : null}
-            </div>
-            {activeSection === 'home' && (
-              <div className="flex shrink-0 items-center gap-1.5">
-                <MiniMonthCalendar />
+        <main className={`flex-1 px-4 ${activeSection === 'home' ? 'py-4' : 'py-6'}`}>
+          {activeSection !== 'home' && (
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+                <CurrentIcon className="h-5 w-5" />
               </div>
-            )}
-          </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl font-semibold text-slate-900">
+                  {current.title}
+                </h2>
+                {current.description ? (
+                  <p className="text-sm text-slate-500">{current.description}</p>
+                ) : null}
+              </div>
+            </div>
+          )}
 
           {activeSection === 'home' && (
             <HomeView

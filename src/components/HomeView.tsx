@@ -32,10 +32,17 @@ import {
   isOverdueNoteImpegno,
   tasksForNote,
 } from '../utils/overdue'
-import { AreaSidebar } from './AreaSidebar'
+import {
+  shareEventsSection,
+  shareExpensesSection,
+  shareImpegnoRowsSection,
+  shareNotesSection,
+} from '../utils/share'
+import { AreaChips } from './AreaChips'
 import { CollapsibleSection, sectionIcon } from './CollapsibleSection'
 import { EventExpandableRow } from './EventExpandableRow'
 import { ExpenseExpandableRow } from './ExpenseExpandableRow'
+import { MiniMonthCalendar } from './MiniMonthCalendar'
 import { MonthExpenseSummary } from './MonthExpenseSummary'
 import { NoteExpandableRow } from './NoteExpandableRow'
 
@@ -399,6 +406,51 @@ export function HomeView({
     ? (kind: 'note' | 'event' | 'expense') => () => onAddInArea(selectedAreaName, kind)
     : undefined
 
+  const shareAreaContext = areaFilterActive ? selectedAreaName ?? undefined : undefined
+
+  const shareSectionNotes = () =>
+    void shareNotesSection(displayNotes, {
+      areaName: shareAreaContext,
+      sectionTitle: shareAreaContext ? `Note · ${shareAreaContext}` : 'Note',
+    })
+
+  const shareSectionImpegni = () =>
+    void shareImpegnoRowsSection(displayImpegni, (id) => areaNameById(areas ?? [], id), {
+      sectionTitle: shareAreaContext ? `Impegni · ${shareAreaContext}` : 'Impegni',
+      hideArea: areaFilterActive,
+      footer:
+        impegnoTotal > 0 ? `Totale costi: ${formatAmount(impegnoTotal)}` : undefined,
+    })
+
+  const shareSectionExpenses = () =>
+    void shareExpensesSection(displayExpenses, {
+      areaName: shareAreaContext,
+      sectionTitle: shareAreaContext ? `Spese · ${shareAreaContext}` : 'Spese',
+      monthLabel: areaFilterActive ? undefined : sentenceCase(monthLabel),
+      footer: speseTotal > 0 ? `Totale: ${formatAmount(speseTotal)}` : undefined,
+    })
+
+  const shareSectionRenewals = () =>
+    void shareEventsSection(urgentRenewals, {
+      sectionTitle: 'Rinnovi in arrivo',
+      context: shareAreaContext ? `Area: ${shareAreaContext}` : undefined,
+      resolveArea: areaFilterActive
+        ? undefined
+        : (e) => areaNameById(areas ?? [], e.areaId),
+      footer:
+        renewalsTotal > 0
+          ? `Totale: ${formatAmount(renewalsTotal)}/mese`
+          : undefined,
+    })
+
+  const shareSectionOverdue = () =>
+    void shareImpegnoRowsSection(overdueRows, (id) => areaNameById(areas ?? [], id), {
+      sectionTitle: 'In ritardo',
+      hideArea: areaFilterActive,
+      footer:
+        overdueTotal > 0 ? `Totale costi: ${formatAmount(overdueTotal)}` : undefined,
+    })
+
   const impegnoList = (
     <ul className="space-y-1">
       {displayImpegni.map((row) =>
@@ -489,17 +541,19 @@ export function HomeView({
   const speseTotal = sumPositiveExpenses(displayExpenses)
 
   const noteSectionIcon = sectionIcon(
-    'bg-amber-100 text-amber-700',
-    <StickyNote className="h-3.5 w-3.5" />,
+    'bg-amber-100 text-amber-700 h-9 w-9',
+    <StickyNote className="h-4 w-4" />,
   )
   const impegnoSectionIcon = sectionIcon(
-    'bg-indigo-100 text-indigo-700',
-    <CalendarDays className="h-3.5 w-3.5" />,
+    'bg-indigo-100 text-indigo-700 h-9 w-9',
+    <CalendarDays className="h-4 w-4" />,
   )
   const speseSectionIcon = sectionIcon(
-    'bg-rose-100 text-rose-600',
-    <Wallet className="h-3.5 w-3.5" />,
+    'bg-rose-100 text-rose-600 h-9 w-9',
+    <Wallet className="h-4 w-4" />,
   )
+
+  const sectionComfort = { comfortable: true as const }
 
   const mainContent = (
     <div className="space-y-3">
@@ -554,61 +608,62 @@ export function HomeView({
       )}
 
       {!areaFilterActive && (
-        <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,0.7fr)_minmax(0,1.45fr)] gap-1.5">
-          <button
-            type="button"
-            onClick={onGoToNotes}
-            className="rounded-lg border border-slate-100 bg-white px-2 py-2 text-left shadow-sm hover:border-amber-200"
-          >
-            <p className="text-[9px] font-medium text-slate-400">Note</p>
-            <p className="mt-0.5 text-xs font-bold text-amber-700">{noteCount}</p>
-          </button>
-          <button
-            type="button"
-            onClick={onGoToEvents}
-            className="flex flex-col items-center justify-center rounded-lg border border-slate-100 bg-white px-1.5 py-2 text-center shadow-sm hover:border-indigo-200"
-          >
-            <p className="text-[9px] font-medium text-slate-400">Impegni</p>
-            <p className="mt-0.5 text-xs font-bold text-indigo-600">
-              {impegnoCount}
-            </p>
-          </button>
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onGoToNotes}
+              className="rounded-xl border border-slate-100 bg-white px-3 py-3 text-left shadow-sm hover:border-amber-200 active:scale-[0.99]"
+            >
+              <p className="text-xs font-medium text-slate-500">Note</p>
+              <p className="mt-1 text-2xl font-bold text-amber-700">{noteCount}</p>
+            </button>
+            <button
+              type="button"
+              onClick={onGoToEvents}
+              className="rounded-xl border border-slate-100 bg-white px-3 py-3 text-center shadow-sm hover:border-indigo-200 active:scale-[0.99]"
+            >
+              <p className="text-xs font-medium text-slate-500">Impegni</p>
+              <p className="mt-1 text-2xl font-bold text-indigo-600">
+                {impegnoCount}
+              </p>
+            </button>
+          </div>
           <button
             type="button"
             onClick={onGoToExpenses}
-            className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-left shadow-sm hover:border-rose-200"
+            className="w-full rounded-xl border border-slate-100 bg-white px-3 py-3 text-left shadow-sm hover:border-rose-200 active:scale-[0.99]"
           >
-            <p className="text-[9px] font-medium leading-tight text-slate-400">
-              Spese
-              <span className="font-normal text-rose-400">
-                {' '}
-                · {sentenceCase(monthLabel)}
+            <p className="text-xs font-medium text-slate-500">
+              Spese ·{' '}
+              <span className="capitalize text-rose-500">
+                {sentenceCase(monthLabel)}
               </span>
             </p>
-            <div className="mt-1.5 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-3">
               <div className="min-w-0">
-                <p className="text-[8px] font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                   Pagato
                 </p>
-                <p className="mt-0.5 truncate text-[11px] font-bold leading-tight text-rose-600">
+                <p className="mt-0.5 text-base font-bold text-rose-600">
                   {formatAmount(monthExpensesTotal)}
                 </p>
               </div>
-              <div className="min-w-0 border-l border-rose-100 pl-2">
-                <p className="text-[8px] font-medium uppercase tracking-wide text-slate-400">
+              <div className="min-w-0 border-l border-rose-100 pl-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                   Previsto
                 </p>
-                <p className="mt-0.5 truncate text-[11px] font-bold leading-tight text-orange-600">
+                <p className="mt-0.5 text-base font-bold text-orange-600">
                   {formatAmount(monthPlannedTotal)}
                 </p>
               </div>
             </div>
             {prevMonthExpenses > 0 && (
               <p
-                className={`mt-1 text-[8px] font-medium leading-tight ${expenseDelta > 0 ? 'text-rose-400' : expenseDelta < 0 ? 'text-emerald-500' : 'text-slate-400'}`}
+                className={`mt-2 text-[10px] font-medium ${expenseDelta > 0 ? 'text-rose-400' : expenseDelta < 0 ? 'text-emerald-500' : 'text-slate-400'}`}
               >
                 Pagato: {expenseDelta > 0 ? '+' : ''}
-                {formatAmount(expenseDelta)} vs scorso
+                {formatAmount(expenseDelta)} vs mese scorso
               </p>
             )}
           </button>
@@ -617,6 +672,7 @@ export function HomeView({
 
       {overdueRows.length > 0 && (
         <CollapsibleSection
+          {...sectionComfort}
           title="In ritardo"
           count={overdueRows.length}
           icon={sectionIcon(
@@ -630,6 +686,7 @@ export function HomeView({
           }
           totalAmount={overdueTotal > 0 ? overdueTotal : undefined}
           onSeeAll={onGoToEvents}
+          onShare={shareSectionOverdue}
         >
           <ul className="space-y-1">
             {overdueRows.map((row) =>
@@ -668,6 +725,7 @@ export function HomeView({
 
       {urgentRenewals.length > 0 && (
         <CollapsibleSection
+          {...sectionComfort}
           title="Rinnovi in arrivo"
           count={urgentRenewals.length}
           icon={sectionIcon(
@@ -681,6 +739,7 @@ export function HomeView({
           }
           totalAmount={renewalsTotal > 0 ? renewalsTotal : undefined}
           totalSuffix="/mese"
+          onShare={shareSectionRenewals}
         >
           <ul className="space-y-1">
             {urgentRenewals.map((event) => (
@@ -709,12 +768,14 @@ export function HomeView({
       {areaFilterActive ? (
         <div className="space-y-2.5">
           <CollapsibleSection
+            {...sectionComfort}
             title="Note"
             count={noteCount}
             alwaysShow
             icon={noteSectionIcon}
             containerClassName={AREA_SECTION_STYLE.note}
             onAdd={addInArea?.('note')}
+            onShare={noteCount > 0 ? shareSectionNotes : undefined}
             emptyContent={
               <EmptySectionHint label="nota" onAdd={addInArea?.('note')} />
             }
@@ -723,6 +784,7 @@ export function HomeView({
           </CollapsibleSection>
 
           <CollapsibleSection
+            {...sectionComfort}
             title="Impegni"
             count={impegnoCount}
             alwaysShow
@@ -730,6 +792,7 @@ export function HomeView({
             containerClassName={AREA_SECTION_STYLE.impegno}
             totalAmount={impegnoTotal > 0 ? impegnoTotal : undefined}
             onAdd={addInArea?.('event')}
+            onShare={impegnoCount > 0 ? shareSectionImpegni : undefined}
             emptyContent={
               <EmptySectionHint label="impegno" onAdd={addInArea?.('event')} />
             }
@@ -738,6 +801,7 @@ export function HomeView({
           </CollapsibleSection>
 
           <CollapsibleSection
+            {...sectionComfort}
             title="Spese"
             count={expenseCount}
             alwaysShow
@@ -745,6 +809,7 @@ export function HomeView({
             containerClassName={AREA_SECTION_STYLE.spesa}
             totalAmount={speseTotal > 0 ? speseTotal : undefined}
             onAdd={addInArea?.('expense')}
+            onShare={expenseCount > 0 ? shareSectionExpenses : undefined}
             emptyContent={
               <EmptySectionHint label="spesa" onAdd={addInArea?.('expense')} />
             }
@@ -756,11 +821,13 @@ export function HomeView({
         <>
           {displayImpegni.length > 0 && (
             <CollapsibleSection
+              {...sectionComfort}
               title="Impegni"
               count={impegnoCount}
               icon={impegnoSectionIcon}
               totalAmount={impegnoTotal > 0 ? impegnoTotal : undefined}
               onSeeAll={onGoToEvents}
+              onShare={shareSectionImpegni}
             >
               {impegnoList}
             </CollapsibleSection>
@@ -768,10 +835,12 @@ export function HomeView({
 
           {displayNotes.length > 0 && (
             <CollapsibleSection
+              {...sectionComfort}
               title="Note"
               count={noteCount}
               icon={noteSectionIcon}
               onSeeAll={onGoToNotes}
+              onShare={shareSectionNotes}
             >
               {noteList}
             </CollapsibleSection>
@@ -779,12 +848,14 @@ export function HomeView({
 
           {displayExpenses.length > 0 && (
             <CollapsibleSection
+              {...sectionComfort}
               title="Spese"
               count={expenseCount}
               icon={speseSectionIcon}
               subtitle={`${sentenceCase(monthLabel)} · ${expenseCount} ${expenseCount === 1 ? 'movimento' : 'movimenti'}`}
               totalAmount={speseTotal > 0 ? speseTotal : undefined}
               onSeeAll={onGoToExpenses}
+              onShare={shareSectionExpenses}
             >
               {expenseList}
             </CollapsibleSection>
@@ -802,15 +873,20 @@ export function HomeView({
   )
 
   return (
-    <div className="flex gap-1">
-      <AreaSidebar
+    <div className="min-w-0">
+      <AreaChips
         areas={areas ?? []}
         selectedAreaId={selectedAreaId}
         onSelect={setSelectedAreaId}
         counts={areaCounts}
         totalCount={totalAreaItems}
       />
-      <div className="min-w-0 flex-1">{mainContent}</div>
+      {!areaFilterActive && (
+        <div className="mb-3 flex justify-end">
+          <MiniMonthCalendar />
+        </div>
+      )}
+      {mainContent}
     </div>
   )
 }

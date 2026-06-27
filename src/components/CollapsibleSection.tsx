@@ -1,4 +1,4 @@
-import { ChevronRight, Plus } from 'lucide-react'
+import { Plus, Share2 } from 'lucide-react'
 import { type ReactNode } from 'react'
 import { formatAmount } from '../utils/format'
 import { ExpandableCard } from './ExpandableCard'
@@ -14,8 +14,10 @@ interface CollapsibleSectionProps {
   totalSuffix?: string
   onSeeAll?: () => void
   onAdd?: () => void
+  onShare?: () => void
   emptyContent?: ReactNode
   containerClassName?: string
+  comfortable?: boolean
 }
 
 export function CollapsibleSection({
@@ -29,8 +31,10 @@ export function CollapsibleSection({
   totalSuffix,
   onSeeAll,
   onAdd,
+  onShare,
   emptyContent,
   containerClassName = 'border-slate-100 bg-white',
+  comfortable = false,
 }: CollapsibleSectionProps) {
   if (!alwaysShow && count === 0) return null
 
@@ -41,8 +45,20 @@ export function CollapsibleSection({
   const showTotal = totalAmount != null && totalAmount > 0 && count > 0
 
   const actions =
-    onAdd || onSeeAll ? (
+    onAdd || onSeeAll || onShare ? (
       <div className="flex shrink-0 items-center gap-0.5">
+        {onShare && count > 0 && (
+          <button
+            type="button"
+            onClick={onShare}
+            className={`flex items-center justify-center rounded-md text-sky-600 transition hover:bg-sky-50 ${
+              comfortable ? 'h-8 w-8' : 'h-6 w-6'
+            }`}
+            aria-label={`Condividi ${title.toLowerCase()}`}
+          >
+            <Share2 className="h-3.5 w-3.5" />
+          </button>
+        )}
         {onAdd && (
           <button
             type="button"
@@ -57,10 +73,12 @@ export function CollapsibleSection({
           <button
             type="button"
             onClick={onSeeAll}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-indigo-600 transition hover:bg-indigo-50"
+            className={`shrink-0 rounded-md font-semibold text-indigo-600 transition hover:bg-indigo-50 ${
+              comfortable ? 'px-2 py-1 text-[10px]' : 'px-1.5 py-0.5 text-[9px]'
+            }`}
             aria-label={`Vedi tutti ${title.toLowerCase()}`}
           >
-            <ChevronRight className="h-3.5 w-3.5" />
+            Tutti
           </button>
         )}
       </div>
@@ -68,7 +86,8 @@ export function CollapsibleSection({
 
   return (
     <ExpandableCard
-      compact
+      compact={!comfortable}
+      comfortable={comfortable}
       defaultExpanded={false}
       containerClassName={containerClassName}
       icon={icon}
@@ -76,7 +95,11 @@ export function CollapsibleSection({
       subtitle={resolvedSubtitle}
       trailing={
         showTotal ? (
-          <span className="shrink-0 text-[10px] font-bold text-rose-600">
+          <span
+            className={`shrink-0 font-bold text-rose-600 ${
+              comfortable ? 'text-xs' : 'text-[10px]'
+            }`}
+          >
             {formatAmount(totalAmount!)}
             {totalSuffix ? (
               <span className="font-normal text-slate-400">{totalSuffix}</span>
