@@ -1,5 +1,6 @@
 import { db, type Note } from '../db'
 import { addToArchive } from './archive'
+import { deleteTasksForNote } from './noteTasks'
 
 export async function archiveNote(note: Note): Promise<void> {
   if (!note.id) return
@@ -11,5 +12,6 @@ export async function archiveNote(note: Note): Promise<void> {
     photoBlob: note.photoBlob,
     archivedAt: Date.now(),
   })
+  await deleteTasksForNote(note.id)
   await db.notes.delete(note.id)
 }

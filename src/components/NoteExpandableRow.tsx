@@ -1,9 +1,14 @@
 import type { Note } from '../db'
+import { db } from '../db'
+import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { isPastDue } from '../utils/countdown'
+import { toggleTask } from '../utils/eventTasks'
 import { formatDate, formatDateRange, sentenceCase } from '../utils/format'
+import { isNoteChecklistContent } from '../utils/noteTasks'
 import { archiveNote } from '../utils/noteArchive'
 import { ExpandableCard } from './ExpandableCard'
 import { ItemActions } from './ItemActions'
+import { TaskRow } from './TaskRow'
 
 const COLOR_MAP: Record<string, string> = {
   indigo: 'bg-indigo-500',
@@ -26,10 +31,31 @@ export function NoteExpandableRow({
   areaName,
   compact = false,
 }: NoteExpandableRowProps) {
-  const displayContent = note.content ? sentenceCase(note.content) : ''
+  const checklistTasks = useDexieLiveQuery(
+    async () => {
+      if (!note.id) return []
+      return db.tasks.where('noteId').equals(note.id).sortBy('createdAt')
+    },
+    [note.id],
+  )
+
+  const hasChecklist =
+    (checklistTasks?.length ?? 0) >= 2 ||
+    isNoteChecklistContent(note.content ?? '')
+
+  const displayContent =
+    !hasChecklist && note.content ? sentenceCase(note.content) : ''
   const photoUrl = note.photoBlob ? URL.createObjectURL(note.photoBlob) : null
   const overdue = isPastDue(note.endDate)
   const dateRange = formatDateRange(note.startDate, note.endDate)
+
+  const doneCount = checklistTasks?.filter((t) => t.done).length ?? 0
+  const totalCount = checklistTasks?.length ?? 0
+
+  const checklistPreview =
+    hasChecklist && totalCount > 0
+      ? `${doneCount}/${totalCount} completate`
+      : null
 
   return (
     <ExpandableCard
@@ -48,23 +74,31 @@ export function NoteExpandableRow({
       titleClassName={overdue ? 'text-rose-900' : 'text-slate-900'}
       subtitle={
         areaName
-          ? `${areaName}${note.content || dateRange ? ' · ' : ''}${
-              displayContent
-                ? `${displayContent.slice(0, 50)}${displayContent.length > 50 ? '…' : ''}`
-                : dateRange
-                  ? `${overdue ? 'Scaduta · ' : ''}${dateRange}`
-                  : formatDate(note.updatedAt)
+          ? `${areaName}${checklistPreview || displayContent || dateRange ? ' · ' : ''}${
+              checklistPreview
+                ? checklistPreview
+                : displayContent
+                  ? `${displayContent.slice(0, 50)}${displayContent.length > 50 ? '…' : ''}`
+                  : dateRange
+                    ? `${overdue ? 'Scaduta · ' : ''}${dateRange}`
+                    : formatDate(note.updatedAt)
             }`
-          : displayContent
-            ? `${displayContent.slice(0, 60)}${displayContent.length > 60 ? '…' : ''}`
-            : dateRange
-              ? `${overdue ? 'Scaduta · ' : ''}${dateRange}`
-              : `Aggiornata ${formatDate(note.updatedAt)}`
+          : checklistPreview
+            ? checklistPreview
+            : displayContent
+              ? `${displayContent.slice(0, 60)}${displayContent.length > 60 ? '…' : ''}`
+              : dateRange
+                ? `${overdue ? 'Scaduta · ' : ''}${dateRange}`
+                : `Aggiornata ${formatDate(note.updatedAt)}`
       }
       badge={
         overdue ? (
           <span className={`shrink-0 rounded-full bg-rose-600 font-bold text-white ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
             Scaduta
+          </span>
+        ) : hasChecklist && totalCount > 0 && doneCount === totalCount ? (
+          <span className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
+            Fatto
           </span>
         ) : undefined
       }
@@ -79,10 +113,28 @@ export function NoteExpandableRow({
           className={`w-full object-cover ${compact ? 'max-h-24 rounded-lg' : 'max-h-40 rounded-xl'}`}
         />
       )}
-      {displayContent && (
-        <p className={`whitespace-pre-wrap text-slate-600 ${compact ? 'text-xs' : 'text-sm'}`}>
-          {displayContent}
-        </p>
+      {hasChecklist && checklistTasks && checklistTasks.length > 0 ? (
+        <ul className={compact ? 'space-y-0.5' : 'space-y-1'}>
+          {checklistTasks.map((task) =>
+            task.id ? (
+              <li key={task.id}>
+                <TaskRow
+                  compact={compact}
+                  nested
+                  done={task.done}
+                  title={task.title}
+                  onToggle={() => void toggleTask(task.id!, task.done)}
+                />
+              </li>
+            ) : null,
+          )}
+        </ul>
+      ) : (
+        displayContent && (
+          <p className={`whitespace-pre-wrap text-slate-600 ${compact ? 'text-xs' : 'text-sm'}`}>
+            {displayContent}
+          </p>
+        )
       )}
       {dateRange && (
         <p

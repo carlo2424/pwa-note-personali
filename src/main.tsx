@@ -10,8 +10,10 @@ import {
   pruneSentNotifications,
 } from './utils/renewalNotifications'
 import { migrateTextToSentenceCase } from './utils/textCaseMigrate'
+import { syncChecklistForNote } from './utils/noteTasks'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
+const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
 
 /** In dev: rimuove SW e cache PWA che mostrano build vecchie su localhost */
 async function clearPwaCacheInDev(): Promise<void> {
@@ -42,6 +44,15 @@ db.open().then(async () => {
   if (!localStorage.getItem(TEXT_CASE_MIGRATED_KEY)) {
     await migrateTextToSentenceCase()
     localStorage.setItem(TEXT_CASE_MIGRATED_KEY, '1')
+  }
+
+  if (!localStorage.getItem(NOTE_CHECKLIST_MIGRATED_KEY)) {
+    const notes = await db.notes.toArray()
+    for (const note of notes) {
+      if (!note.id) continue
+      await syncChecklistForNote(note.id, note.content ?? '')
+    }
+    localStorage.setItem(NOTE_CHECKLIST_MIGRATED_KEY, '1')
   }
 
   pruneSentNotifications()

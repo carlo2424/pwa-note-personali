@@ -69,6 +69,7 @@ export interface Task {
   title: string
   done: boolean
   eventId?: number
+  noteId?: number
   listId?: number
   dueDate?: string // ISO YYYY-MM-DD (solo attività singole senza lista)
   createdAt: number
@@ -231,6 +232,18 @@ class PersonalNotesDB extends Dexie {
       archive: '++id, type, originalId, archivedAt',
       events: '++id, title, startDate, renewalDate, createdAt, updatedAt, cardId, areaId',
       tasks: '++id, done, createdAt, eventId, listId, dueDate',
+      taskLists: '++id, createdAt, dueDate',
+      paymentCards: '++id, name, expiry',
+      areas: '++id, name, createdAt',
+    })
+
+    // v12: checklist sulle note (tasks.noteId)
+    this.version(12).stores({
+      notes: '++id, title, createdAt, updatedAt, startDate, endDate, areaId',
+      expenses: '++id, amount, category, date, createdAt, cardId, eventId, areaId',
+      archive: '++id, type, originalId, archivedAt',
+      events: '++id, title, startDate, renewalDate, createdAt, updatedAt, cardId, areaId',
+      tasks: '++id, done, createdAt, eventId, noteId, listId, dueDate',
       taskLists: '++id, createdAt, dueDate',
       paymentCards: '++id, name, expiry',
       areas: '++id, name, createdAt',

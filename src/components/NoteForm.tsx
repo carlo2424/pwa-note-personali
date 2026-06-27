@@ -3,6 +3,7 @@ import { db, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { resolveAreaId, areaNameById } from '../utils/areas'
 import { sentenceCase } from '../utils/format'
+import { syncChecklistForNote } from '../utils/noteTasks'
 import { AreaInput } from './AreaInput'
 import { CameraCapture } from './CameraCapture'
 import { SpeechDictation } from './SpeechDictation'
@@ -75,11 +76,13 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
 
       if (note?.id) {
         await db.notes.update(note.id, fields)
+        await syncChecklistForNote(note.id, content)
       } else {
-        await db.notes.add({
+        const id = await db.notes.add({
           ...fields,
           createdAt: now,
         })
+        if (id !== undefined) await syncChecklistForNote(id, content)
       }
       onSave()
       onClose()
@@ -143,10 +146,14 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onBlur={(e) => setContent(sentenceCase(e.target.value))}
-          placeholder="Scrivi o detta a voce…"
-          rows={4}
+          placeholder={'Scrivi o detta a voce…\n\nLista della spesa:\nuna voce per riga\n(es. latte\npane\nuova)'}
+          rows={6}
           className={inputClass}
         />
+        <p className="mt-1 text-xs text-slate-400">
+          Con <span className="font-medium text-slate-500">almeno 2 righe</span>{' '}
+          nel contenuto compare una lista con spunte da segnare.
+        </p>
       </div>
 
       <CameraCapture photo={photoBlob} onCapture={setPhotoBlob} />

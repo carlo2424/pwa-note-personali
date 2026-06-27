@@ -3,6 +3,7 @@ import { db, type ArchiveItem, type Expense, type Note, type Task } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { formatDate } from '../utils/format'
 import { syncExpensesForEvent } from '../utils/eventExpenses'
+import { syncChecklistForNote } from '../utils/noteTasks'
 import type { SerializedEventData } from '../utils/archive'
 import { ExpandableCard } from './ExpandableCard'
 
@@ -25,7 +26,7 @@ async function restoreItem(item: ArchiveItem) {
 
   if (item.type === 'note') {
     const note = parsed as Note
-    await db.notes.add({
+    const newId = await db.notes.add({
       title: note.title,
       content: note.content,
       color: note.color,
@@ -36,6 +37,9 @@ async function restoreItem(item: ArchiveItem) {
       createdAt: note.createdAt,
       updatedAt: Date.now(),
     })
+    if (newId !== undefined) {
+      await syncChecklistForNote(newId, note.content ?? '')
+    }
   } else if (item.type === 'expense') {
     const expense = parsed as Expense
     await db.expenses.add({
