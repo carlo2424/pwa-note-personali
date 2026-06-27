@@ -1,7 +1,7 @@
 import { db, type Event, type Note, type Task } from '../db'
 import { isPastDue } from './countdown'
 import { isNoteImpegno } from './impegno'
-import { isNoteChecklistContent } from './noteTasks'
+import { isNoteChecklist } from './noteKind'
 
 export function tasksForNote(tasks: Task[], noteId?: number): Task[] {
   if (!noteId) return []
@@ -15,8 +15,7 @@ export function isOverdueNoteImpegno(
 ): boolean {
   if (!isNoteImpegno(note) || !isPastDue(note.endDate)) return false
 
-  const hasChecklist =
-    linkedTasks.length >= 2 || isNoteChecklistContent(note.content ?? '')
+  const hasChecklist = isNoteChecklist(note) && linkedTasks.length > 0
 
   if (hasChecklist && linkedTasks.length > 0) {
     return linkedTasks.some((t) => !t.done)

@@ -1,7 +1,8 @@
-import { CalendarDays, StickyNote, Wallet } from 'lucide-react'
+import { CalendarDays, ListChecks, StickyNote, Wallet } from 'lucide-react'
 
 interface AddChooserProps {
   onAddNote: () => void
+  onAddChecklist: () => void
   onAddEvent: () => void
   onAddExpense: () => void
   areaName?: string
@@ -11,21 +12,28 @@ const options = [
   {
     id: 'note',
     label: 'Nota',
-    description: 'Appunto o promemoria testuale',
+    description: 'Appunto testuale libero',
     icon: StickyNote,
     iconClass: 'bg-amber-100 text-amber-700',
   },
   {
+    id: 'checklist',
+    label: 'Lista',
+    description: 'To-do con voci da spuntare',
+    icon: ListChecks,
+    iconClass: 'bg-emerald-100 text-emerald-700',
+  },
+  {
     id: 'event',
     label: 'Impegno',
-    description: 'Con data inizio e data fine (anche da una nota)',
+    description: 'Con data inizio e data fine',
     icon: CalendarDays,
     iconClass: 'bg-indigo-100 text-indigo-700',
   },
   {
     id: 'expense',
     label: 'Spesa',
-    description: 'Pagamento una tantum (es. assicurazione annuale pagata una volta)',
+    description: 'Pagamento una tantum',
     icon: Wallet,
     iconClass: 'bg-rose-100 text-rose-700',
   },
@@ -34,12 +42,14 @@ const options = [
 /** Scelta del tipo di elemento da creare (un solo tap) */
 export function AddChooser({
   onAddNote,
+  onAddChecklist,
   onAddEvent,
   onAddExpense,
   areaName,
 }: AddChooserProps) {
   const handlers = {
     note: onAddNote,
+    checklist: onAddChecklist,
     event: onAddEvent,
     expense: onAddExpense,
   }

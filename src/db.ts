@@ -6,6 +6,8 @@ export interface Note {
   id?: number
   title: string
   content: string
+  /** Nota testuale o lista to-do con spunte */
+  kind?: 'text' | 'checklist'
   color?: string
   photoBlob?: Blob
   startDate?: string
@@ -247,6 +249,34 @@ class PersonalNotesDB extends Dexie {
       taskLists: '++id, createdAt, dueDate',
       paymentCards: '++id, name, expiry',
       areas: '++id, name, createdAt',
+    })
+
+    // v13: tipo esplicito nota vs lista to-do
+    this.version(13).stores({
+      notes: '++id, title, createdAt, updatedAt, startDate, endDate, areaId, kind',
+      expenses: '++id, amount, category, date, createdAt, cardId, eventId, areaId',
+      archive: '++id, type, originalId, archivedAt',
+      events: '++id, title, startDate, renewalDate, createdAt, updatedAt, cardId, areaId',
+      tasks: '++id, done, createdAt, eventId, noteId, listId, dueDate',
+      taskLists: '++id, createdAt, dueDate',
+      paymentCards: '++id, name, expiry',
+      areas: '++id, name, createdAt',
+    }).upgrade(async (tx) => {
+      const notes = await tx.table('notes').toArray()
+      const tasks = await tx.table('tasks').toArray()
+      for (const note of notes) {
+        if (!note.id || note.kind) continue
+        const linked = tasks.filter(
+          (t: { noteId?: number }) => t.noteId === note.id,
+        )
+        const lineCount = String(note.content ?? '')
+          .split(/\r?\n/)
+          .map((line: string) => line.trim())
+          .filter(Boolean).length
+        const kind =
+          linked.length >= 2 || lineCount >= 2 ? 'checklist' : 'text'
+        await tx.table('notes').update(note.id, { kind })
+      }
     })
   }
 }

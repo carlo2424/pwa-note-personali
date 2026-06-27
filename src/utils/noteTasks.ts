@@ -16,11 +16,17 @@ export async function deleteTasksForNote(noteId: number): Promise<void> {
   }
 }
 
-/** Sincronizza le voci checklist collegate a una nota (dal contenuto multiriga) */
+/** Sincronizza le voci checklist collegate a una nota (solo tipo lista) */
 export async function syncChecklistForNote(
   noteId: number,
   content: string,
+  kind: 'text' | 'checklist' = 'checklist',
 ): Promise<void> {
+  if (kind !== 'checklist') {
+    await deleteTasksForNote(noteId)
+    return
+  }
+
   const lines = parseTaskLines(content)
   if (lines.length < MIN_CHECKLIST_LINES) {
     await deleteTasksForNote(noteId)

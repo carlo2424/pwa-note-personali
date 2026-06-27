@@ -6,6 +6,7 @@ import { deletePermanentlyConfirmCopy } from '../utils/confirmMessages'
 import { formatDate } from '../utils/format'
 import { syncExpensesForEvent } from '../utils/eventExpenses'
 import { syncChecklistForNote } from '../utils/noteTasks'
+import { resolveNoteKind } from '../utils/noteKind'
 import type { SerializedEventData } from '../utils/archive'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ExpandableCard } from './ExpandableCard'
@@ -32,6 +33,7 @@ async function restoreItem(item: ArchiveItem) {
     const newId = await db.notes.add({
       title: note.title,
       content: note.content,
+      kind: note.kind ?? resolveNoteKind(note),
       color: note.color,
       photoBlob: item.photoBlob,
       startDate: note.startDate,
@@ -41,7 +43,11 @@ async function restoreItem(item: ArchiveItem) {
       updatedAt: Date.now(),
     })
     if (newId !== undefined) {
-      await syncChecklistForNote(newId, note.content ?? '')
+      await syncChecklistForNote(
+        newId,
+        note.content ?? '',
+        resolveNoteKind(note),
+      )
     }
   } else if (item.type === 'expense') {
     const expense = parsed as Expense

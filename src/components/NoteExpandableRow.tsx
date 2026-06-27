@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ListChecks } from 'lucide-react'
 import type { Note } from '../db'
 import { db } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
@@ -7,7 +8,7 @@ import { isPastDue } from '../utils/countdown'
 import { toggleTask } from '../utils/eventTasks'
 import { formatDate, formatDateRange, sentenceCase } from '../utils/format'
 import { isNoteImpegno } from '../utils/impegno'
-import { isNoteChecklistContent } from '../utils/noteTasks'
+import { isNoteChecklist } from '../utils/noteKind'
 import { archiveNote } from '../utils/noteArchive'
 import { shareNote } from '../utils/share'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -39,22 +40,24 @@ export function NoteExpandableRow({
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
   const archiveKind = isNoteImpegno(note) ? 'impegno' : 'nota'
   const archiveCopy = archiveConfirmCopy(archiveKind, note.title)
+  const checklistNote = isNoteChecklist(note)
 
   const checklistTasks = useDexieLiveQuery(
     async () => {
-      if (!note.id) return []
+      if (!note.id || !checklistNote) return []
       return db.tasks.where('noteId').equals(note.id).sortBy('createdAt')
     },
-    [note.id],
+    [note.id, checklistNote],
   )
 
-  const hasChecklist =
-    (checklistTasks?.length ?? 0) >= 2 ||
-    isNoteChecklistContent(note.content ?? '')
+  const hasChecklist = checklistNote && (checklistTasks?.length ?? 0) > 0
 
   const displayContent =
-    !hasChecklist && note.content ? sentenceCase(note.content) : ''
-  const photoUrl = note.photoBlob ? URL.createObjectURL(note.photoBlob) : null
+    !checklistNote && note.content ? sentenceCase(note.content) : ''
+  const photoUrl =
+    !checklistNote && note.photoBlob
+      ? URL.createObjectURL(note.photoBlob)
+      : null
   const overdue = isPastDue(note.endDate)
   const dateRange = formatDateRange(note.startDate, note.endDate)
 
@@ -64,7 +67,19 @@ export function NoteExpandableRow({
   const checklistPreview =
     hasChecklist && totalCount > 0
       ? `${doneCount}/${totalCount} completate`
-      : null
+      : checklistNote
+        ? 'Lista vuota'
+        : null
+
+  const typeBadge = checklistNote ? (
+    <span
+      className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${
+        compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'
+      }`}
+    >
+      Lista
+    </span>
+  ) : null
 
   return (
     <>
@@ -73,12 +88,24 @@ export function NoteExpandableRow({
       containerClassName={
         overdue
           ? 'border-rose-200 bg-rose-50/50 ring-1 ring-rose-100'
-          : 'border-slate-100 bg-white'
+          : checklistNote
+            ? 'border-emerald-100 bg-emerald-50/30'
+            : 'border-slate-100 bg-white'
       }
       icon={
-        <div
-          className={`shrink-0 rounded-full ${COLOR_MAP[note.color ?? 'indigo']} ${compact ? 'h-2.5 w-2.5' : 'h-3 w-3'}`}
-        />
+        checklistNote ? (
+          <div
+            className={`flex shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 ${
+              compact ? 'h-6 w-6' : 'h-7 w-7'
+            }`}
+          >
+            <ListChecks className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
+          </div>
+        ) : (
+          <div
+            className={`shrink-0 rounded-full ${COLOR_MAP[note.color ?? 'indigo']} ${compact ? 'h-2.5 w-2.5' : 'h-3 w-3'}`}
+          />
+        )
       }
       title={note.title}
       titleClassName={overdue ? 'text-rose-900' : 'text-slate-900'}
@@ -110,7 +137,9 @@ export function NoteExpandableRow({
           <span className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
             Fatto
           </span>
-        ) : undefined
+        ) : (
+          typeBadge
+        )
       }
       actions={
         <ItemActions

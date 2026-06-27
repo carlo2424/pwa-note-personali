@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { ListChecks, StickyNote } from 'lucide-react'
 import { db, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { resolveAreaId, areaNameById } from '../utils/areas'
 import { sentenceCase } from '../utils/format'
 import { clampEndDateToStart } from '../utils/recurring'
+import { type NoteKind, resolveNoteKind } from '../utils/noteKind'
 import { syncChecklistForNote } from '../utils/noteTasks'
 import { AreaInput } from './AreaInput'
 import { CameraCapture } from './CameraCapture'
@@ -22,12 +24,62 @@ const NOTE_COLORS = [
 
 interface NoteFormProps {
   note?: Note
+  defaultKind?: NoteKind
   defaultAreaName?: string
   onSave: () => void
   onClose: () => void
 }
 
-export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormProps) {
+function NoteKindToggle({
+  kind,
+  onChange,
+  disabled,
+}: {
+  kind: NoteKind
+  onChange: (kind: NoteKind) => void
+  disabled?: boolean
+}) {
+  const options: { id: NoteKind; label: string; icon: typeof StickyNote }[] = [
+    { id: 'text', label: 'Nota', icon: StickyNote },
+    { id: 'checklist', label: 'Lista', icon: ListChecks },
+  ]
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {options.map((opt) => {
+        const Icon = opt.icon
+        const active = kind === opt.id
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(opt.id)}
+            className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+              active
+                ? 'border-indigo-300 bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+export function NoteForm({
+  note,
+  defaultKind = 'text',
+  defaultAreaName,
+  onSave,
+  onClose,
+}: NoteFormProps) {
+  const [kind, setKind] = useState<NoteKind>(
+    note ? resolveNoteKind(note) : defaultKind,
+  )
   const [title, setTitle] = useState(note?.title ? sentenceCase(note.title) : '')
   const [content, setContent] = useState(
     note?.content ? sentenceCase(note.content) : '',
@@ -41,14 +93,20 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
   const [saving, setSaving] = useState(false)
 
   const areas = useDexieLiveQuery(() => db.areas.toArray())
+  const isChecklist = kind === 'checklist'
 
   useEffect(() => {
     if (note?.id) {
+      setKind(resolveNoteKind(note))
       setAreaName(areaNameById(areas ?? [], note.areaId) ?? '')
     } else if (defaultAreaName) {
       setAreaName(defaultAreaName)
     }
-  }, [note?.id, note?.areaId, areas, defaultAreaName])
+  }, [note?.id, note?.areaId, note?.kind, note?.content, areas, defaultAreaName])
+
+  useEffect(() => {
+    if (!note?.id) setKind(defaultKind)
+  }, [defaultKind, note?.id])
 
   function handleStartDateChange(date: string) {
     setStartDate(date)
@@ -72,7 +130,15 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
 
   function appendContent(text: string) {
     setContent((prev) =>
-      sentenceCase(prev ? `${prev.trimEnd()} ${text}` : text),
+      sentenceCase(
+        isChecklist
+          ? prev
+            ? `${prev.trimEnd()}\n${text}`
+            : text
+          : prev
+            ? `${prev.trimEnd()} ${text}`
+            : text,
+      ),
     )
   }
 
@@ -88,8 +154,9 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
       const fields = {
         title: sentenceCase(title),
         content: sentenceCase(content),
+        kind,
         color,
-        photoBlob,
+        photoBlob: isChecklist ? undefined : photoBlob,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         areaId,
@@ -98,13 +165,13 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
 
       if (note?.id) {
         await db.notes.update(note.id, fields)
-        await syncChecklistForNote(note.id, content)
+        await syncChecklistForNote(note.id, content, kind)
       } else {
         const id = await db.notes.add({
           ...fields,
           createdAt: now,
         })
-        if (id !== undefined) await syncChecklistForNote(id, content)
+        if (id !== undefined) await syncChecklistForNote(id, content, kind)
       }
       onSave()
       onClose()
@@ -116,6 +183,13 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
+        <label className="mb-1.5 block text-sm font-medium text-slate-700">
+          Tipo
+        </label>
+        <NoteKindToggle kind={kind} onChange={setKind} disabled={saving} />
+      </div>
+
+      <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">
           Titolo
         </label>
@@ -124,7 +198,7 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={(e) => setTitle(sentenceCase(e.target.value))}
-          placeholder="Titolo della nota"
+          placeholder={isChecklist ? 'Titolo della lista' : 'Titolo della nota'}
           className={inputClass}
           required
         />
@@ -155,31 +229,40 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
       </div>
       {startDate && endDate && (
         <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
-          Con data inizio e fine questa nota compare anche tra gli{' '}
-          <span className="font-semibold">Impegni</span>.
+          Con data inizio e fine {isChecklist ? 'questa lista' : 'questa nota'}{' '}
+          compare anche tra gli <span className="font-semibold">Impegni</span>.
         </p>
       )}
 
       <div>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <label className="text-sm font-medium text-slate-700">Contenuto</label>
+          <label className="text-sm font-medium text-slate-700">
+            {isChecklist ? 'Voci' : 'Contenuto'}
+          </label>
           <SpeechDictation onTranscript={appendContent} disabled={saving} />
         </div>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onBlur={(e) => setContent(sentenceCase(e.target.value))}
-          placeholder={'Scrivi o detta a voce…\n\nLista della spesa:\nuna voce per riga\n(es. latte\npane\nuova)'}
-          rows={6}
+          placeholder={
+            isChecklist
+              ? 'Una voce per riga, ad esempio:\nLatte\nPane\nUova'
+              : 'Scrivi o detta a voce il testo della nota…'
+          }
+          rows={isChecklist ? 8 : 6}
           className={inputClass}
         />
         <p className="mt-1 text-xs text-slate-400">
-          Con <span className="font-medium text-slate-500">almeno 2 righe</span>{' '}
-          nel contenuto compare una lista con spunte da segnare.
+          {isChecklist
+            ? 'Ogni riga diventa una voce con spunta. Servono almeno 2 voci.'
+            : 'Testo libero: anche più righe restano un appunto, senza spunte.'}
         </p>
       </div>
 
-      <CameraCapture photo={photoBlob} onCapture={setPhotoBlob} />
+      {!isChecklist && (
+        <CameraCapture photo={photoBlob} onCapture={setPhotoBlob} />
+      )}
 
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -215,7 +298,13 @@ export function NoteForm({ note, defaultAreaName, onSave, onClose }: NoteFormPro
           disabled={saving || !title.trim()}
           className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
-          {saving ? 'Salvataggio...' : note ? 'Aggiorna' : 'Crea nota'}
+          {saving
+            ? 'Salvataggio...'
+            : note
+              ? 'Aggiorna'
+              : isChecklist
+                ? 'Crea lista'
+                : 'Crea nota'}
         </button>
       </div>
     </form>

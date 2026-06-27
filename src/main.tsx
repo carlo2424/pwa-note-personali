@@ -11,6 +11,7 @@ import {
 } from './utils/renewalNotifications'
 import { migrateTextToSentenceCase } from './utils/textCaseMigrate'
 import { syncChecklistForNote } from './utils/noteTasks'
+import { resolveNoteKind } from './utils/noteKind'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
@@ -50,7 +51,11 @@ db.open().then(async () => {
     const notes = await db.notes.toArray()
     for (const note of notes) {
       if (!note.id) continue
-      await syncChecklistForNote(note.id, note.content ?? '')
+      await syncChecklistForNote(
+        note.id,
+        note.content ?? '',
+        resolveNoteKind(note),
+      )
     }
     localStorage.setItem(NOTE_CHECKLIST_MIGRATED_KEY, '1')
   }

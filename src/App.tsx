@@ -27,6 +27,8 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { NavBadge } from './components/NavBadge'
 import { useOverdueCounts } from './hooks/useOverdueCounts'
 import { resetDB, type Event, type Expense, type Note } from './db'
+import type { NoteKind } from './utils/noteKind'
+import { resolveNoteKind } from './utils/noteKind'
 
 type Section = 'home' | 'notes' | 'events' | 'expenses' | 'cards' | 'archive'
 
@@ -43,8 +45,8 @@ const sections: Record<
   notes: {
     label: 'Note',
     icon: StickyNote,
-    title: 'Note libere',
-    description: 'Appunti e promemoria testuali.',
+    title: 'Note e liste',
+    description: 'Appunti testuali e liste to-do con spunte.',
   },
   events: {
     label: 'Impegni',
@@ -82,6 +84,7 @@ function App() {
   const [editingEvent, setEditingEvent] = useState<Event | undefined>()
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>()
   const [editingNote, setEditingNote] = useState<Note | undefined>()
+  const [newNoteKind, setNewNoteKind] = useState<NoteKind>('text')
   const [defaultAreaName, setDefaultAreaName] = useState<string | undefined>()
 
   const current = sections[activeSection]
@@ -117,13 +120,15 @@ function App() {
     setShowExpenseForm(true)
   }
 
-  function openNewNote() {
+  function openNewNote(kind: NoteKind = 'text') {
     setEditingNote(undefined)
+    setNewNoteKind(kind)
     setShowNoteForm(true)
   }
 
   function openEditNote(note: Note) {
     setEditingNote(note)
+    setNewNoteKind(resolveNoteKind(note))
     setShowNoteForm(true)
   }
 
@@ -149,9 +154,12 @@ function App() {
     else setShowAddChooser(true)
   }
 
-  function addFromChooser(kind: 'note' | 'event' | 'expense') {
+  function addFromChooser(
+    kind: 'note' | 'checklist' | 'event' | 'expense',
+  ) {
     setShowAddChooser(false)
-    if (kind === 'note') openNewNote()
+    if (kind === 'note') openNewNote('text')
+    else if (kind === 'checklist') openNewNote('checklist')
     else if (kind === 'event') openNewEvent()
     else openNewExpense()
   }
@@ -345,6 +353,7 @@ function App() {
           <AddChooser
             areaName={defaultAreaName}
             onAddNote={() => addFromChooser('note')}
+            onAddChecklist={() => addFromChooser('checklist')}
             onAddEvent={() => addFromChooser('event')}
             onAddExpense={() => addFromChooser('expense')}
           />
@@ -373,11 +382,20 @@ function App() {
 
       {showNoteForm && (
         <Modal
-          title={editingNote ? 'Modifica nota' : 'Nuova nota'}
+          title={
+            editingNote
+              ? resolveNoteKind(editingNote) === 'checklist'
+                ? 'Modifica lista'
+                : 'Modifica nota'
+              : newNoteKind === 'checklist'
+                ? 'Nuova lista'
+                : 'Nuova nota'
+          }
           onClose={closeNoteForm}
         >
           <NoteForm
             note={editingNote}
+            defaultKind={newNoteKind}
             defaultAreaName={editingNote ? undefined : defaultAreaName}
             onSave={closeNoteForm}
             onClose={closeNoteForm}
