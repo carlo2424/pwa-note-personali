@@ -46,7 +46,8 @@ export function RecoveryScreen({
       ) : null}
       {showLoadingHint ? (
         <p className="max-w-xs text-sm text-slate-500">
-          Se resta bloccata, usa i pulsanti qui sotto.
+          Se resta bloccata, usa i pulsanti qui sotto. Su Brave, se compare un
+          errore sul service worker, tocca comunque Ricarica.
         </p>
       ) : null}
       {actionError ? (

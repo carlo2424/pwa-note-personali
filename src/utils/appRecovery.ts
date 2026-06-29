@@ -1,17 +1,56 @@
 import Dexie from 'dexie'
 
-/** Svuota cache PWA e service worker (senza toccare IndexedDB) */
-export async function clearPwaCache(): Promise<void> {
-  sessionStorage.setItem('pwa-recovery', String(Date.now()))
+const SW_BLOCKED_KEY = 'pwa-sw-blocked'
 
-  if ('serviceWorker' in navigator) {
+export function isServiceWorkerBlocked(): boolean {
+  return localStorage.getItem(SW_BLOCKED_KEY) === '1'
+}
+
+function markServiceWorkerBlocked(): void {
+  localStorage.setItem(SW_BLOCKED_KEY, '1')
+}
+
+/** True se il browser consente l'uso dei service worker */
+export async function canUseServiceWorker(): Promise<boolean> {
+  if (!('serviceWorker' in navigator)) return false
+  if (isServiceWorkerBlocked()) return false
+  try {
+    await navigator.serviceWorker.getRegistrations()
+    return true
+  } catch (err) {
+    console.warn('[PWA] Service worker non disponibile:', err)
+    markServiceWorkerBlocked()
+    return false
+  }
+}
+
+async function safeUnregisterServiceWorkers(): Promise<void> {
+  if (!('serviceWorker' in navigator)) return
+  try {
     const regs = await navigator.serviceWorker.getRegistrations()
     await Promise.all(regs.map((r) => r.unregister()))
+  } catch (err) {
+    console.warn('[PWA] Impossibile rimuovere service worker:', err)
+    markServiceWorkerBlocked()
   }
-  if ('caches' in window) {
+}
+
+async function safeClearCaches(): Promise<void> {
+  if (!('caches' in window)) return
+  try {
     const keys = await caches.keys()
     await Promise.all(keys.map((k) => caches.delete(k)))
+  } catch (err) {
+    console.warn('[PWA] Impossibile svuotare cache:', err)
   }
+}
+
+/** Svuota cache PWA (non tocca IndexedDB). Non lancia errori. */
+export async function clearPwaCache(): Promise<void> {
+  sessionStorage.setItem('pwa-recovery', String(Date.now()))
+  markServiceWorkerBlocked()
+  await safeUnregisterServiceWorkers()
+  await safeClearCaches()
 }
 
 function recoveryUrl(): string {
@@ -33,7 +72,7 @@ export async function resetAppData(): Promise<void> {
   window.location.replace(recoveryUrl())
 }
 
-/** Se l'app è stata appena recuperata, salta la registrazione SW una volta */
+/** Salta registrazione SW subito dopo un recupero */
 export function shouldSkipServiceWorkerRegistration(): boolean {
   const flag = sessionStorage.getItem('pwa-recovery')
   if (!flag) return false

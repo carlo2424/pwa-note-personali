@@ -5,7 +5,11 @@ import './index.css'
 import App from './App.tsx'
 import { RecoveryScreen } from './components/RecoveryScreen.tsx'
 import { db } from './db'
-import { shouldSkipServiceWorkerRegistration } from './utils/appRecovery'
+import {
+  canUseServiceWorker,
+  isServiceWorkerBlocked,
+  shouldSkipServiceWorkerRegistration,
+} from './utils/appRecovery'
 import { syncExpensesForEvent } from './utils/eventExpenses'
 import {
   checkRenewalNotifications,
@@ -22,13 +26,21 @@ const BOOT_TIMEOUT_MS = 12_000
 /** In dev: rimuove SW e cache PWA che mostrano build vecchie su localhost */
 async function clearPwaCacheInDev(): Promise<void> {
   if (!import.meta.env.DEV) return
-  if ('serviceWorker' in navigator) {
-    const regs = await navigator.serviceWorker.getRegistrations()
-    await Promise.all(regs.map((r) => r.unregister()))
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(regs.map((r) => r.unregister()))
+    }
+  } catch {
+    // Brave / privacy: service worker non consentito
   }
-  if ('caches' in window) {
-    const keys = await caches.keys()
-    await Promise.all(keys.map((k) => caches.delete(k)))
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys()
+      await Promise.all(keys.map((k) => caches.delete(k)))
+    }
+  } catch {
+    // ignora
   }
 }
 
@@ -131,24 +143,39 @@ function Bootstrap() {
   return <App />
 }
 
-// Registra il service worker PWA solo in produzione (build)
-if (import.meta.env.PROD && !shouldSkipServiceWorkerRegistration()) {
-  const updateSW = registerSW({
-    immediate: true,
-    onOfflineReady() {
-      console.info('[PWA] App pronta per uso offline')
-    },
-    onNeedRefresh() {
-      if (
-        window.confirm(
-          'È disponibile una nuova versione. Aggiornare ora?',
-        )
-      ) {
-        updateSW(true)
-      }
-    },
-  })
+async function tryRegisterServiceWorker(): Promise<void> {
+  if (!import.meta.env.PROD) return
+  if (shouldSkipServiceWorkerRegistration()) return
+  if (isServiceWorkerBlocked()) return
+  if (!(await canUseServiceWorker())) return
+
+  try {
+    const updateSW = registerSW({
+      immediate: true,
+      onRegisterError(error) {
+        console.warn('[PWA] Registrazione fallita:', error)
+        localStorage.setItem('pwa-sw-blocked', '1')
+      },
+      onOfflineReady() {
+        console.info('[PWA] App pronta per uso offline')
+      },
+      onNeedRefresh() {
+        if (
+          window.confirm(
+            'È disponibile una nuova versione. Aggiornare ora?',
+          )
+        ) {
+          updateSW(true)
+        }
+      },
+    })
+  } catch (error) {
+    console.warn('[PWA] Service worker non disponibile:', error)
+    localStorage.setItem('pwa-sw-blocked', '1')
+  }
 }
+
+void tryRegisterServiceWorker()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
