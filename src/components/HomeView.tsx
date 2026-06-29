@@ -26,7 +26,6 @@ import {
   currentMonthBounds,
   eventInCurrentMonth,
   expenseInCurrentMonth,
-  noteInCurrentMonth,
 } from '../utils/monthFilter'
 import {
   computeMonthPaidTotal,
@@ -43,6 +42,7 @@ import {
   shareImpegnoRowsSection,
 } from '../utils/share'
 import { deadlineLabel, sortNotesByUrgency } from '../utils/homeSpotlight'
+import { noteVisibleOnHome } from '../utils/homeReminders'
 import { AreaChips } from './AreaChips'
 import { CollapsibleSection, sectionIcon } from './CollapsibleSection'
 import { EventExpandableRow } from './EventExpandableRow'
@@ -230,7 +230,7 @@ export function HomeView({
       filterNoteImpegni(notes ?? []).filter(
         (n) =>
           matchesAreaSelection(n, areaSelection, areaList) &&
-          noteInCurrentMonth(n) &&
+          noteVisibleOnHome(n) &&
           !overdueNoteIds.has(n.id!),
       ),
     [notes, areaSelection, areaList, overdueNoteIds],
@@ -241,9 +241,10 @@ export function HomeView({
       (notes ?? []).filter(
         (n) =>
           matchesAreaSelection(n, areaSelection, areaList) &&
-          noteInCurrentMonth(n),
+          noteVisibleOnHome(n) &&
+          !overdueNoteIds.has(n.id!),
       ),
-    [notes, areaSelection, areaList],
+    [notes, areaSelection, areaList, overdueNoteIds],
   )
 
   const monthExpensesList = useMemo(
@@ -328,7 +329,7 @@ export function HomeView({
 
   const areaCounts = useMemo(() => {
     const counts = new Map<number, number>()
-    const noteList = (notes ?? []).filter((n) => noteInCurrentMonth(n))
+    const noteList = (notes ?? []).filter((n) => noteVisibleOnHome(n))
     const eventList = (events ?? []).filter((e) => eventInCurrentMonth(e))
     const expenseList = (expenses ?? []).filter((e) => expenseInCurrentMonth(e))
     for (const area of areas ?? []) {
@@ -342,7 +343,7 @@ export function HomeView({
   }, [areas, notes, events, expenses])
 
   const totalAreaItems = countDistinctAreaItems(
-    (notes ?? []).filter((n) => noteInCurrentMonth(n)),
+    (notes ?? []).filter((n) => noteVisibleOnHome(n)),
     (events ?? []).filter((e) => eventInCurrentMonth(e)),
     (expenses ?? []).filter((e) => expenseInCurrentMonth(e)),
   )
