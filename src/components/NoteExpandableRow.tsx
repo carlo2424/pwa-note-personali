@@ -7,7 +7,7 @@ import { archiveConfirmCopy } from '../utils/confirmMessages'
 import { isPastDue } from '../utils/countdown'
 import { deadlineLabel, noteDateUrgency } from '../utils/homeSpotlight'
 import { toggleTask } from '../utils/eventTasks'
-import { formatDate, formatDateRange, sentenceCase } from '../utils/format'
+import { formatDate, formatDateRange, formatIsoDate, sentenceCase } from '../utils/format'
 import { isNoteImpegno } from '../utils/impegno'
 import { isNoteChecklist } from '../utils/noteKind'
 import { archiveNote } from '../utils/noteArchive'
@@ -29,6 +29,8 @@ interface NoteExpandableRowProps {
   note: Note
   onEdit: () => void
   areaName?: string
+  /** Nome membro area quando il titolo è il gruppo (es. Lorenzo sotto Famiglia) */
+  areaMember?: string
   compact?: boolean
   /** In Home globale: mostra l'area (es. Lorenzo) come titolo per le liste */
   promoteAreaTitle?: boolean
@@ -38,6 +40,7 @@ export function NoteExpandableRow({
   note,
   onEdit,
   areaName,
+  areaMember,
   compact = false,
   promoteAreaTitle = true,
 }: NoteExpandableRowProps) {
@@ -80,32 +83,45 @@ export function NoteExpandableRow({
     dateUrg === 'today' || dateUrg === 'soon'
   const keyDate = note.endDate ?? note.startDate
   const soonLabel = keyDate ? deadlineLabel(keyDate) : ''
+  const dueDateLabel =
+    note.endDate && note.startDate && note.endDate !== note.startDate
+      ? formatDateRange(note.startDate, note.endDate)
+      : keyDate
+        ? formatIsoDate(keyDate)
+        : null
+
+  const showAreaAsTitle = Boolean(areaName && promoteAreaTitle)
 
   const primaryTitle =
-    checklistNote && areaName && promoteAreaTitle
-      ? areaName
-      : sentenceCase(note.title)
+    showAreaAsTitle ? areaName! : sentenceCase(note.title)
 
   const subtitleParts: string[] = []
-  if (checklistNote && areaName && promoteAreaTitle) {
+  if (checklistNote && showAreaAsTitle) {
     subtitleParts.push(sentenceCase(note.title))
   }
+  if (areaMember && showAreaAsTitle) {
+    subtitleParts.push(areaMember)
+  }
   if (checklistPreview) subtitleParts.push(checklistPreview)
-  if (soonLabel && (soon || overdue)) subtitleParts.push(soonLabel)
+  if (dueDateLabel) {
+    subtitleParts.push(
+      overdue ? `Scadenza ${dueDateLabel}` : dueDateLabel,
+    )
+  } else if (soonLabel && (soon || overdue)) {
+    subtitleParts.push(soonLabel)
+  }
   if (!checklistNote && displayContent) {
     subtitleParts.push(
       `${displayContent.slice(0, 50)}${displayContent.length > 50 ? '…' : ''}`,
     )
-  } else if (!checklistNote && dateRange) {
-    subtitleParts.push(`${overdue ? 'Scaduta · ' : ''}${dateRange}`)
-  } else if (!checklistNote && !displayContent && !dateRange) {
+  } else if (!checklistNote && !displayContent && !dueDateLabel && !dateRange) {
     subtitleParts.push(`Aggiornata ${formatDate(note.updatedAt)}`)
   }
 
   const resolvedSubtitle =
     subtitleParts.length > 0 ? subtitleParts.join(' · ') : undefined
 
-  const typeBadge = checklistNote && !(areaName && promoteAreaTitle) ? (
+  const typeBadge = checklistNote && !showAreaAsTitle ? (
     <span
       className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${
         compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'

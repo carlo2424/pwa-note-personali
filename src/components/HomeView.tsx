@@ -8,7 +8,7 @@ import {
 import { useMemo, useState } from 'react'
 import { db, type Event, type Expense, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
-import { areaNameById, countDistinctAreaItems } from '../utils/areas'
+import { areaHomeLabel, areaNameById, countDistinctAreaItems } from '../utils/areas'
 import {
   type AreaSelection,
   isAreaFilterActive,
@@ -131,7 +131,6 @@ export function HomeView({
   onOpenEventFromExpense,
   onGoToEvents,
   onGoToExpenses,
-  onGoToNotes,
   onAddInArea,
 }: {
   onEditEvent: (event: Event) => void
@@ -140,7 +139,6 @@ export function HomeView({
   onOpenEventFromExpense?: (event: Event) => void
   onGoToEvents: () => void
   onGoToExpenses: () => void
-  onGoToNotes: () => void
   onAddInArea: (
     areaName: string,
     kind?: 'note' | 'event' | 'expense',
@@ -527,18 +525,52 @@ export function HomeView({
 
   const noteRowsList = (
     <ul className="space-y-2">
-      {sortedDisplayNotes.map((note) => (
-        <li key={note.id}>
-          <NoteExpandableRow
+      {sortedDisplayNotes.map((note) => {
+        const areaLabel =
+          areaSelection.kind === 'area'
+            ? {}
+            : areaHomeLabel(areas ?? [], note.areaId)
+        return (
+          <li key={note.id}>
+            <NoteExpandableRow
+              compact
+              note={note}
+              promoteAreaTitle={promoteNoteAreaTitle}
+              areaName={areaLabel.title}
+              areaMember={areaLabel.member}
+              onEdit={() => onEditNote(note)}
+            />
+          </li>
+        )
+      })}
+    </ul>
+  )
+
+  const globalActiveList = (
+    <ul className="space-y-2">
+      {sortedDisplayNotes.map((note) => {
+        const { title, member } = areaHomeLabel(areas ?? [], note.areaId)
+        return (
+          <li key={note.id}>
+            <NoteExpandableRow
+              compact
+              note={note}
+              promoteAreaTitle
+              areaName={title}
+              areaMember={member}
+              onEdit={() => onEditNote(note)}
+            />
+          </li>
+        )
+      })}
+      {displayExpenses.map((expense) => (
+        <li key={expense.id}>
+          <ExpenseExpandableRow
             compact
-            note={note}
-            promoteAreaTitle={promoteNoteAreaTitle}
-            areaName={
-              areaSelection.kind === 'area'
-                ? undefined
-                : areaNameById(areas ?? [], note.areaId)
-            }
-            onEdit={() => onEditNote(note)}
+            expense={expense}
+            areaName={areaNameById(areas ?? [], expense.areaId)}
+            onEdit={() => onEditExpense(expense)}
+            onOpenEvent={onOpenEventFromExpense}
           />
         </li>
       ))}
@@ -645,23 +677,18 @@ export function HomeView({
 
       {!areaFilterActive && (
         <HomeSpotlightCards
-          notes={sortedDisplayNotes}
-          impegnoRows={displayImpegni.filter(
-            (r): r is Extract<ImpegnoRow, { kind: 'event' }> =>
-              r.kind === 'event',
-          )}
-          impegnoCount={impegnoCount}
           monthLabel={monthLabel}
           monthPaid={monthExpensesTotal}
           monthPlanned={monthPlannedTotal}
           expenseDelta={expenseDelta}
           prevMonthExpenses={prevMonthExpenses}
-          areaNameById={(id) => areaNameById(areas ?? [], id)}
-          onGoToNotes={onGoToNotes}
-          onGoToEvents={onGoToEvents}
           onGoToExpenses={onGoToExpenses}
         />
       )}
+
+      {!areaFilterActive &&
+        (sortedDisplayNotes.length > 0 || displayExpenses.length > 0) &&
+        globalActiveList}
 
       {overdueRows.length > 0 && (
         <CollapsibleSection
@@ -814,46 +841,7 @@ export function HomeView({
             {expenseList}
           </CollapsibleSection>
         </div>
-      ) : (
-        <>
-          {displayImpegni.length > 0 && (
-            <CollapsibleSection
-              {...sectionComfort}
-              title={impegnoSectionTitle}
-              count={impegnoCount}
-              icon={impegnoSectionIcon}
-              subtitle={impegnoSectionSubtitle}
-              containerClassName={
-                impegnoSectionUrgent
-                  ? 'border-indigo-200 bg-indigo-50/50 ring-1 ring-indigo-100'
-                  : 'border-slate-100 bg-white'
-              }
-              totalAmount={impegnoTotal > 0 ? impegnoTotal : undefined}
-              onSeeAll={onGoToEvents}
-              onShare={shareSectionImpegni}
-            >
-              {impegnoList}
-            </CollapsibleSection>
-          )}
-
-          {displayNotes.length > 0 && noteRowsList}
-
-          {displayExpenses.length > 0 && (
-            <CollapsibleSection
-              {...sectionComfort}
-              title={formatAmount(speseTotal)}
-              count={expenseCount}
-              icon={speseSectionIcon}
-              subtitle={`${sentenceCase(monthLabel)} · ${expenseCount} ${expenseCount === 1 ? 'movimento' : 'movimenti'}`}
-              totalAmount={speseTotal > 0 ? speseTotal : undefined}
-              onSeeAll={onGoToExpenses}
-              onShare={shareSectionExpenses}
-            >
-              {expenseList}
-            </CollapsibleSection>
-          )}
-        </>
-      )}
+      ) : null}
 
       {isEmpty && (
         <p className="py-4 text-center text-sm text-slate-400">

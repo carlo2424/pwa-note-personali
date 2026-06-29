@@ -258,7 +258,6 @@ function App() {
               }}
               onGoToEvents={() => setActiveSection('events')}
               onGoToExpenses={() => setActiveSection('expenses')}
-              onGoToNotes={() => setActiveSection('notes')}
               onAddInArea={openAddInArea}
             />
           )}

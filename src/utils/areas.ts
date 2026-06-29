@@ -109,6 +109,23 @@ export function areaNameById(
   return name ? sentenceCase(name) : undefined
 }
 
+/** Etichetta area in Home: gruppo (es. Famiglia) o nome area (es. Budget) */
+export function areaHomeLabel(
+  areas: { id?: number; name: string; groupName?: string }[],
+  areaId?: number,
+): { title?: string; member?: string } {
+  if (!areaId) return {}
+  const area = areas.find((a) => a.id === areaId)
+  if (!area) return {}
+  if (area.groupName?.trim()) {
+    return {
+      title: sentenceCase(area.groupName),
+      member: sentenceCase(area.name),
+    }
+  }
+  return { title: sentenceCase(area.name) }
+}
+
 /** Elementi distinti per area (senza doppi conteggi spesa↔impegno) */
 export function countDistinctAreaItems(
   notes: Pick<Note, 'areaId' | 'startDate' | 'endDate'>[],
