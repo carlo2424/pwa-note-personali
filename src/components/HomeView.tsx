@@ -246,14 +246,6 @@ export function HomeView({
     [notes, areaSelection, areaList],
   )
 
-  const monthPlainNotes = useMemo(
-    () =>
-      filterPlainNotes(notes ?? []).filter(
-        (n) => matchesAreaSelection(n, areaSelection, areaList) && noteInCurrentMonth(n),
-      ),
-    [notes, areaSelection, areaList],
-  )
-
   const monthExpensesList = useMemo(
     () =>
       [...(expenses ?? [])]
