@@ -23,6 +23,8 @@ interface ExpenseExpandableRowProps {
   onOpenEvent?: (event: Event) => void
   areaName?: string
   compact?: boolean
+  /** In Home globale: area in titolo, data e descrizione nel sottotitolo */
+  promoteAreaTitle?: boolean
 }
 
 export function ExpenseExpandableRow({
@@ -31,10 +33,21 @@ export function ExpenseExpandableRow({
   onOpenEvent,
   areaName,
   compact = false,
+  promoteAreaTitle = false,
 }: ExpenseExpandableRowProps) {
   const isIncome = expense.amount < 0
   const method = (expense.paymentMethod ?? 'altro') as PaymentMethod
-  const meta = `${expense.category} · ${formatDate(new Date(expense.date).getTime())}`
+  const expenseDate = formatDate(new Date(expense.date).getTime())
+  const meta = `${expense.category} · ${expenseDate}`
+
+  const title = promoteAreaTitle && areaName
+    ? areaName
+    : expense.description
+  const subtitle = promoteAreaTitle && areaName
+    ? `${expenseDate} · ${expense.description}`
+    : areaName
+      ? `${areaName} · ${meta}`
+      : meta
 
   return (
     <ExpandableCard
@@ -46,8 +59,8 @@ export function ExpenseExpandableRow({
           {isIncome ? '+' : '−'}
         </div>
       }
-      title={expense.description}
-      subtitle={areaName ? `${areaName} · ${meta}` : meta}
+      title={title}
+      subtitle={subtitle}
       badge={
         expense.eventId ? (
           <span

@@ -571,6 +571,7 @@ export function HomeView({
           <ExpenseExpandableRow
             compact
             expense={expense}
+            promoteAreaTitle
             areaName={areaNameById(areas ?? [], expense.areaId)}
             onEdit={() => onEditExpense(expense)}
             onOpenEvent={onOpenEventFromExpense}

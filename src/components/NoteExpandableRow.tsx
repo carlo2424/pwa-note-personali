@@ -92,34 +92,46 @@ export function NoteExpandableRow({
 
   const showAreaAsTitle = Boolean(areaName && promoteAreaTitle)
 
-  const primaryTitle =
-    showAreaAsTitle ? areaName! : sentenceCase(note.title)
+  let primaryTitle: string
+  let resolvedSubtitle: string | undefined
 
-  const subtitleParts: string[] = []
-  if (checklistNote && showAreaAsTitle) {
-    subtitleParts.push(sentenceCase(note.title))
-  }
-  if (areaMember && showAreaAsTitle) {
-    subtitleParts.push(areaMember)
-  }
-  if (checklistPreview) subtitleParts.push(checklistPreview)
-  if (dueDateLabel) {
-    subtitleParts.push(
-      overdue ? `Scadenza ${dueDateLabel}` : dueDateLabel,
-    )
-  } else if (soonLabel && (soon || overdue)) {
-    subtitleParts.push(soonLabel)
-  }
-  if (!checklistNote && displayContent) {
-    subtitleParts.push(
-      `${displayContent.slice(0, 50)}${displayContent.length > 50 ? '…' : ''}`,
-    )
-  } else if (!checklistNote && !displayContent && !dueDateLabel && !dateRange) {
-    subtitleParts.push(`Aggiornata ${formatDate(note.updatedAt)}`)
-  }
+  if (showAreaAsTitle) {
+    const areaLabel = areaMember ? `${areaName} · ${areaMember}` : areaName!
+    const homeParts: string[] = []
+    if (dueDateLabel) {
+      homeParts.push(overdue ? `Scadenza ${dueDateLabel}` : dueDateLabel)
+    } else if (soonLabel && (soon || overdue)) {
+      homeParts.push(soonLabel)
+    }
+    homeParts.push(sentenceCase(note.title))
+    if (checklistPreview) homeParts.push(checklistPreview)
 
-  const resolvedSubtitle =
-    subtitleParts.length > 0 ? subtitleParts.join(' · ') : undefined
+    primaryTitle = areaLabel
+    resolvedSubtitle = homeParts.join(' · ')
+  } else {
+    primaryTitle = sentenceCase(note.title)
+
+    const subtitleParts: string[] = []
+    if (checklistPreview) subtitleParts.push(checklistPreview)
+    if (dueDateLabel) {
+      subtitleParts.push(
+        overdue ? `Scadenza ${dueDateLabel}` : dueDateLabel,
+      )
+    } else if (soonLabel && (soon || overdue)) {
+      subtitleParts.push(soonLabel)
+    }
+    if (!checklistNote && displayContent) {
+      subtitleParts.push(
+        `${displayContent.slice(0, 50)}${displayContent.length > 50 ? '…' : ''}`,
+      )
+    } else if (!checklistNote && !displayContent && !dueDateLabel && !dateRange) {
+      subtitleParts.push(`Aggiornata ${formatDate(note.updatedAt)}`)
+    }
+    if (areaName) subtitleParts.unshift(areaName)
+
+    resolvedSubtitle =
+      subtitleParts.length > 0 ? subtitleParts.join(' · ') : undefined
+  }
 
   const typeBadge = checklistNote && !showAreaAsTitle ? (
     <span
