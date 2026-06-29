@@ -12,6 +12,7 @@ import { AddChooser } from './components/AddChooser'
 import { ArchiveList } from './components/ArchiveList'
 import { formatToday } from './utils/format'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { RecoveryScreen } from './components/RecoveryScreen'
 import { OfflineStatus } from './components/OfflineStatus'
 import { ExpenseForm } from './components/ExpenseForm'
 import { ExpenseList } from './components/ExpenseList'
@@ -24,8 +25,7 @@ import { NoteList } from './components/NoteList'
 import { SettingsPanel } from './components/SettingsPanel'
 import { NavBadge } from './components/NavBadge'
 import { useOverdueCounts } from './hooks/useOverdueCounts'
-import { resetDB, type Event, type Expense, type Note } from './db'
-import { clearPwaCacheAndReload } from './utils/appRecovery'
+import { type Event, type Expense, type Note } from './db'
 import type { NoteKind } from './utils/noteKind'
 import { resolveNoteKind } from './utils/noteKind'
 
@@ -190,35 +190,7 @@ function App() {
   return (
     <ErrorBoundary
       fallback={
-        <div className="flex min-h-svh flex-col items-center justify-center gap-4 p-6 text-center">
-          <p className="text-lg font-semibold text-slate-800">
-            Qualcosa è andato storto
-          </p>
-          <p className="text-sm text-slate-500">
-            Prova a svuotare la cache dell&apos;app o a ricaricare.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white"
-          >
-            Ricarica
-          </button>
-          <button
-            type="button"
-            onClick={() => void clearPwaCacheAndReload()}
-            className="rounded-xl border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-700"
-          >
-            Svuota cache app
-          </button>
-          <button
-            type="button"
-            onClick={resetDB}
-            className="text-xs text-rose-500 underline"
-          >
-            Reset database (cancella tutti i dati)
-          </button>
-        </div>
+        <RecoveryScreen title="Qualcosa è andato storto" />
       }
     >
       <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-slate-50">

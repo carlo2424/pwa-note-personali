@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
+import { RecoveryScreen } from './components/RecoveryScreen.tsx'
 import { db } from './db'
-import { clearPwaCacheAndReload, resetAppData } from './utils/appRecovery'
+import { shouldSkipServiceWorkerRegistration } from './utils/appRecovery'
 import { syncExpensesForEvent } from './utils/eventExpenses'
 import {
   checkRenewalNotifications,
@@ -16,6 +17,7 @@ import { resolveNoteKind } from './utils/noteKind'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
+const BOOT_TIMEOUT_MS = 12_000
 
 /** In dev: rimuove SW e cache PWA che mostrano build vecchie su localhost */
 async function clearPwaCacheInDev(): Promise<void> {
@@ -67,68 +69,26 @@ async function runPostOpenTasks(): Promise<void> {
   }, 60 * 60 * 1000)
 }
 
-function StartupScreen({
-  message,
-  detail,
-  onRetry,
-  onClearCache,
-  onResetData,
-}: {
-  message: string
-  detail?: string
-  onRetry?: () => void
-  onClearCache?: () => void
-  onResetData?: () => void
-}) {
-  return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-slate-50 p-6 text-center">
-      <p className="text-lg font-semibold text-slate-800">{message}</p>
-      {detail ? (
-        <p className="max-w-sm text-xs font-mono text-slate-500">{detail}</p>
-      ) : null}
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white"
-        >
-          Riprova
-        </button>
-      )}
-      {onClearCache && (
-        <button
-          type="button"
-          onClick={onClearCache}
-          className="rounded-xl border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-700"
-        >
-          Svuota cache app
-        </button>
-      )}
-      {onResetData && (
-        <button
-          type="button"
-          onClick={onResetData}
-          className="text-xs text-rose-500 underline"
-        >
-          Reset database (cancella tutti i dati)
-        </button>
-      )}
-    </div>
-  )
-}
-
 function Bootstrap() {
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [slowBoot, setSlowBoot] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) setSlowBoot(true)
+    }, BOOT_TIMEOUT_MS)
+
     async function boot() {
       try {
         await db.open()
-        await runPostOpenTasks()
-        if (!cancelled) setReady(true)
+        if (cancelled) return
+        setReady(true)
+        void runPostOpenTasks().catch((err) => {
+          console.error('[DB] Errore attività post-avvio:', err)
+        })
       } catch (err) {
         console.error('[DB] Errore avvio:', err)
         if (!cancelled) {
@@ -142,24 +102,29 @@ function Bootstrap() {
     void boot()
     return () => {
       cancelled = true
+      window.clearTimeout(timeout)
     }
   }, [])
 
   if (error) {
     return (
-      <StartupScreen
-        message="Impossibile aprire il database locale"
+      <RecoveryScreen
+        title="Impossibile aprire il database locale"
         detail={error}
-        onRetry={() => window.location.reload()}
-        onClearCache={() => void clearPwaCacheAndReload()}
-        onResetData={() => void resetAppData()}
       />
     )
   }
 
   if (!ready) {
     return (
-      <StartupScreen message="Caricamento Note Personali…" />
+      <RecoveryScreen
+        title={
+          slowBoot
+            ? 'Caricamento lento…'
+            : 'Caricamento Note Personali…'
+        }
+        showLoadingHint
+      />
     )
   }
 
@@ -167,7 +132,7 @@ function Bootstrap() {
 }
 
 // Registra il service worker PWA solo in produzione (build)
-if (import.meta.env.PROD) {
+if (import.meta.env.PROD && !shouldSkipServiceWorkerRegistration()) {
   const updateSW = registerSW({
     immediate: true,
     onOfflineReady() {
