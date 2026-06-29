@@ -1,8 +1,9 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { RecoveryScreen } from './RecoveryScreen'
 
 interface Props {
   children: ReactNode
-  fallback?: ReactNode
+  fallback?: ReactNode | ((error: Error) => ReactNode)
 }
 
 interface State {
@@ -11,7 +12,7 @@ interface State {
 
 /**
  * Cattura errori nei componenti figli e mostra un messaggio invece
- * di far crashare tutta l'app. Da usare attorno a form/modal complessi.
+ * di far crashare tutta l'app.
  */
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
@@ -29,19 +30,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override render() {
     if (this.state.error) {
+      const { fallback } = this.props
+      if (typeof fallback === 'function') {
+        return fallback(this.state.error)
+      }
       return (
-        this.props.fallback ?? (
-          <div className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">
-            <p className="font-semibold">Errore nel componente</p>
-            <p className="mt-1 font-mono text-xs">{this.state.error.message}</p>
-            <button
-              type="button"
-              onClick={() => this.setState({ error: null })}
-              className="mt-3 rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-medium"
-            >
-              Riprova
-            </button>
-          </div>
+        fallback ?? (
+          <RecoveryScreen
+            title="Errore nel componente"
+            detail={this.state.error.message}
+          />
         )
       )
     }

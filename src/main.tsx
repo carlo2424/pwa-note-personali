@@ -1,15 +1,9 @@
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
 import { RecoveryScreen } from './components/RecoveryScreen.tsx'
 import { db } from './db'
-import {
-  canUseServiceWorker,
-  isServiceWorkerBlocked,
-  shouldSkipServiceWorkerRegistration,
-} from './utils/appRecovery'
 import { syncExpensesForEvent } from './utils/eventExpenses'
 import {
   checkRenewalNotifications,
@@ -142,40 +136,6 @@ function Bootstrap() {
 
   return <App />
 }
-
-async function tryRegisterServiceWorker(): Promise<void> {
-  if (!import.meta.env.PROD) return
-  if (shouldSkipServiceWorkerRegistration()) return
-  if (isServiceWorkerBlocked()) return
-  if (!(await canUseServiceWorker())) return
-
-  try {
-    const updateSW = registerSW({
-      immediate: true,
-      onRegisterError(error) {
-        console.warn('[PWA] Registrazione fallita:', error)
-        localStorage.setItem('pwa-sw-blocked', '1')
-      },
-      onOfflineReady() {
-        console.info('[PWA] App pronta per uso offline')
-      },
-      onNeedRefresh() {
-        if (
-          window.confirm(
-            'È disponibile una nuova versione. Aggiornare ora?',
-          )
-        ) {
-          updateSW(true)
-        }
-      },
-    })
-  } catch (error) {
-    console.warn('[PWA] Service worker non disponibile:', error)
-    localStorage.setItem('pwa-sw-blocked', '1')
-  }
-}
-
-void tryRegisterServiceWorker()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

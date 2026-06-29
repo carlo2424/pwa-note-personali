@@ -404,28 +404,10 @@ export function HomeView({
     expenseCount === 0 &&
     !areaFilterActive
 
-  if (loading) {
-    return <p className="text-sm text-slate-400">Caricamento...</p>
-  }
-
-  const addInArea =
-    selectedAreaName && areaSelection.kind === 'area'
-      ? (kind: 'note' | 'event' | 'expense') => () =>
-          onAddInArea(selectedAreaName, kind)
-      : undefined
-
-  const shareAreaContext = areaFilterActive ? selectedAreaName ?? undefined : undefined
-
-  const promoteNoteAreaTitle =
-    !areaFilterActive || areaSelection.kind === 'group'
-
   const sortedDisplayNotes = useMemo(
     () => [...displayNotes].sort(sortNotesByUrgency),
     [displayNotes],
   )
-
-  const impegnoSectionTitle =
-    displayImpegni[0]?.item.title ?? ''
 
   const impegnoSectionSubtitle = useMemo(() => {
     for (const row of displayImpegni) {
@@ -448,6 +430,24 @@ export function HomeView({
     }
     return false
   }, [displayImpegni])
+
+  if (loading) {
+    return <p className="text-sm text-slate-400">Caricamento...</p>
+  }
+
+  const addInArea =
+    selectedAreaName && areaSelection.kind === 'area'
+      ? (kind: 'note' | 'event' | 'expense') => () =>
+          onAddInArea(selectedAreaName, kind)
+      : undefined
+
+  const shareAreaContext = areaFilterActive ? selectedAreaName ?? undefined : undefined
+
+  const promoteNoteAreaTitle =
+    !areaFilterActive || areaSelection.kind === 'group'
+
+  const impegnoSectionTitle =
+    displayImpegni[0]?.item.title ?? ''
 
   const shareSectionImpegni = () =>
     void shareImpegnoRowsSection(displayImpegni, (id) => areaNameById(areas ?? [], id), {

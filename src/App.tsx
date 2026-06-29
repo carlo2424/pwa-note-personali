@@ -189,9 +189,12 @@ function App() {
 
   return (
     <ErrorBoundary
-      fallback={
-        <RecoveryScreen title="Qualcosa è andato storto" />
-      }
+      fallback={(error) => (
+        <RecoveryScreen
+          title="Qualcosa è andato storto"
+          detail={error.message}
+        />
+      )}
     >
       <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-slate-50">
         <OfflineStatus />
