@@ -1,8 +1,12 @@
 import { useMemo, useState } from 'react'
-import { db, type Event, type Expense } from '../db'
+import { db, type Event, type Expense, type PaymentMethod } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
-import { groupExpensesByMonth } from '../utils/monthFilter'
+import {
+  currentMonthBounds,
+  groupExpensesByMonth,
+} from '../utils/monthFilter'
 import { MonthExpenseSummary } from './MonthExpenseSummary'
+import { PaymentOverview } from './PaymentOverview'
 import { SearchBar } from './SearchBar'
 
 interface ExpenseListProps {
@@ -12,6 +16,8 @@ interface ExpenseListProps {
 
 export function ExpenseList({ onEdit, onOpenEvent }: ExpenseListProps) {
   const [search, setSearch] = useState('')
+  const [methodFilter, setMethodFilter] = useState<PaymentMethod | null>(null)
+  const { label: monthLabel } = currentMonthBounds()
 
   const expenses = useDexieLiveQuery(
     () => db.expenses.orderBy('date').reverse().toArray(),
@@ -22,13 +28,19 @@ export function ExpenseList({ onEdit, onOpenEvent }: ExpenseListProps) {
 
   const filtered = useMemo(() => {
     if (!expenses) return []
-    if (!query) return expenses
-    return expenses.filter(
+    let list = expenses
+    if (methodFilter) {
+      list = list.filter(
+        (e) => (e.paymentMethod ?? 'altro') === methodFilter,
+      )
+    }
+    if (!query) return list
+    return list.filter(
       (e) =>
         e.description.toLowerCase().includes(query) ||
         e.category.toLowerCase().includes(query),
     )
-  }, [expenses, query])
+  }, [expenses, query, methodFilter])
 
   const monthGroups = useMemo(
     () => groupExpensesByMonth(filtered),
@@ -39,43 +51,57 @@ export function ExpenseList({ onEdit, onOpenEvent }: ExpenseListProps) {
     return <p className="py-8 text-center text-sm text-slate-400">Caricamento...</p>
   }
 
-  if (expenses.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
-        <p className="text-sm font-medium text-slate-600">Nessuna spesa</p>
-        <p className="mt-1 text-xs text-slate-400">
-          Tocca <span className="font-medium">+</span> per aggiungere
-        </p>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-4">
-      <SearchBar
-        value={search}
-        onChange={setSearch}
-        placeholder="Cerca spese, categorie..."
+    <div className="space-y-5">
+      <PaymentOverview
+        monthLabel={monthLabel}
+        filterMethod={methodFilter}
+        onFilterMethod={setMethodFilter}
       />
 
-      {monthGroups.length === 0 ? (
-        <p className="py-4 text-center text-sm text-slate-400">
-          Nessun risultato per &ldquo;{search}&rdquo;
+      {methodFilter && (
+        <p className="text-center text-xs text-slate-500">
+          Filtro attivo — tocca di nuovo il metodo per mostrare tutto
         </p>
+      )}
+
+      {expenses.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center">
+          <p className="text-sm font-medium text-slate-600">Nessuna spesa</p>
+          <p className="mt-1 text-xs text-slate-400">
+            Tocca <span className="font-medium">+</span> per aggiungere
+          </p>
+        </div>
       ) : (
-        <ul className="space-y-2">
-          {monthGroups.map((group) => (
-            <li key={group.key}>
-              <MonthExpenseSummary
-                monthLabel={group.label}
-                expenses={group.items}
-                areas={areas ?? []}
-                onEdit={onEdit}
-                onOpenEvent={onOpenEvent}
-              />
-            </li>
-          ))}
-        </ul>
+        <>
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Cerca spese, categorie..."
+          />
+
+          {monthGroups.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400">
+              {query
+                ? `Nessun risultato per "${search}"`
+                : 'Nessuna spesa con questo metodo di pagamento'}
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {monthGroups.map((group) => (
+                <li key={group.key}>
+                  <MonthExpenseSummary
+                    monthLabel={group.label}
+                    expenses={group.items}
+                    areas={areas ?? []}
+                    onEdit={onEdit}
+                    onOpenEvent={onOpenEvent}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   )

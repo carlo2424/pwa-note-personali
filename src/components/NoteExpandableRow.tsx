@@ -5,6 +5,7 @@ import { db } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { archiveConfirmCopy } from '../utils/confirmMessages'
 import { isPastDue } from '../utils/countdown'
+import { deadlineLabel, noteDateUrgency } from '../utils/homeSpotlight'
 import { toggleTask } from '../utils/eventTasks'
 import { formatDate, formatDateRange, sentenceCase } from '../utils/format'
 import { isNoteImpegno } from '../utils/impegno'
@@ -29,6 +30,8 @@ interface NoteExpandableRowProps {
   onEdit: () => void
   areaName?: string
   compact?: boolean
+  /** In Home globale: mostra l'area (es. Lorenzo) come titolo per le liste */
+  promoteAreaTitle?: boolean
 }
 
 export function NoteExpandableRow({
@@ -36,6 +39,7 @@ export function NoteExpandableRow({
   onEdit,
   areaName,
   compact = false,
+  promoteAreaTitle = true,
 }: NoteExpandableRowProps) {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
   const archiveKind = isNoteImpegno(note) ? 'impegno' : 'nota'
@@ -71,7 +75,37 @@ export function NoteExpandableRow({
         ? 'Lista vuota'
         : null
 
-  const typeBadge = checklistNote ? (
+  const dateUrg = noteDateUrgency(note)
+  const soon =
+    dateUrg === 'today' || dateUrg === 'soon'
+  const keyDate = note.endDate ?? note.startDate
+  const soonLabel = keyDate ? deadlineLabel(keyDate) : ''
+
+  const primaryTitle =
+    checklistNote && areaName && promoteAreaTitle
+      ? areaName
+      : sentenceCase(note.title)
+
+  const subtitleParts: string[] = []
+  if (checklistNote && areaName && promoteAreaTitle) {
+    subtitleParts.push(sentenceCase(note.title))
+  }
+  if (checklistPreview) subtitleParts.push(checklistPreview)
+  if (soonLabel && (soon || overdue)) subtitleParts.push(soonLabel)
+  if (!checklistNote && displayContent) {
+    subtitleParts.push(
+      `${displayContent.slice(0, 50)}${displayContent.length > 50 ? '…' : ''}`,
+    )
+  } else if (!checklistNote && dateRange) {
+    subtitleParts.push(`${overdue ? 'Scaduta · ' : ''}${dateRange}`)
+  } else if (!checklistNote && !displayContent && !dateRange) {
+    subtitleParts.push(`Aggiornata ${formatDate(note.updatedAt)}`)
+  }
+
+  const resolvedSubtitle =
+    subtitleParts.length > 0 ? subtitleParts.join(' · ') : undefined
+
+  const typeBadge = checklistNote && !(areaName && promoteAreaTitle) ? (
     <span
       className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${
         compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'
@@ -86,11 +120,13 @@ export function NoteExpandableRow({
     <ExpandableCard
       compact={compact}
       containerClassName={
-        overdue
+        overdue || dateUrg === 'expired'
           ? 'border-rose-200 bg-rose-50/50 ring-1 ring-rose-100'
-          : checklistNote
-            ? 'border-emerald-100 bg-emerald-50/30'
-            : 'border-slate-100 bg-white'
+          : soon
+            ? 'border-amber-200 bg-amber-50/70 ring-1 ring-amber-100'
+            : checklistNote
+              ? 'border-emerald-100 bg-emerald-50/30'
+              : 'border-slate-100 bg-white'
       }
       icon={
         checklistNote ? (
@@ -107,31 +143,23 @@ export function NoteExpandableRow({
           />
         )
       }
-      title={note.title}
-      titleClassName={overdue ? 'text-rose-900' : 'text-slate-900'}
-      subtitle={
-        areaName
-          ? `${areaName}${checklistPreview || displayContent || dateRange ? ' · ' : ''}${
-              checklistPreview
-                ? checklistPreview
-                : displayContent
-                  ? `${displayContent.slice(0, 50)}${displayContent.length > 50 ? '…' : ''}`
-                  : dateRange
-                    ? `${overdue ? 'Scaduta · ' : ''}${dateRange}`
-                    : formatDate(note.updatedAt)
-            }`
-          : checklistPreview
-            ? checklistPreview
-            : displayContent
-              ? `${displayContent.slice(0, 60)}${displayContent.length > 60 ? '…' : ''}`
-              : dateRange
-                ? `${overdue ? 'Scaduta · ' : ''}${dateRange}`
-                : `Aggiornata ${formatDate(note.updatedAt)}`
+      title={primaryTitle}
+      titleClassName={
+        overdue || dateUrg === 'expired'
+          ? 'text-rose-900'
+          : soon
+            ? 'text-amber-900'
+            : 'text-slate-900'
       }
+      subtitle={resolvedSubtitle}
       badge={
-        overdue ? (
+        overdue || dateUrg === 'expired' ? (
           <span className={`shrink-0 rounded-full bg-rose-600 font-bold text-white ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
             Scaduta
+          </span>
+        ) : soon ? (
+          <span className={`shrink-0 rounded-full bg-amber-500 font-bold text-white ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
+            {soonLabel === 'Oggi' ? 'Oggi' : 'Presto'}
           </span>
         ) : hasChecklist && totalCount > 0 && doneCount === totalCount ? (
           <span className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>

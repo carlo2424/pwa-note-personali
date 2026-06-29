@@ -647,7 +647,7 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
             </select>
             {cards?.length === 0 && (
               <p className="mt-1 text-xs text-slate-400">
-                Aggiungi carte nella sezione Carte
+                Aggiungi carte nella sezione Spese
               </p>
             )}
           </div>

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Archive,
   CalendarDays,
-  CreditCard,
   Home,
   Plus,
   Settings,
@@ -12,7 +11,6 @@ import {
 import { AddChooser } from './components/AddChooser'
 import { ArchiveList } from './components/ArchiveList'
 import { formatToday } from './utils/format'
-import { CardSummary } from './components/CardSummary'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OfflineStatus } from './components/OfflineStatus'
 import { ExpenseForm } from './components/ExpenseForm'
@@ -30,7 +28,7 @@ import { resetDB, type Event, type Expense, type Note } from './db'
 import type { NoteKind } from './utils/noteKind'
 import { resolveNoteKind } from './utils/noteKind'
 
-type Section = 'home' | 'notes' | 'events' | 'expenses' | 'cards' | 'archive'
+type Section = 'home' | 'notes' | 'events' | 'expenses' | 'archive'
 
 const sections: Record<
   Section,
@@ -57,14 +55,8 @@ const sections: Record<
   expenses: {
     label: 'Spese',
     icon: Wallet,
-    title: 'Gestione spese',
-    description: 'Spese, entrate e pagamenti.',
-  },
-  cards: {
-    label: 'Carte',
-    icon: CreditCard,
-    title: 'Promemoria carte',
-    description: 'Nome, cifre e scadenza delle tue carte.',
+    title: 'Spese e pagamenti',
+    description: 'Movimenti, carte e totali per metodo.',
   },
   archive: {
     label: 'Archivio',
@@ -185,9 +177,7 @@ function App() {
   function handleAddClick() {
     if (activeSection === 'expenses') openNewExpense()
     else if (activeSection === 'notes') openNewNote()
-    else if (activeSection === 'cards') {
-      document.querySelector<HTMLButtonElement>('[data-add-card]')?.click()
-    } else if (activeSection === 'home') {
+    else if (activeSection === 'home') {
       openAddChooser()
     } else {
       openNewEvent()
@@ -304,7 +294,6 @@ function App() {
               }}
             />
           )}
-          {activeSection === 'cards' && <CardSummary />}
           {activeSection === 'archive' && <ArchiveList />}
         </main>
 
