@@ -75,13 +75,7 @@ if (import.meta.env.PROD) {
       console.info('[PWA] App pronta per uso offline')
     },
     onNeedRefresh() {
-      if (
-        window.confirm(
-          'È disponibile una nuova versione. Aggiornare ora?',
-        )
-      ) {
-        updateSW(true)
-      }
+      updateSW(true)
     },
   })
 }
