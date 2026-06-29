@@ -1,9 +1,10 @@
-import { StrictMode } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
 import { db } from './db'
+import { clearPwaCacheAndReload, resetAppData } from './utils/appRecovery'
 import { syncExpensesForEvent } from './utils/eventExpenses'
 import {
   checkRenewalNotifications,
@@ -31,8 +32,7 @@ async function clearPwaCacheInDev(): Promise<void> {
 
 void clearPwaCacheInDev()
 
-// Sincronizza spese per eventi già salvati (dati precedenti)
-db.open().then(async () => {
+async function runPostOpenTasks(): Promise<void> {
   const events = await db.events.toArray()
   for (const e of events) {
     if (!e.id) continue
@@ -65,7 +65,106 @@ db.open().then(async () => {
   setInterval(() => {
     checkRenewalNotifications()
   }, 60 * 60 * 1000)
-})
+}
+
+function StartupScreen({
+  message,
+  detail,
+  onRetry,
+  onClearCache,
+  onResetData,
+}: {
+  message: string
+  detail?: string
+  onRetry?: () => void
+  onClearCache?: () => void
+  onResetData?: () => void
+}) {
+  return (
+    <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-slate-50 p-6 text-center">
+      <p className="text-lg font-semibold text-slate-800">{message}</p>
+      {detail ? (
+        <p className="max-w-sm text-xs font-mono text-slate-500">{detail}</p>
+      ) : null}
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white"
+        >
+          Riprova
+        </button>
+      )}
+      {onClearCache && (
+        <button
+          type="button"
+          onClick={onClearCache}
+          className="rounded-xl border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-700"
+        >
+          Svuota cache app
+        </button>
+      )}
+      {onResetData && (
+        <button
+          type="button"
+          onClick={onResetData}
+          className="text-xs text-rose-500 underline"
+        >
+          Reset database (cancella tutti i dati)
+        </button>
+      )}
+    </div>
+  )
+}
+
+function Bootstrap() {
+  const [ready, setReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function boot() {
+      try {
+        await db.open()
+        await runPostOpenTasks()
+        if (!cancelled) setReady(true)
+      } catch (err) {
+        console.error('[DB] Errore avvio:', err)
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : 'Errore database sconosciuto',
+          )
+        }
+      }
+    }
+
+    void boot()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (error) {
+    return (
+      <StartupScreen
+        message="Impossibile aprire il database locale"
+        detail={error}
+        onRetry={() => window.location.reload()}
+        onClearCache={() => void clearPwaCacheAndReload()}
+        onResetData={() => void resetAppData()}
+      />
+    )
+  }
+
+  if (!ready) {
+    return (
+      <StartupScreen message="Caricamento Note Personali…" />
+    )
+  }
+
+  return <App />
+}
 
 // Registra il service worker PWA solo in produzione (build)
 if (import.meta.env.PROD) {
@@ -75,13 +174,19 @@ if (import.meta.env.PROD) {
       console.info('[PWA] App pronta per uso offline')
     },
     onNeedRefresh() {
-      updateSW(true)
+      if (
+        window.confirm(
+          'È disponibile una nuova versione. Aggiornare ora?',
+        )
+      ) {
+        updateSW(true)
+      }
     },
   })
 }
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <Bootstrap />
   </StrictMode>,
 )

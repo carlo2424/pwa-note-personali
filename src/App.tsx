@@ -25,6 +25,7 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { NavBadge } from './components/NavBadge'
 import { useOverdueCounts } from './hooks/useOverdueCounts'
 import { resetDB, type Event, type Expense, type Note } from './db'
+import { clearPwaCacheAndReload } from './utils/appRecovery'
 import type { NoteKind } from './utils/noteKind'
 import { resolveNoteKind } from './utils/noteKind'
 
@@ -194,7 +195,7 @@ function App() {
             Qualcosa è andato storto
           </p>
           <p className="text-sm text-slate-500">
-            Potrebbe esserci un problema con il database locale.
+            Prova a svuotare la cache dell&apos;app o a ricaricare.
           </p>
           <button
             type="button"
@@ -202,6 +203,13 @@ function App() {
             className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white"
           >
             Ricarica
+          </button>
+          <button
+            type="button"
+            onClick={() => void clearPwaCacheAndReload()}
+            className="rounded-xl border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-700"
+          >
+            Svuota cache app
           </button>
           <button
             type="button"

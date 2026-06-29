@@ -6,6 +6,23 @@ import {
 } from './monthFilter'
 import { formatAmount } from './format'
 
+function resolvePaymentMethod(value?: string): PaymentMethod {
+  if (
+    value === 'carta' ||
+    value === 'bonifico' ||
+    value === 'contanti' ||
+    value === 'altro'
+  ) {
+    return value
+  }
+  return 'altro'
+}
+
+function expenseAmount(expense: Pick<Expense, 'amount'>): number {
+  const amount = Number(expense.amount)
+  return Number.isFinite(amount) ? amount : 0
+}
+
 export interface MethodTotal {
   method: PaymentMethod
   label: string
@@ -32,17 +49,19 @@ export function sumByPaymentMethod(
   }
 
   for (const e of expenses) {
-    if (e.amount <= 0) continue
+    const amount = expenseAmount(e)
+    if (amount <= 0) continue
     if (monthOnly && !expenseInCurrentMonth(e)) continue
-    const method = (e.paymentMethod ?? 'altro') as PaymentMethod
-    totals[method] += e.amount
+    const method = resolvePaymentMethod(e.paymentMethod)
+    totals[method] += amount
   }
 
   for (const ev of events) {
-    if (!ev.cost || ev.cost <= 0) continue
+    const cost = Number(ev.cost)
+    if (!Number.isFinite(cost) || cost <= 0) continue
     if (monthOnly && !eventInCurrentMonth(ev)) continue
-    const method = ev.paymentMethod ?? 'carta'
-    totals[method] += ev.cost
+    const method = resolvePaymentMethod(ev.paymentMethod ?? 'carta')
+    totals[method] += cost
   }
 
   return PAYMENT_METHODS.map((m) => ({
@@ -66,19 +85,19 @@ export function cardBreakdowns(
       .filter(
         (e) =>
           e.cardId === card.id &&
-          e.amount > 0 &&
+          expenseAmount(e) > 0 &&
           (!monthOnly || expenseInCurrentMonth(e)),
       )
-      .reduce((s, e) => s + e.amount, 0)
+      .reduce((s, e) => s + expenseAmount(e), 0)
     const eventi = events
       .filter(
         (e) =>
           e.cardId === card.id &&
           e.cost != null &&
-          e.cost > 0 &&
+          Number(e.cost) > 0 &&
           (!monthOnly || eventInCurrentMonth(e)),
       )
-      .reduce((s, e) => s + (e.cost ?? 0), 0)
+      .reduce((s, e) => s + (Number(e.cost) || 0), 0)
     return { card, spese, eventi, total: spese + eventi }
   })
 }

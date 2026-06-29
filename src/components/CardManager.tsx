@@ -119,7 +119,7 @@ export function CardManager({
                       <CreditCard className="h-3.5 w-3.5" />
                     </div>
                   }
-                  title={card.name}
+                  title={card.name || 'Carta'}
                   subtitle={formatCardNumber(card.digitsStart, card.digitsEnd)}
                   trailing={
                     total > 0 ? (

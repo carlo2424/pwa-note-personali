@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { clearPwaCache } from './utils/appRecovery'
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
@@ -302,11 +303,8 @@ function createDB() {
 /** Cancella e ricrea il DB (usato solo in caso di errore critico) */
 export async function resetDB() {
   await Dexie.delete('PersonalNotesDB')
+  await clearPwaCache()
   window.location.reload()
 }
 
 export const db = createDB()
-
-db.open().catch((err) => {
-  console.error('[DB] Errore apertura database:', err)
-})

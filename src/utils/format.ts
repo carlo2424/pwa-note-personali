@@ -1,6 +1,6 @@
 /** Testo utente: prima lettera maiuscola, resto minuscolo. */
-export function sentenceCase(text: string): string {
-  const trimmed = text.trim()
+export function sentenceCase(text: string | null | undefined): string {
+  const trimmed = (text ?? '').trim()
   if (!trimmed) return ''
   const lower = trimmed.toLocaleLowerCase('it-IT')
   return lower.charAt(0).toLocaleUpperCase('it-IT') + lower.slice(1)
@@ -47,8 +47,9 @@ export function formatDateRange(
 }
 
 export function formatAmount(amount: number): string {
+  const value = Number.isFinite(amount) ? amount : 0
   return new Intl.NumberFormat('it-IT', {
     style: 'currency',
     currency: 'EUR',
-  }).format(amount)
+  }).format(value)
 }
