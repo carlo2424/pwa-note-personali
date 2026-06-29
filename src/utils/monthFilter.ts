@@ -58,6 +58,8 @@ export function noteInCurrentMonth(
   if (isNoteImpegno(note)) {
     return periodOverlapsCurrentMonth(note.startDate, note.endDate)
   }
+  if (note.endDate && isoInCurrentMonth(note.endDate)) return true
+  if (note.startDate && isoInCurrentMonth(note.startDate)) return true
   return timestampInCurrentMonth(note.updatedAt)
 }
 

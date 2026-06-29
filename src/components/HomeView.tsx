@@ -236,6 +236,16 @@ export function HomeView({
     [notes, areaSelection, areaList, overdueNoteIds],
   )
 
+  const monthHomeNotes = useMemo(
+    () =>
+      (notes ?? []).filter(
+        (n) =>
+          matchesAreaSelection(n, areaSelection, areaList) &&
+          noteInCurrentMonth(n),
+      ),
+    [notes, areaSelection, areaList],
+  )
+
   const monthPlainNotes = useMemo(
     () =>
       filterPlainNotes(notes ?? []).filter(
@@ -346,7 +356,7 @@ export function HomeView({
   )
 
   const displayImpegni = areaFilterActive ? areaImpegniRows : impegnoRows
-  const displayNotes = areaFilterActive ? areaPlainNotes : monthPlainNotes
+  const displayNotes = areaFilterActive ? areaPlainNotes : monthHomeNotes
   const displayExpenses = areaFilterActive ? areaExpensesList : monthExpensesList
 
   const impegnoCount = displayImpegni.length
