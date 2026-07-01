@@ -30,6 +30,8 @@ import {
 import {
   computeMonthPaidTotal,
   computeMonthPlannedTotal,
+  computeMonthUpcomingExpenses,
+  sumOccurredPositiveExpenses,
 } from '../utils/monthExpenseTotals'
 import {
   isOverdueEvent,
@@ -89,12 +91,6 @@ function sumImpegnoCosts(rows: ImpegnoRow[]): number {
     }
     return s
   }, 0)
-}
-
-function sumPositiveExpenses(expenses: Expense[]): number {
-  return expenses
-    .filter((e) => e.amount > 0)
-    .reduce((s, e) => s + e.amount, 0)
 }
 
 function EmptySectionHint({
@@ -358,6 +354,11 @@ export function HomeView({
 
   const monthExpensesTotal = computeMonthPaidTotal(expenses ?? [])
 
+  const monthUpcomingExpenses = useMemo(
+    () => computeMonthUpcomingExpenses(expenses ?? []),
+    [expenses],
+  )
+
   const monthPlannedTotal = useMemo(
     () => computeMonthPlannedTotal(events ?? []),
     [events],
@@ -610,7 +611,7 @@ export function HomeView({
   const renewalsTotal = sumEventCosts(urgentRenewals)
   const overdueTotal = sumImpegnoCosts(overdueRows)
   const impegnoTotal = sumImpegnoCosts(displayImpegni)
-  const speseTotal = sumPositiveExpenses(displayExpenses)
+  const speseTotal = sumOccurredPositiveExpenses(displayExpenses)
 
   const impegnoSectionIcon = sectionIcon(
     'bg-indigo-100 text-indigo-700 h-9 w-9',
@@ -684,6 +685,7 @@ export function HomeView({
           monthLabel={monthLabel}
           monthPaid={monthExpensesTotal}
           monthPlanned={monthPlannedTotal}
+          upcomingExpenses={monthUpcomingExpenses}
           expenseDelta={expenseDelta}
           prevMonthExpenses={prevMonthExpenses}
           onGoToExpenses={onGoToExpenses}

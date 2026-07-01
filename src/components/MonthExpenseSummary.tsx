@@ -1,8 +1,14 @@
 import { Wallet } from 'lucide-react'
 import type { Event, Expense } from '../db'
 import { formatAmount } from '../utils/format'
+import {
+  expenseHasOccurred,
+  sumOccurredPositiveExpenses,
+  upcomingFromExpenses,
+} from '../utils/monthExpenseTotals'
 import { ExpandableCard } from './ExpandableCard'
 import { ExpenseExpandableRow } from './ExpenseExpandableRow'
+import { UpcomingExpenseHints } from './UpcomingExpenseHints'
 import { areaNameById } from '../utils/areas'
 
 interface MonthExpenseSummaryProps {
@@ -29,16 +35,21 @@ export function MonthExpenseSummary({
   compact = false,
   nested = false,
 }: MonthExpenseSummaryProps) {
-  const totalSpese = expenses
-    .filter((e) => e.amount > 0)
-    .reduce((s, e) => s + e.amount, 0)
+  const upcoming = upcomingFromExpenses(expenses)
+  const totalSpese = sumOccurredPositiveExpenses(expenses)
   const totalEntrate = expenses
-    .filter((e) => e.amount < 0)
+    .filter((e) => e.amount < 0 && expenseHasOccurred(e))
     .reduce((s, e) => s + Math.abs(e.amount), 0)
   const bilancio = totalEntrate - totalSpese
 
   const body = (
     <>
+      {nested && (
+        <UpcomingExpenseHints
+          items={upcoming}
+          className={compact ? 'px-0.5' : undefined}
+        />
+      )}
       {(totalEntrate > 0 || expenses.length > 0) && (
         <div
           className={`flex flex-wrap gap-x-3 text-slate-500 ${compact ? 'px-0.5 pb-1 text-[10px]' : 'pb-1.5 text-xs'}`}
@@ -99,11 +110,14 @@ export function MonthExpenseSummary({
       title={monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
       subtitle={`${expenses.length} ${expenses.length === 1 ? 'movimento' : 'movimenti'}`}
       trailing={
-        <span
-          className={`shrink-0 font-bold text-rose-600 ${compact ? 'text-[10px]' : 'text-xs'}`}
-        >
-          {formatAmount(totalSpese)}
-        </span>
+        <div className="text-right">
+          <span
+            className={`font-bold text-rose-600 ${compact ? 'text-[10px]' : 'text-xs'}`}
+          >
+            {formatAmount(totalSpese)}
+          </span>
+          <UpcomingExpenseHints items={upcoming} align="right" />
+        </div>
       }
     >
       {body}

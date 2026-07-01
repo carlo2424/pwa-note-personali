@@ -1,5 +1,7 @@
 import type { Event, Expense, PaymentMethod } from '../db'
+import { daysUntil } from '../utils/countdown'
 import { formatAmount, formatDate } from '../utils/format'
+import { expenseHasOccurred } from '../utils/monthExpenseTotals'
 import { ExpenseDetailBody } from './ExpenseDetailBody'
 import { ExpandableCard } from './ExpandableCard'
 
@@ -36,6 +38,8 @@ export function ExpenseExpandableRow({
   promoteAreaTitle = false,
 }: ExpenseExpandableRowProps) {
   const isIncome = expense.amount < 0
+  const isUpcoming = !isIncome && !expenseHasOccurred(expense)
+  const upcomingDays = isUpcoming ? daysUntil(expense.date) : 0
   const method = (expense.paymentMethod ?? 'altro') as PaymentMethod
   const expenseDate = formatDate(new Date(expense.date).getTime())
   const meta = `${expense.category} · ${expenseDate}`
@@ -62,7 +66,14 @@ export function ExpenseExpandableRow({
       title={title}
       subtitle={subtitle}
       badge={
-        expense.eventId ? (
+        isUpcoming ? (
+          <span
+            className={`shrink-0 rounded-full bg-amber-100 font-medium text-amber-800 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-1.5 py-0.5 text-[10px]'}`}
+          >
+            Tra {upcomingDays}{' '}
+            {upcomingDays === 1 ? 'giorno' : 'giorni'}
+          </span>
+        ) : expense.eventId ? (
           <span
             className={`shrink-0 rounded-full bg-violet-100 font-medium text-violet-700 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-1.5 py-0.5 text-[10px]'}`}
           >

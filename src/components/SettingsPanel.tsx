@@ -7,10 +7,15 @@ import {
   requestNotificationPermission,
   setRenewalNotifEnabled,
 } from '../utils/renewalNotifications'
+import { BackupPanel } from './BackupPanel'
 import { FileImportPanel } from './FileImportPanel'
 import { AreaGroupsSettings } from './AreaGroupsSettings'
 
-export function SettingsPanel() {
+interface SettingsPanelProps {
+  onBackupDone?: () => void
+}
+
+export function SettingsPanel({ onBackupDone }: SettingsPanelProps) {
   const [notifEnabled, setNotifEnabled] = useState(isRenewalNotifEnabled())
   const [permission, setPermission] = useState(getNotificationPermission())
 
@@ -41,6 +46,7 @@ export function SettingsPanel() {
 
   return (
     <div className="space-y-4">
+      <BackupPanel onBackupDone={onBackupDone} />
       <FileImportPanel />
       <AreaGroupsSettings />
 

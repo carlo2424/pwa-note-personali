@@ -1,10 +1,13 @@
 import { Wallet } from 'lucide-react'
 import { formatAmount, sentenceCase } from '../utils/format'
+import type { UpcomingMonthExpense } from '../utils/monthExpenseTotals'
+import { UpcomingExpenseHints } from './UpcomingExpenseHints'
 
 interface HomeSpotlightCardsProps {
   monthLabel: string
   monthPaid: number
   monthPlanned: number
+  upcomingExpenses: UpcomingMonthExpense[]
   expenseDelta: number
   prevMonthExpenses: number
   onGoToExpenses: () => void
@@ -15,6 +18,7 @@ export function HomeSpotlightCards({
   monthLabel,
   monthPaid,
   monthPlanned,
+  upcomingExpenses,
   expenseDelta,
   prevMonthExpenses,
   onGoToExpenses,
@@ -35,12 +39,23 @@ export function HomeSpotlightCards({
           </p>
           <p className="mt-0.5 text-xs capitalize text-slate-500">
             {sentenceCase(monthLabel)}
-            {monthPlanned > 0
-              ? ` · prev. ${formatAmount(monthPlanned)}`
-              : ''}
           </p>
         </div>
+        {monthPlanned > 0 && (
+          <p className="shrink-0 pt-0.5 text-right text-xs text-slate-500">
+            Prev.{' '}
+            <span className="font-semibold text-slate-700">
+              {formatAmount(monthPlanned)}
+            </span>
+          </p>
+        )}
       </div>
+      {upcomingExpenses.length > 0 && (
+        <UpcomingExpenseHints
+          items={upcomingExpenses}
+          className="mt-1.5 pl-[2.875rem]"
+        />
+      )}
       {prevMonthExpenses > 0 && (
         <p
           className={`mt-2 pl-[2.875rem] text-[10px] font-medium ${expenseDelta > 0 ? 'text-rose-400' : expenseDelta < 0 ? 'text-emerald-500' : 'text-slate-400'}`}

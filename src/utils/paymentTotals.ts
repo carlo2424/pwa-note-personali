@@ -1,5 +1,6 @@
 import type { Event, Expense, PaymentCard, PaymentMethod } from '../db'
 import { PAYMENT_METHODS } from '../constants/events'
+import { todayIso } from './countdown'
 import {
   eventInCurrentMonth,
   expenseInCurrentMonth,
@@ -16,6 +17,18 @@ function resolvePaymentMethod(value?: string): PaymentMethod {
     return value
   }
   return 'altro'
+}
+
+function expenseCountsInMonth(e: Expense): boolean {
+  return expenseInCurrentMonth(e) && e.date <= todayIso()
+}
+
+function eventChargeDate(ev: Event): string {
+  return ev.renewalDate ?? ev.startDate
+}
+
+function eventCountsInMonth(ev: Event): boolean {
+  return eventInCurrentMonth(ev) && eventChargeDate(ev) <= todayIso()
 }
 
 function expenseAmount(expense: Pick<Expense, 'amount'>): number {
@@ -51,7 +64,7 @@ export function sumByPaymentMethod(
   for (const e of expenses) {
     const amount = expenseAmount(e)
     if (amount <= 0) continue
-    if (monthOnly && !expenseInCurrentMonth(e)) continue
+    if (monthOnly && !expenseCountsInMonth(e)) continue
     const method = resolvePaymentMethod(e.paymentMethod)
     totals[method] += amount
   }
@@ -59,7 +72,7 @@ export function sumByPaymentMethod(
   for (const ev of events) {
     const cost = Number(ev.cost)
     if (!Number.isFinite(cost) || cost <= 0) continue
-    if (monthOnly && !eventInCurrentMonth(ev)) continue
+    if (monthOnly && !eventCountsInMonth(ev)) continue
     const method = resolvePaymentMethod(ev.paymentMethod ?? 'carta')
     totals[method] += cost
   }
@@ -86,7 +99,7 @@ export function cardBreakdowns(
         (e) =>
           e.cardId === card.id &&
           expenseAmount(e) > 0 &&
-          (!monthOnly || expenseInCurrentMonth(e)),
+          (!monthOnly || expenseCountsInMonth(e)),
       )
       .reduce((s, e) => s + expenseAmount(e), 0)
     const eventi = events
@@ -95,7 +108,7 @@ export function cardBreakdowns(
           e.cardId === card.id &&
           e.cost != null &&
           Number(e.cost) > 0 &&
-          (!monthOnly || eventInCurrentMonth(e)),
+          (!monthOnly || eventCountsInMonth(e)),
       )
       .reduce((s, e) => s + (Number(e.cost) || 0), 0)
     return { card, spese, eventi, total: spese + eventi }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Archive,
   CalendarDays,
@@ -23,6 +23,9 @@ import { Modal } from './components/Modal'
 import { NoteForm } from './components/NoteForm'
 import { NoteList } from './components/NoteList'
 import { SettingsPanel } from './components/SettingsPanel'
+import { BackupReminderBanner } from './components/BackupReminderBanner'
+import { hasBackupableData } from './utils/backup'
+import { shouldShowBackupReminder } from './utils/backupReminder'
 import { NavBadge } from './components/NavBadge'
 import { useOverdueCounts } from './hooks/useOverdueCounts'
 import { type Event, type Expense, type Note } from './db'
@@ -73,6 +76,7 @@ function App() {
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [showNoteForm, setShowNoteForm] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showBackupReminder, setShowBackupReminder] = useState(false)
   const [showAddChooser, setShowAddChooser] = useState(false)
   const [editingEvent, setEditingEvent] = useState<Event | undefined>()
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>()
@@ -187,6 +191,30 @@ function App() {
 
   const showAddButton = activeSection !== 'archive'
 
+  useEffect(() => {
+    let cancelled = false
+    async function checkBackupReminder() {
+      if (!shouldShowBackupReminder()) {
+        if (!cancelled) setShowBackupReminder(false)
+        return
+      }
+      const hasData = await hasBackupableData()
+      if (!cancelled) setShowBackupReminder(hasData)
+    }
+    void checkBackupReminder()
+    return () => {
+      cancelled = true
+    }
+  }, [showSettings])
+
+  function dismissBackupReminder() {
+    setShowBackupReminder(false)
+  }
+
+  function openSettingsFromBackup() {
+    setShowSettings(true)
+  }
+
   return (
     <ErrorBoundary
       fallback={(error) => (
@@ -198,6 +226,12 @@ function App() {
     >
       <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-slate-50">
         <OfflineStatus />
+        {showBackupReminder && (
+          <BackupReminderBanner
+            onOpenSettings={openSettingsFromBackup}
+            onDismiss={dismissBackupReminder}
+          />
+        )}
 
         <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/90 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-md">
           <div className="flex items-center justify-between">
@@ -347,7 +381,7 @@ function App() {
 
       {showSettings && (
         <Modal title="Impostazioni" onClose={() => setShowSettings(false)}>
-          <SettingsPanel />
+          <SettingsPanel onBackupDone={dismissBackupReminder} />
         </Modal>
       )}
 
