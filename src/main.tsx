@@ -12,6 +12,7 @@ import {
 import { migrateTextToSentenceCase } from './utils/textCaseMigrate'
 import { syncChecklistForNote } from './utils/noteTasks'
 import { resolveNoteKind } from './utils/noteKind'
+import { requestPersistentStorage } from './utils/storagePersistence'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
@@ -92,6 +93,13 @@ function Bootstrap() {
         await db.open()
         if (cancelled) return
         setReady(true)
+        void requestPersistentStorage().then((granted) => {
+          if (!granted) {
+            console.warn(
+              '[Storage] Persistenza non concessa: il browser potrebbe cancellare i dati automaticamente.',
+            )
+          }
+        })
         void runPostOpenTasks().catch((err) => {
           console.error('[DB] Errore attività post-avvio:', err)
         })
