@@ -36,6 +36,8 @@ jobs:
         env:
           # Deve coincidere con il nome del repository GitHub
           VITE_BASE_PATH: /pwa-note-personali/
+          # Identifica ogni deploy: l'app svuota cache PWA quando cambia
+          VITE_APP_BUILD: ${{ github.sha }}
 
       - name: Carica artefatto Pages
         uses: actions/upload-pages-artifact@v3

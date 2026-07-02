@@ -13,6 +13,10 @@ import { migrateTextToSentenceCase } from './utils/textCaseMigrate'
 import { syncChecklistForNote } from './utils/noteTasks'
 import { resolveNoteKind } from './utils/noteKind'
 import { requestPersistentStorage } from './utils/storagePersistence'
+import {
+  prepareAppUpdate,
+  registerProductionServiceWorker,
+} from './utils/appUpdate'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
@@ -145,8 +149,20 @@ function Bootstrap() {
   return <App />
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <Bootstrap />
-  </StrictMode>,
-)
+async function startApp(): Promise<void> {
+  const action = await prepareAppUpdate()
+  if (action === 'reload') {
+    window.location.reload()
+    return
+  }
+
+  registerProductionServiceWorker()
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <Bootstrap />
+    </StrictMode>,
+  )
+}
+
+void startApp()

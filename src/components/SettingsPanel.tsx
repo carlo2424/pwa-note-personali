@@ -11,6 +11,10 @@ import { BackupPanel } from './BackupPanel'
 import { StoragePersistencePanel } from './StoragePersistencePanel'
 import { FileImportPanel } from './FileImportPanel'
 import { AreaGroupsSettings } from './AreaGroupsSettings'
+import {
+  appBuildLabel,
+  forceAppUpdateAndReload,
+} from '../utils/appUpdate'
 
 interface SettingsPanelProps {
   onBackupDone?: () => void
@@ -80,6 +84,24 @@ export function SettingsPanel({ onBackupDone }: SettingsPanelProps) {
           Le notifiche funzionano quando l&apos;app è aperta o installata come
           PWA.
         </p>
+      </section>
+
+      <section className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+        <h4 className="text-sm font-semibold text-slate-800">Aggiornamento app</h4>
+        <p className="mt-1 text-xs text-slate-500">
+          Versione installata: <span className="font-mono">{appBuildLabel()}</span>
+        </p>
+        <p className="mt-1 text-xs text-slate-400">
+          Se vedi ancora la versione vecchia, usa il pulsante qui sotto. I tuoi
+          dati locali non vengono cancellati.
+        </p>
+        <button
+          type="button"
+          onClick={() => void forceAppUpdateAndReload()}
+          className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Scarica ultima versione
+        </button>
       </section>
     </div>
   )
