@@ -81,6 +81,11 @@ export function ExpenseExpandableRow({
     subtitle = parts.join(' · ')
   }
 
+  const fromImpegno = !!expense.eventId
+  const cardStyle = fromImpegno
+    ? ITEM_TYPE_STYLE.event.card
+    : ITEM_TYPE_STYLE.expense.card
+
   const iconNode = linkedEvent ? (
     <ItemIconCircle
       icon={linkedEvent.icon}
@@ -101,7 +106,7 @@ export function ExpenseExpandableRow({
     <ExpandableCard
       compact={compact}
       subtitleMultiline={compact}
-      containerClassName={ITEM_TYPE_STYLE.expense.card}
+      containerClassName={cardStyle}
       icon={iconNode}
       title={title}
       subtitle={subtitle}

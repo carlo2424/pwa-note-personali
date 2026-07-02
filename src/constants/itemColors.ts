@@ -64,9 +64,9 @@ export const NAV_SECTION_STYLE: Record<
   'home' | 'notes' | 'events' | 'expenses' | 'archive',
   { active: string; inactive: string }
 > = {
-  home: { active: ITEM_TYPE_STYLE.home.navActive, inactive: 'text-slate-400' },
-  notes: { active: 'text-indigo-600', inactive: 'text-slate-400' },
-  events: { active: ITEM_TYPE_STYLE.event.navActive, inactive: 'text-slate-400' },
-  expenses: { active: ITEM_TYPE_STYLE.expense.navActive, inactive: 'text-slate-400' },
+  home: { active: ITEM_TYPE_STYLE.home.navActive, inactive: 'text-emerald-500' },
+  notes: { active: 'text-indigo-600', inactive: 'text-indigo-400' },
+  events: { active: ITEM_TYPE_STYLE.event.navActive, inactive: 'text-violet-400' },
+  expenses: { active: ITEM_TYPE_STYLE.expense.navActive, inactive: 'text-rose-400' },
   archive: { active: ITEM_TYPE_STYLE.archive.navActive, inactive: 'text-slate-400' },
 }

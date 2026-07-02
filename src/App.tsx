@@ -398,7 +398,7 @@ function App() {
                   >
                     <span className="relative">
                       <Icon
-                        className={`h-5 w-5 ${isActive ? `stroke-[2.5] ${navStyle.active}` : navStyle.inactive}`}
+                        className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : 'stroke-[2]'} ${tone}`}
                       />
                       <NavBadge
                         count={navBadgeCount(key)}
