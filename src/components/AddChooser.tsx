@@ -15,28 +15,28 @@ const options = [
     label: 'Nota',
     description: 'Appunto testuale libero',
     icon: StickyNote,
-    iconClass: ITEM_TYPE_STYLE.note.navIconBg,
+    style: ITEM_TYPE_STYLE.note,
   },
   {
     id: 'checklist',
     label: 'Lista',
     description: 'To-do con voci da spuntare',
     icon: ListChecks,
-    iconClass: ITEM_TYPE_STYLE.note.navIconBg,
+    style: ITEM_TYPE_STYLE.note,
   },
   {
     id: 'event',
     label: 'Impegno',
     description: 'Con data inizio e data fine',
     icon: CalendarDays,
-    iconClass: ITEM_TYPE_STYLE.event.navIconBg,
+    style: ITEM_TYPE_STYLE.event,
   },
   {
     id: 'expense',
     label: 'Spesa',
     description: 'Pagamento una tantum',
     icon: Wallet,
-    iconClass: ITEM_TYPE_STYLE.expense.navIconBg,
+    style: ITEM_TYPE_STYLE.expense,
   },
 ] as const
 
@@ -69,10 +69,10 @@ export function AddChooser({
             key={opt.id}
             type="button"
             onClick={handlers[opt.id]}
-            className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 text-left shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50/40 active:scale-[.99]"
+            className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition active:scale-[.99] ${opt.style.card} ${opt.style.cardHover}`}
           >
             <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${opt.iconClass}`}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${opt.style.navIconBg}`}
             >
               <Icon className="h-5 w-5" />
             </div>
