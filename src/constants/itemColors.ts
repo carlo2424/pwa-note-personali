@@ -2,15 +2,20 @@
 
 export const ITEM_TYPE_STYLE = {
   note: {
-    card: 'border-slate-100 bg-white',
-    cardSoon: 'border-amber-200 bg-amber-50/70 ring-1 ring-amber-100',
-    cardExpired: 'border-rose-200 bg-rose-50/50 ring-1 ring-rose-100',
+    /** Note testuali: giallo chiaro, stesso tono dell'icona "Nota" nel menu + */
+    card: 'border-amber-200 bg-amber-100',
+    /** Liste to-do: giallo più scuro per distinguerle dalle note testuali */
+    cardChecklist: 'border-amber-300 bg-amber-200',
+    /** Scadenza vicina: arancio, si distingue dal giallo di base */
+    cardSoon: 'border-orange-300 bg-orange-100 ring-1 ring-orange-200',
+    cardExpired: 'border-rose-300 bg-rose-100 ring-1 ring-rose-200',
     section: 'border-amber-200/90 bg-amber-50/90 ring-1 ring-amber-100 shadow-sm',
     navActive: 'text-amber-600',
     navIconBg: 'bg-amber-100 text-amber-700',
   },
   event: {
-    card: 'border-violet-100 bg-violet-50/45',
+    /** Stesso violetto dell'icona "Impegno" nel menu + */
+    card: 'border-violet-200 bg-violet-100',
     section: 'border-violet-200/90 bg-violet-50/80 ring-1 ring-violet-100 shadow-sm',
     navActive: 'text-violet-600',
     navIconBg: 'bg-violet-100 text-violet-700',
@@ -22,8 +27,8 @@ export const ITEM_TYPE_STYLE = {
     navIconBg: 'bg-rose-100 text-rose-700',
   },
   home: {
-    navActive: 'text-indigo-600',
-    navIconBg: 'bg-indigo-100 text-indigo-700',
+    navActive: 'text-emerald-600',
+    navIconBg: 'bg-emerald-100 text-emerald-700',
   },
   archive: {
     navActive: 'text-slate-600',

@@ -164,7 +164,9 @@ export function NoteExpandableRow({
           ? ITEM_TYPE_STYLE.note.cardExpired
           : soon
             ? ITEM_TYPE_STYLE.note.cardSoon
-            : ITEM_TYPE_STYLE.note.card
+            : checklistNote
+              ? ITEM_TYPE_STYLE.note.cardChecklist
+              : ITEM_TYPE_STYLE.note.card
       }
       icon={
         <ItemIconCircle
