@@ -1,5 +1,6 @@
 import { Wallet } from 'lucide-react'
 import type { Event, Expense } from '../db'
+import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { formatAmount } from '../utils/format'
 import {
   expenseHasOccurred,
@@ -99,10 +100,10 @@ export function MonthExpenseSummary({
     <ExpandableCard
       compact={compact}
       defaultExpanded={defaultExpanded}
-      containerClassName="border-slate-100 bg-white"
+      containerClassName={ITEM_TYPE_STYLE.expense.card}
       icon={
         <div
-          className={`flex shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600 ${compact ? 'h-7 w-7' : 'h-9 w-9 rounded-xl'}`}
+          className={`flex shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white text-rose-600 ${compact ? 'h-7 w-7' : 'h-9 w-9 rounded-xl'}`}
         >
           <Wallet className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
         </div>

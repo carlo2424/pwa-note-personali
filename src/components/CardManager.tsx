@@ -5,6 +5,7 @@ import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { isCardExpired } from '../utils/countdown'
 import { formatAmount } from '../utils/format'
 import { cardBreakdowns } from '../utils/paymentTotals'
+import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { ExpandableCard } from './ExpandableCard'
 import { ItemActions } from './ItemActions'
 
@@ -112,10 +113,10 @@ export function CardManager({
                   containerClassName={
                     expired
                       ? 'border-rose-200 bg-rose-50/50'
-                      : 'border-slate-100 bg-white'
+                      : ITEM_TYPE_STYLE.expense.card
                   }
                   icon={
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white text-rose-600">
                       <CreditCard className="h-3.5 w-3.5" />
                     </div>
                   }

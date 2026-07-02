@@ -1,9 +1,8 @@
-/** Stili per tipo di elemento: card, sezioni Home, navigazione, menu "+" */
+/** Stili per tipo di elemento: card, sezioni Home, navigazione */
 
 export const ITEM_TYPE_STYLE = {
   note: {
-    card: 'border-amber-100 bg-amber-50/40',
-    cardHover: 'hover:border-amber-200 hover:bg-amber-50/70',
+    card: 'border-slate-100 bg-white',
     cardSoon: 'border-amber-200 bg-amber-50/70 ring-1 ring-amber-100',
     cardExpired: 'border-rose-200 bg-rose-50/50 ring-1 ring-rose-100',
     section: 'border-amber-200/90 bg-amber-50/90 ring-1 ring-amber-100 shadow-sm',
@@ -12,14 +11,12 @@ export const ITEM_TYPE_STYLE = {
   },
   event: {
     card: 'border-violet-100 bg-violet-50/45',
-    cardHover: 'hover:border-violet-200 hover:bg-violet-50/70',
     section: 'border-violet-200/90 bg-violet-50/80 ring-1 ring-violet-100 shadow-sm',
     navActive: 'text-violet-600',
     navIconBg: 'bg-violet-100 text-violet-700',
   },
   expense: {
     card: 'border-rose-100 bg-rose-50/40',
-    cardHover: 'hover:border-rose-200 hover:bg-rose-50/70',
     section: 'border-rose-200/90 bg-rose-50/80 ring-1 ring-rose-100 shadow-sm',
     navActive: 'text-rose-600',
     navIconBg: 'bg-rose-100 text-rose-700',

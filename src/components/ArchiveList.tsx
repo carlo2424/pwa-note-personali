@@ -19,10 +19,10 @@ const TYPE_LABELS: Record<ArchiveItem['type'], string> = {
 }
 
 const TYPE_STYLE: Record<ArchiveItem['type'], string> = {
-  note: 'bg-indigo-100 text-indigo-700',
+  note: 'bg-amber-100 text-amber-700',
   expense: 'bg-rose-100 text-rose-700',
   event: 'bg-violet-100 text-violet-700',
-  task: 'bg-emerald-100 text-emerald-700',
+  task: 'bg-amber-100 text-amber-700',
 }
 
 async function restoreItem(item: ArchiveItem) {
