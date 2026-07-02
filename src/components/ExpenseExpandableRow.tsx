@@ -5,6 +5,7 @@ import { daysUntil } from '../utils/countdown'
 import { formatAmount, formatDate, formatModifiedAt, sentenceCase } from '../utils/format'
 import { expenseHasOccurred } from '../utils/monthExpenseTotals'
 import { summarizeText } from '../utils/textSummary'
+import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { ExpenseDetailBody } from './ExpenseDetailBody'
 import { ExpandableCard } from './ExpandableCard'
 import { ItemIconCircle } from './ItemIconCircle'
@@ -88,7 +89,9 @@ export function ExpenseExpandableRow({
     />
   ) : (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-lg font-bold ${isIncome ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} ${compact ? 'h-7 w-7 text-xs' : 'h-9 w-9 rounded-xl text-sm'}`}
+      className={`flex shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white font-bold ${
+        isIncome ? 'text-emerald-600' : 'text-rose-600'
+      } ${compact ? 'h-7 w-7 text-xs' : 'h-9 w-9 rounded-xl text-sm'}`}
     >
       {isIncome ? '+' : '−'}
     </div>
@@ -98,6 +101,7 @@ export function ExpenseExpandableRow({
     <ExpandableCard
       compact={compact}
       subtitleMultiline={compact}
+      containerClassName={ITEM_TYPE_STYLE.expense.card}
       icon={iconNode}
       title={title}
       subtitle={subtitle}

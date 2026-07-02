@@ -1,4 +1,5 @@
 import { CalendarDays, ListChecks, StickyNote, Wallet } from 'lucide-react'
+import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 
 interface AddChooserProps {
   onAddNote: () => void
@@ -14,28 +15,28 @@ const options = [
     label: 'Nota',
     description: 'Appunto testuale libero',
     icon: StickyNote,
-    iconClass: 'bg-amber-100 text-amber-700',
+    iconClass: ITEM_TYPE_STYLE.note.navIconBg,
   },
   {
     id: 'checklist',
     label: 'Lista',
     description: 'To-do con voci da spuntare',
     icon: ListChecks,
-    iconClass: 'bg-emerald-100 text-emerald-700',
+    iconClass: ITEM_TYPE_STYLE.note.navIconBg,
   },
   {
     id: 'event',
     label: 'Impegno',
     description: 'Con data inizio e data fine',
     icon: CalendarDays,
-    iconClass: 'bg-indigo-100 text-indigo-700',
+    iconClass: ITEM_TYPE_STYLE.event.navIconBg,
   },
   {
     id: 'expense',
     label: 'Spesa',
     description: 'Pagamento una tantum',
     icon: Wallet,
-    iconClass: 'bg-rose-100 text-rose-700',
+    iconClass: ITEM_TYPE_STYLE.expense.navIconBg,
   },
 ] as const
 

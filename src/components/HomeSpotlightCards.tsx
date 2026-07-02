@@ -1,4 +1,5 @@
 import { Wallet } from 'lucide-react'
+import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { formatAmount, sentenceCase } from '../utils/format'
 import {
   formatUpcomingExpenseLabel,
@@ -33,7 +34,7 @@ export function HomeSpotlightCards({
     <button
       type="button"
       onClick={onGoToExpenses}
-      className="flex w-full items-center gap-2.5 rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-left shadow-sm hover:border-rose-200 active:scale-[0.99]"
+      className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left shadow-sm hover:border-rose-200 active:scale-[0.99] ${ITEM_TYPE_STYLE.expense.card}`}
     >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
         <Wallet className="h-4 w-4" />

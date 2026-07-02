@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { CalendarPlus, Check, Plus, X } from 'lucide-react'
 import {
-  EVENT_COLORS, EVENT_ICONS, PAYMENT_METHODS, PRESET_LABELS,
+  EVENT_ICONS, PRESET_LABELS,
+  PAYMENT_METHODS,
 } from '../constants/events'
+import { iconColorClass } from '../constants/itemColors'
 import { db, type Event, type PaymentMethod, type RecurrenceFrequency } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { addToCalendar } from '../utils/calendar'
@@ -16,6 +18,7 @@ import { syncTasksForEvent, type TodoInput } from '../utils/eventTasks'
 import { resolveAreaId, areaNameById } from '../utils/areas'
 import { RECURRENCE_OPTIONS, deriveImpegnoPeriodFields, computeDurationFromRange, computeEndDateFromDuration, clampEndDateToStart } from '../utils/recurring'
 import { AreaInput } from './AreaInput'
+import { IconColorPicker } from './IconColorPicker'
 
 interface EventFormProps {
   event?: Event
@@ -371,30 +374,18 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
               }`}
               aria-label={name}
             >
-              <EventIcon name={name} className="h-4 w-4" />
+              <EventIcon
+                name={name}
+                className={`h-4 w-4 ${
+                  icon === name ? iconColorClass(color) : 'text-slate-400'
+                }`}
+              />
             </button>
           ))}
         </div>
       </div>
 
-      <div>
-        <label className="mb-2 block text-sm font-medium text-slate-700">
-          Colore
-        </label>
-        <div className="flex gap-2">
-          {EVENT_COLORS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => setColor(c.value)}
-              className={`h-8 w-8 rounded-full ${c.class} transition ${
-                color === c.value ? `ring-2 ring-offset-2 ${c.ring}` : 'opacity-50'
-              }`}
-              aria-label={c.value}
-            />
-          ))}
-        </div>
-      </div>
+      <IconColorPicker value={color} onChange={setColor} previewIcon={icon} />
 
       {/* Etichette */}
       <div>

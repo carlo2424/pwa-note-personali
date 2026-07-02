@@ -45,6 +45,7 @@ import {
 } from '../utils/share'
 import { deadlineLabel, sortNotesByUrgency } from '../utils/homeSpotlight'
 import { buildHomeFeedItems, isHomeFeedQuiet } from '../utils/homeFeed'
+import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { noteVisibleOnHome } from '../utils/homeReminders'
 import { AreaChips } from './AreaChips'
 import { CollapsibleSection, sectionIcon } from './CollapsibleSection'
@@ -59,14 +60,13 @@ const URGENCY_CONTAINER = {
   expired: 'border-rose-200 bg-rose-50',
   today: 'border-amber-200 bg-amber-50',
   soon: 'border-orange-200 bg-orange-50',
-  ok: 'border-slate-100 bg-white',
+  ok: ITEM_TYPE_STYLE.event.card,
 }
 
-/** Macro-sezioni in vista area: sfondo pastello + contorno più leggibile */
 const AREA_SECTION_STYLE = {
-  note: 'border-amber-200/90 bg-amber-50/90 ring-1 ring-amber-100 shadow-sm',
-  impegno: 'border-indigo-200/90 bg-indigo-50/80 ring-1 ring-indigo-100 shadow-sm',
-  spesa: 'border-rose-200/90 bg-rose-50/80 ring-1 ring-rose-100 shadow-sm',
+  note: ITEM_TYPE_STYLE.note.section,
+  impegno: ITEM_TYPE_STYLE.event.section,
+  spesa: ITEM_TYPE_STYLE.expense.section,
   rinnovi: 'border-emerald-200/90 bg-emerald-50/80 ring-1 ring-emerald-100 shadow-sm',
   ritardo: 'border-rose-300/80 bg-rose-50/90 ring-1 ring-rose-100 shadow-sm',
 } as const

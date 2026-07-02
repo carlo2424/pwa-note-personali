@@ -28,6 +28,7 @@ import { hasBackupableData } from './utils/backup'
 import { shouldShowBackupReminder } from './utils/backupReminder'
 import { NavBadge } from './components/NavBadge'
 import { useNavSectionCounts } from './hooks/useNavSectionCounts'
+import { NAV_SECTION_STYLE } from './constants/itemColors'
 import { useOverdueCounts } from './hooks/useOverdueCounts'
 import { type Event, type Expense, type Note } from './db'
 import type { NoteKind } from './utils/noteKind'
@@ -330,6 +331,7 @@ function App() {
               const section = sections[key]
               const Icon = section.icon
               const isActive = activeSection === key
+              const navStyle = NAV_SECTION_STYLE[key]
 
               return (
                 <li key={key} className="flex-1">
@@ -338,8 +340,8 @@ function App() {
                     onClick={() => setActiveSection(key)}
                     className={`flex w-full flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-medium transition ${
                       isActive
-                        ? 'text-indigo-600'
-                        : 'text-slate-400 hover:text-slate-600'
+                        ? navStyle.active
+                        : `${navStyle.inactive} hover:text-slate-600`
                     }`}
                     aria-current={isActive ? 'page' : undefined}
                   >

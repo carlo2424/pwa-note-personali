@@ -1,4 +1,5 @@
 import type { Event } from '../db'
+import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { countdownLabel, countdownUrgency } from '../utils/countdown'
 import { formatAmount, formatIsoDate, formatModifiedAt, sentenceCase } from '../utils/format'
 import { recurrenceShort } from '../utils/recurring'
@@ -32,7 +33,7 @@ export function EventExpandableRow({
   onEdit,
   onArchived,
   todoCount = 0,
-  containerClassName = 'border-slate-100 bg-white',
+  containerClassName = ITEM_TYPE_STYLE.event.card,
   defaultExpanded = false,
   expanded,
   onExpandedChange,

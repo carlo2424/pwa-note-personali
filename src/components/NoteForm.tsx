@@ -6,24 +6,18 @@ import { resolveAreaId, areaNameById } from '../utils/areas'
 import { sentenceCase } from '../utils/format'
 import { clampEndDateToStart } from '../utils/recurring'
 import { EVENT_ICONS } from '../constants/events'
+import { iconColorClass } from '../constants/itemColors'
 import { type NoteKind, resolveNoteKind } from '../utils/noteKind'
 import { defaultNoteIcon } from '../utils/noteIcon'
 import { syncChecklistForNote } from '../utils/noteTasks'
 import { AreaInput } from './AreaInput'
 import { CameraCapture } from './CameraCapture'
 import { EventIcon } from './EventIcon'
+import { IconColorPicker } from './IconColorPicker'
 import { SpeechDictation } from './SpeechDictation'
 
 const inputClass =
   'w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
-
-const NOTE_COLORS = [
-  { value: 'indigo', label: 'Indaco', class: 'bg-indigo-500' },
-  { value: 'emerald', label: 'Verde', class: 'bg-emerald-500' },
-  { value: 'amber', label: 'Ambra', class: 'bg-amber-500' },
-  { value: 'rose', label: 'Rosa', class: 'bg-rose-500' },
-  { value: 'slate', label: 'Grigio', class: 'bg-slate-400' },
-]
 
 interface NoteFormProps {
   note?: Note
@@ -105,6 +99,7 @@ export function NoteForm({
     if (note?.id) {
       setKind(resolveNoteKind(note))
       setIcon(note.icon ?? defaultNoteIcon(resolveNoteKind(note)))
+      setColor(note.color ?? 'indigo')
       setAreaName(areaNameById(areas ?? [], note.areaId) ?? '')
     } else if (defaultAreaName) {
       setAreaName(defaultAreaName)
@@ -231,11 +226,22 @@ export function NoteForm({
               }`}
               aria-label={name}
             >
-              <EventIcon name={name} className="h-4 w-4" />
+              <EventIcon
+                name={name}
+                className={`h-4 w-4 ${
+                  icon === name ? iconColorClass(color) : 'text-slate-400'
+                }`}
+              />
             </button>
           ))}
         </div>
       </div>
+
+      <IconColorPicker
+        value={color}
+        onChange={setColor}
+        previewIcon={icon}
+      />
 
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -294,27 +300,6 @@ export function NoteForm({
       {!isChecklist && (
         <CameraCapture photo={photoBlob} onCapture={setPhotoBlob} />
       )}
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-slate-700">
-          Colore
-        </label>
-        <div className="flex gap-2">
-          {NOTE_COLORS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => setColor(c.value)}
-              className={`h-8 w-8 rounded-full ${c.class} transition ${
-                color === c.value
-                  ? 'ring-2 ring-offset-2 ring-indigo-400'
-                  : 'opacity-60 hover:opacity-100'
-              }`}
-              aria-label={c.label}
-            />
-          ))}
-        </div>
-      </div>
 
       <div className="flex gap-3 pt-2">
         <button

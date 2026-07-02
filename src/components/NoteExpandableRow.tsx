@@ -11,6 +11,7 @@ import { isNoteImpegno } from '../utils/impegno'
 import { isNoteChecklist } from '../utils/noteKind'
 import { resolveNoteIcon } from '../utils/noteIcon'
 import { archiveNote } from '../utils/noteArchive'
+import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { shareNote } from '../utils/share'
 import {
   summarizeChecklistTasks,
@@ -160,12 +161,10 @@ export function NoteExpandableRow({
       subtitleMultiline={compact}
       containerClassName={
         overdue || dateUrg === 'expired'
-          ? 'border-rose-200 bg-rose-50/50 ring-1 ring-rose-100'
+          ? ITEM_TYPE_STYLE.note.cardExpired
           : soon
-            ? 'border-amber-200 bg-amber-50/70 ring-1 ring-amber-100'
-            : checklistNote
-              ? 'border-emerald-100 bg-emerald-50/30'
-              : 'border-slate-100 bg-white'
+            ? ITEM_TYPE_STYLE.note.cardSoon
+            : ITEM_TYPE_STYLE.note.card
       }
       icon={
         <ItemIconCircle
