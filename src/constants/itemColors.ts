@@ -65,7 +65,7 @@ export const NAV_SECTION_STYLE: Record<
   { active: string; inactive: string }
 > = {
   home: { active: ITEM_TYPE_STYLE.home.navActive, inactive: 'text-slate-400' },
-  notes: { active: ITEM_TYPE_STYLE.note.navActive, inactive: 'text-slate-400' },
+  notes: { active: 'text-indigo-600', inactive: 'text-slate-400' },
   events: { active: ITEM_TYPE_STYLE.event.navActive, inactive: 'text-slate-400' },
   expenses: { active: ITEM_TYPE_STYLE.expense.navActive, inactive: 'text-slate-400' },
   archive: { active: ITEM_TYPE_STYLE.archive.navActive, inactive: 'text-slate-400' },

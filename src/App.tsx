@@ -36,6 +36,18 @@ import { resolveNoteKind } from './utils/noteKind'
 
 type Section = 'home' | 'notes' | 'events' | 'expenses' | 'archive'
 
+const ALL_SECTIONS: Section[] = [
+  'home',
+  'notes',
+  'events',
+  'expenses',
+  'archive',
+]
+
+function isSection(value: string): value is Section {
+  return ALL_SECTIONS.includes(value as Section)
+}
+
 const sections: Record<
   Section,
   { label: string; icon: typeof Home; title: string; description: string }
@@ -224,6 +236,48 @@ function App() {
     setShowSettings(true)
   }
 
+  function navigateSection(next: Section) {
+    if (next === activeSection) return
+
+    if (next === 'home') {
+      setActiveSection('home')
+      window.history.replaceState(
+        { section: 'home' },
+        '',
+        `${window.location.pathname}${window.location.search}`,
+      )
+      return
+    }
+
+    setActiveSection(next)
+    window.history.pushState({ section: next }, '', `#${next}`)
+  }
+
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '')
+    const initial = isSection(hash) ? hash : 'home'
+    setActiveSection(initial)
+    window.history.replaceState(
+      { section: initial },
+      '',
+      initial === 'home'
+        ? `${window.location.pathname}${window.location.search}`
+        : `#${initial}`,
+    )
+
+    function onPopState() {
+      setActiveSection('home')
+      window.history.replaceState(
+        { section: 'home' },
+        '',
+        `${window.location.pathname}${window.location.search}`,
+      )
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
   return (
     <ErrorBoundary
       fallback={(error) => (
@@ -296,11 +350,11 @@ function App() {
               onEditNote={openEditNote}
               onEditExpense={openEditExpense}
               onOpenEventFromExpense={(event) => {
-                setActiveSection('events')
+                navigateSection('events')
                 openEditEvent(event)
               }}
-              onGoToEvents={() => setActiveSection('events')}
-              onGoToExpenses={() => setActiveSection('expenses')}
+              onGoToEvents={() => navigateSection('events')}
+              onGoToExpenses={() => navigateSection('expenses')}
               onAddInArea={openAddInArea}
             />
           )}
@@ -314,7 +368,7 @@ function App() {
             <ExpenseList
               onEdit={openEditExpense}
               onOpenEvent={(event) => {
-                setActiveSection('events')
+                navigateSection('events')
                 openEditEvent(event)
               }}
             />
@@ -332,22 +386,19 @@ function App() {
               const Icon = section.icon
               const isActive = activeSection === key
               const navStyle = NAV_SECTION_STYLE[key]
+              const tone = isActive ? navStyle.active : navStyle.inactive
 
               return (
                 <li key={key} className="flex-1">
                   <button
                     type="button"
-                    onClick={() => setActiveSection(key)}
-                    className={`flex w-full flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-medium transition ${
-                      isActive
-                        ? navStyle.active
-                        : `${navStyle.inactive} hover:text-slate-600`
-                    }`}
+                    onClick={() => navigateSection(key)}
+                    className={`flex w-full flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-medium transition ${tone}`}
                     aria-current={isActive ? 'page' : undefined}
                   >
                     <span className="relative">
                       <Icon
-                        className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : ''}`}
+                        className={`h-5 w-5 ${isActive ? `stroke-[2.5] ${navStyle.active}` : navStyle.inactive}`}
                       />
                       <NavBadge
                         count={navBadgeCount(key)}

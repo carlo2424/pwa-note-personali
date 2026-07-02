@@ -56,13 +56,6 @@ import { MiniMonthCalendar } from './MiniMonthCalendar'
 import { MonthExpenseSummary } from './MonthExpenseSummary'
 import { NoteExpandableRow } from './NoteExpandableRow'
 
-const URGENCY_CONTAINER = {
-  expired: 'border-rose-200 bg-rose-50',
-  today: 'border-amber-200 bg-amber-50',
-  soon: 'border-orange-200 bg-orange-50',
-  ok: ITEM_TYPE_STYLE.event.card,
-}
-
 const AREA_SECTION_STYLE = {
   note: ITEM_TYPE_STYLE.note.section,
   impegno: ITEM_TYPE_STYLE.event.section,
@@ -536,11 +529,6 @@ export function HomeView({
                   ? undefined
                   : areaNameById(areas ?? [], row.item.areaId)
               }
-              containerClassName={
-                row.item.renewalDate
-                  ? URGENCY_CONTAINER[countdownUrgency(row.item.renewalDate)]
-                  : undefined
-              }
               onEdit={() => onEditEvent(row.item)}
             />
           </li>
@@ -610,11 +598,6 @@ export function HomeView({
                 compact
                 event={row.item}
                 areaName={areaNameById(areas ?? [], row.item.areaId)}
-                containerClassName={
-                  row.item.renewalDate
-                    ? URGENCY_CONTAINER[countdownUrgency(row.item.renewalDate)]
-                    : undefined
-                }
                 onEdit={() => onEditEvent(row.item)}
               />
             </li>
@@ -778,7 +761,6 @@ export function HomeView({
                         ? undefined
                         : areaNameById(areas ?? [], row.item.areaId)
                     }
-                    containerClassName={URGENCY_CONTAINER.expired}
                     onEdit={() => onEditEvent(row.item)}
                   />
                 </li>
@@ -830,11 +812,6 @@ export function HomeView({
                     areaSelection.kind === 'area'
                       ? undefined
                       : areaNameById(areas ?? [], event.areaId)
-                  }
-                  containerClassName={
-                    event.renewalDate
-                      ? URGENCY_CONTAINER[countdownUrgency(event.renewalDate)]
-                      : 'border-slate-100 bg-white'
                   }
                   onEdit={() => onEditEvent(event)}
                 />
