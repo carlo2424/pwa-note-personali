@@ -1,10 +1,10 @@
-import { COLOR_ICON_BG } from '../constants/events'
 import type { Event } from '../db'
 import { countdownLabel, countdownUrgency } from '../utils/countdown'
-import { formatAmount, formatIsoDate } from '../utils/format'
+import { formatAmount, formatIsoDate, formatModifiedAt, sentenceCase } from '../utils/format'
 import { recurrenceShort } from '../utils/recurring'
+import { summarizeText } from '../utils/textSummary'
 import { EventDetailBody } from './EventDetailBody'
-import { EventIcon } from './EventIcon'
+import { ItemIconCircle } from './ItemIconCircle'
 import { ExpandableCard } from './ExpandableCard'
 
 const URGENCY_BADGE = {
@@ -41,23 +41,37 @@ export function EventExpandableRow({
 }: EventExpandableRowProps) {
   const freqShort = recurrenceShort(event.recurrenceFrequency)
   const meta = `${freqShort ? `${freqShort} · ` : ''}${formatIsoDate(event.startDate)}${event.endDate ? ` → ${formatIsoDate(event.endDate)}` : ''}${event.labels.length > 0 ? ` · ${event.labels[0]}` : ''}${todoCount > 0 ? ` · ${todoCount} da fare` : ''}`
+  const descriptionExcerpt = summarizeText(event.writtenNote)
+  const titleNorm = sentenceCase(event.title.trim()).toLowerCase()
+  const showDescriptionExcerpt =
+    !!descriptionExcerpt &&
+    descriptionExcerpt.toLowerCase() !== titleNorm &&
+    !descriptionExcerpt.toLowerCase().startsWith(`${titleNorm}…`)
+
+  const subtitleParts: string[] = []
+  if (areaName) subtitleParts.push(areaName)
+  subtitleParts.push(meta)
+  if (showDescriptionExcerpt) subtitleParts.push(descriptionExcerpt)
+  if (compact) subtitleParts.push(formatModifiedAt(event.updatedAt))
+  const subtitle = subtitleParts.join(' · ')
 
   return (
     <ExpandableCard
       compact={compact}
+      subtitleMultiline={compact}
       containerClassName={containerClassName}
       defaultExpanded={defaultExpanded}
       expanded={expanded}
       onExpandedChange={onExpandedChange}
       icon={
-        <div
-          className={`flex shrink-0 items-center justify-center rounded-lg ${COLOR_ICON_BG[event.color] ?? COLOR_ICON_BG.indigo} ${compact ? 'h-7 w-7' : 'h-9 w-9 rounded-xl'}`}
-        >
-          <EventIcon name={event.icon} className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
-        </div>
+        <ItemIconCircle
+          icon={event.icon}
+          color={event.color}
+          compact={compact}
+        />
       }
       title={event.title}
-      subtitle={areaName ? `${areaName} · ${meta}` : meta}
+      subtitle={subtitle}
       badge={
         event.renewalDate ? (
           <span

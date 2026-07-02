@@ -100,7 +100,10 @@ export function AreaChips({
   const [deleting, setDeleting] = useState(false)
 
   const chipBase =
-    'flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition active:scale-[0.98]'
+    'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition active:scale-[0.98]'
+
+  const chipWrap =
+    '-mx-1 flex flex-wrap gap-2 px-1 pb-1'
 
   const { standalone, groups } = useMemo(
     () => buildAreaChipLayout(areas),
@@ -383,11 +386,7 @@ export function AreaChips({
         </form>
       )}
 
-      <div
-        className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        role="tablist"
-        aria-label="Filtra per area"
-      >
+      <div className={chipWrap} role="tablist" aria-label="Filtra per area">
         <button
           type="button"
           role="tab"
@@ -457,7 +456,7 @@ export function AreaChips({
       </div>
 
       {activeExpandedGroup && (
-        <div className="mt-1.5 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className={`mt-1.5 ${chipWrap}`}>
           {groups
             .find((g) => g.name === activeExpandedGroup)
             ?.areas.map((area) => {

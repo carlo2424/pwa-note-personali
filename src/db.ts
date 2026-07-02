@@ -10,6 +10,7 @@ export interface Note {
   /** Nota testuale o lista to-do con spunte */
   kind?: 'text' | 'checklist'
   color?: string
+  icon?: string
   photoBlob?: Blob
   startDate?: string
   endDate?: string

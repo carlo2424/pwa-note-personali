@@ -5,10 +5,13 @@ import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { resolveAreaId, areaNameById } from '../utils/areas'
 import { sentenceCase } from '../utils/format'
 import { clampEndDateToStart } from '../utils/recurring'
+import { EVENT_ICONS } from '../constants/events'
 import { type NoteKind, resolveNoteKind } from '../utils/noteKind'
+import { defaultNoteIcon } from '../utils/noteIcon'
 import { syncChecklistForNote } from '../utils/noteTasks'
 import { AreaInput } from './AreaInput'
 import { CameraCapture } from './CameraCapture'
+import { EventIcon } from './EventIcon'
 import { SpeechDictation } from './SpeechDictation'
 
 const inputClass =
@@ -88,6 +91,9 @@ export function NoteForm({
   const [endDate, setEndDate] = useState(note?.endDate ?? '')
   const [endManual, setEndManual] = useState(!!note?.endDate)
   const [color, setColor] = useState(note?.color ?? 'indigo')
+  const [icon, setIcon] = useState(
+    note?.icon ?? defaultNoteIcon(note ? resolveNoteKind(note) : defaultKind),
+  )
   const [photoBlob, setPhotoBlob] = useState<Blob | undefined>(note?.photoBlob)
   const [areaName, setAreaName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -98,6 +104,7 @@ export function NoteForm({
   useEffect(() => {
     if (note?.id) {
       setKind(resolveNoteKind(note))
+      setIcon(note.icon ?? defaultNoteIcon(resolveNoteKind(note)))
       setAreaName(areaNameById(areas ?? [], note.areaId) ?? '')
     } else if (defaultAreaName) {
       setAreaName(defaultAreaName)
@@ -156,6 +163,7 @@ export function NoteForm({
         content: sentenceCase(content),
         kind,
         color,
+        icon,
         photoBlob: isChecklist ? undefined : photoBlob,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
@@ -263,6 +271,29 @@ export function NoteForm({
       {!isChecklist && (
         <CameraCapture photo={photoBlob} onCapture={setPhotoBlob} />
       )}
+
+      <div>
+        <label className="mb-2 block text-sm font-medium text-slate-700">
+          Icona
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {EVENT_ICONS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => setIcon(name)}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                icon === name
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
+                  : 'border-slate-200 text-slate-500 hover:border-slate-300'
+              }`}
+              aria-label={name}
+            >
+              <EventIcon name={name} className="h-4 w-4" />
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-700">

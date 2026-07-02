@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { ListChecks } from 'lucide-react'
 import type { Note } from '../db'
 import { db } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
@@ -7,23 +6,21 @@ import { archiveConfirmCopy } from '../utils/confirmMessages'
 import { isPastDue } from '../utils/countdown'
 import { deadlineLabel, noteDateUrgency } from '../utils/homeSpotlight'
 import { toggleTask } from '../utils/eventTasks'
-import { formatDate, formatDateRange, formatIsoDate, sentenceCase } from '../utils/format'
+import { formatDate, formatDateRange, formatIsoDate, formatModifiedAt, sentenceCase } from '../utils/format'
 import { isNoteImpegno } from '../utils/impegno'
 import { isNoteChecklist } from '../utils/noteKind'
+import { resolveNoteIcon } from '../utils/noteIcon'
 import { archiveNote } from '../utils/noteArchive'
 import { shareNote } from '../utils/share'
+import {
+  summarizeChecklistTasks,
+  summarizeText,
+} from '../utils/textSummary'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ExpandableCard } from './ExpandableCard'
+import { ItemIconCircle } from './ItemIconCircle'
 import { ItemActions } from './ItemActions'
 import { TaskRow } from './TaskRow'
-
-const COLOR_MAP: Record<string, string> = {
-  indigo: 'bg-indigo-500',
-  emerald: 'bg-emerald-500',
-  amber: 'bg-amber-500',
-  rose: 'bg-rose-500',
-  slate: 'bg-slate-400',
-}
 
 interface NoteExpandableRowProps {
   note: Note
@@ -78,6 +75,16 @@ export function NoteExpandableRow({
         ? 'Lista vuota'
         : null
 
+  const contentExcerpt = checklistNote
+    ? summarizeChecklistTasks(checklistTasks ?? [])
+    : summarizeText(displayContent)
+
+  const titleNorm = sentenceCase(note.title.trim()).toLowerCase()
+  const showContentExcerpt =
+    !!contentExcerpt &&
+    contentExcerpt.toLowerCase() !== titleNorm &&
+    !contentExcerpt.toLowerCase().startsWith(`${titleNorm}…`)
+
   const dateUrg = noteDateUrgency(note)
   const soon =
     dateUrg === 'today' || dateUrg === 'soon'
@@ -105,6 +112,8 @@ export function NoteExpandableRow({
     }
     homeParts.push(sentenceCase(note.title))
     if (checklistPreview) homeParts.push(checklistPreview)
+    if (showContentExcerpt) homeParts.push(contentExcerpt)
+    if (compact) homeParts.push(formatModifiedAt(note.updatedAt))
 
     primaryTitle = areaLabel
     resolvedSubtitle = homeParts.join(' · ')
@@ -120,13 +129,12 @@ export function NoteExpandableRow({
     } else if (soonLabel && (soon || overdue)) {
       subtitleParts.push(soonLabel)
     }
-    if (!checklistNote && displayContent) {
-      subtitleParts.push(
-        `${displayContent.slice(0, 50)}${displayContent.length > 50 ? '…' : ''}`,
-      )
-    } else if (!checklistNote && !displayContent && !dueDateLabel && !dateRange) {
+    if (showContentExcerpt) {
+      subtitleParts.push(contentExcerpt)
+    } else if (!compact && !checklistNote && !displayContent && !dueDateLabel && !dateRange) {
       subtitleParts.push(`Aggiornata ${formatDate(note.updatedAt)}`)
     }
+    if (compact) subtitleParts.push(formatModifiedAt(note.updatedAt))
     if (areaName) subtitleParts.unshift(areaName)
 
     resolvedSubtitle =
@@ -143,10 +151,13 @@ export function NoteExpandableRow({
     </span>
   ) : null
 
+  const noteIcon = resolveNoteIcon(note, checklistNote ? 'checklist' : 'text')
+
   return (
     <>
     <ExpandableCard
       compact={compact}
+      subtitleMultiline={compact}
       containerClassName={
         overdue || dateUrg === 'expired'
           ? 'border-rose-200 bg-rose-50/50 ring-1 ring-rose-100'
@@ -157,19 +168,11 @@ export function NoteExpandableRow({
               : 'border-slate-100 bg-white'
       }
       icon={
-        checklistNote ? (
-          <div
-            className={`flex shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 ${
-              compact ? 'h-6 w-6' : 'h-7 w-7'
-            }`}
-          >
-            <ListChecks className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
-          </div>
-        ) : (
-          <div
-            className={`shrink-0 rounded-full ${COLOR_MAP[note.color ?? 'indigo']} ${compact ? 'h-2.5 w-2.5' : 'h-3 w-3'}`}
-          />
-        )
+        <ItemIconCircle
+          icon={noteIcon}
+          color={note.color ?? 'indigo'}
+          compact={compact}
+        />
       }
       title={primaryTitle}
       titleClassName={

@@ -18,6 +18,8 @@ interface ExpandableCardProps {
   onExpandedChange?: (expanded: boolean) => void
   compact?: boolean
   comfortable?: boolean
+  /** Sottotitolo su due righe (utile in Home con riassunto) */
+  subtitleMultiline?: boolean
 }
 
 /** Riga compatta stile evento — tap per espandere il contenuto */
@@ -37,6 +39,7 @@ export function ExpandableCard({
   onExpandedChange,
   compact = false,
   comfortable = false,
+  subtitleMultiline = false,
 }: ExpandableCardProps) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded)
   const expanded = controlledExpanded ?? internalExpanded
@@ -99,13 +102,15 @@ export function ExpandableCard({
             </p>
             {subtitle && (
               <p
-                className={`truncate text-slate-400 ${
+                className={`text-slate-500 ${
+                  subtitleMultiline ? 'line-clamp-2 whitespace-normal' : 'truncate'
+                } ${
                   dense
                     ? 'text-[10px] leading-tight'
                     : comfortable
                       ? 'text-xs leading-snug'
                       : compact
-                        ? 'text-[10px] leading-tight'
+                        ? 'text-[10px] leading-snug'
                         : 'text-xs'
                 }`}
               >

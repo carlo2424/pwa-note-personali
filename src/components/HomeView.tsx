@@ -44,6 +44,7 @@ import {
   shareImpegnoRowsSection,
 } from '../utils/share'
 import { deadlineLabel, sortNotesByUrgency } from '../utils/homeSpotlight'
+import { buildHomeFeedItems, isHomeFeedQuiet } from '../utils/homeFeed'
 import { noteVisibleOnHome } from '../utils/homeReminders'
 import { AreaChips } from './AreaChips'
 import { CollapsibleSection, sectionIcon } from './CollapsibleSection'
@@ -411,6 +412,40 @@ export function HomeView({
     [displayNotes],
   )
 
+  const homeFeedQuiet = useMemo(
+    () =>
+      areaFilterActive ||
+      isHomeFeedQuiet(notes ?? [], events ?? [], expenses ?? []),
+    [areaFilterActive, notes, events, expenses],
+  )
+
+  const homeFeedItems = useMemo(() => {
+    if (areaFilterActive) return []
+    const renewalIds = new Set(
+      urgentRenewals.map((e) => e.id).filter((id): id is number => id != null),
+    )
+    return buildHomeFeedItems(notes ?? [], events ?? [], expenses ?? []).filter(
+      (row) => {
+        if (row.kind === 'note' && row.item.id && overdueNoteIds.has(row.item.id)) {
+          return false
+        }
+        if (row.kind === 'event' && row.item.id) {
+          if (overdueEventIds.has(row.item.id)) return false
+          if (renewalIds.has(row.item.id)) return false
+        }
+        return true
+      },
+    )
+  }, [
+    areaFilterActive,
+    notes,
+    events,
+    expenses,
+    overdueNoteIds,
+    overdueEventIds,
+    urgentRenewals,
+  ])
+
   const impegnoSectionSubtitle = useMemo(() => {
     for (const row of displayImpegni) {
       if (row.kind !== 'event') continue
@@ -550,35 +585,54 @@ export function HomeView({
     </ul>
   )
 
-  const globalActiveList = (
+  const homeFeedList = (
     <ul className="space-y-2">
-      {sortedDisplayNotes.map((note) => {
-        const { title, member } = areaHomeLabel(areas ?? [], note.areaId)
+      {homeFeedItems.map((row) => {
+        if (row.kind === 'note') {
+          const { title, member } = areaHomeLabel(areas ?? [], row.item.areaId)
+          return (
+            <li key={`feed-n-${row.item.id}`}>
+              <NoteExpandableRow
+                compact
+                note={row.item}
+                promoteAreaTitle
+                areaName={title}
+                areaMember={member}
+                onEdit={() => onEditNote(row.item)}
+              />
+            </li>
+          )
+        }
+        if (row.kind === 'event') {
+          return (
+            <li key={`feed-e-${row.item.id}`}>
+              <EventExpandableRow
+                compact
+                event={row.item}
+                areaName={areaNameById(areas ?? [], row.item.areaId)}
+                containerClassName={
+                  row.item.renewalDate
+                    ? URGENCY_CONTAINER[countdownUrgency(row.item.renewalDate)]
+                    : undefined
+                }
+                onEdit={() => onEditEvent(row.item)}
+              />
+            </li>
+          )
+        }
         return (
-          <li key={note.id}>
-            <NoteExpandableRow
+          <li key={`feed-x-${row.item.id}`}>
+            <ExpenseExpandableRow
               compact
-              note={note}
+              expense={row.item}
               promoteAreaTitle
-              areaName={title}
-              areaMember={member}
-              onEdit={() => onEditNote(note)}
+              areaName={areaNameById(areas ?? [], row.item.areaId)}
+              onEdit={() => onEditExpense(row.item)}
+              onOpenEvent={onOpenEventFromExpense}
             />
           </li>
         )
       })}
-      {displayExpenses.map((expense) => (
-        <li key={expense.id}>
-          <ExpenseExpandableRow
-            compact
-            expense={expense}
-            promoteAreaTitle
-            areaName={areaNameById(areas ?? [], expense.areaId)}
-            onEdit={() => onEditExpense(expense)}
-            onOpenEvent={onOpenEventFromExpense}
-          />
-        </li>
-      ))}
     </ul>
   )
 
@@ -692,11 +746,9 @@ export function HomeView({
         />
       )}
 
-      {!areaFilterActive &&
-        (sortedDisplayNotes.length > 0 || displayExpenses.length > 0) &&
-        globalActiveList}
+      {!areaFilterActive && !homeFeedQuiet && homeFeedItems.length > 0 && homeFeedList}
 
-      {overdueRows.length > 0 && (
+      {!homeFeedQuiet && overdueRows.length > 0 && (
         <CollapsibleSection
           {...sectionComfort}
           title="In ritardo"
@@ -749,7 +801,7 @@ export function HomeView({
         </CollapsibleSection>
       )}
 
-      {urgentRenewals.length > 0 && (
+      {!homeFeedQuiet && urgentRenewals.length > 0 && (
         <CollapsibleSection
           {...sectionComfort}
           title="Rinnovi in arrivo"
@@ -849,7 +901,7 @@ export function HomeView({
         </div>
       ) : null}
 
-      {isEmpty && (
+      {!homeFeedQuiet && isEmpty && (
         <p className="py-4 text-center text-sm text-slate-400">
           Niente in questo mese. Aggiungi con{' '}
           <span className="font-semibold text-indigo-600">+</span>.

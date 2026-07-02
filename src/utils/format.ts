@@ -53,3 +53,8 @@ export function formatAmount(amount: number): string {
     currency: 'EUR',
   }).format(value)
 }
+
+/** Etichetta breve per ultima modifica (es. "Mod. 2 lug 2026") */
+export function formatModifiedAt(timestamp: number): string {
+  return `Mod. ${formatDate(timestamp)}`
+}

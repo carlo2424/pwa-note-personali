@@ -10,6 +10,7 @@ export const EVENT_COLORS = [
 export const EVENT_ICONS = [
   'Calendar', 'CreditCard', 'Music', 'Tv', 'Wifi', 'Car',
   'Home', 'Heart', 'Smartphone', 'Dumbbell', 'BookOpen', 'Cloud',
+  'StickyNote', 'ListChecks',
 ] as const
 
 export type EventIconName = (typeof EVENT_ICONS)[number]
@@ -42,4 +43,5 @@ export const COLOR_ICON_BG: Record<string, string> = {
   rose: 'bg-rose-100 text-rose-600',
   sky: 'bg-sky-100 text-sky-600',
   violet: 'bg-violet-100 text-violet-600',
+  slate: 'bg-slate-100 text-slate-600',
 }

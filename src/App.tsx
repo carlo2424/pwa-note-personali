@@ -27,6 +27,7 @@ import { BackupReminderBanner } from './components/BackupReminderBanner'
 import { hasBackupableData } from './utils/backup'
 import { shouldShowBackupReminder } from './utils/backupReminder'
 import { NavBadge } from './components/NavBadge'
+import { useNavSectionCounts } from './hooks/useNavSectionCounts'
 import { useOverdueCounts } from './hooks/useOverdueCounts'
 import { type Event, type Expense, type Note } from './db'
 import type { NoteKind } from './utils/noteKind'
@@ -87,10 +88,17 @@ function App() {
   const current = sections[activeSection]
   const CurrentIcon = current.icon
   const overdueCounts = useOverdueCounts()
+  const navCounts = useNavSectionCounts()
 
   function navBadgeCount(section: Section): number {
-    if (section === 'home' || section === 'events') return overdueCounts.impegni
-    return 0
+    return navCounts[section]
+  }
+
+  function navBadgeUrgent(section: Section): boolean {
+    return (
+      overdueCounts.impegni > 0 &&
+      (section === 'home' || section === 'events')
+    )
   }
 
   function clearDefaultArea() {
@@ -339,7 +347,10 @@ function App() {
                       <Icon
                         className={`h-5 w-5 ${isActive ? 'stroke-[2.5]' : ''}`}
                       />
-                      <NavBadge count={navBadgeCount(key)} />
+                      <NavBadge
+                        count={navBadgeCount(key)}
+                        urgent={navBadgeUrgent(key)}
+                      />
                     </span>
                     {section.label}
                   </button>
