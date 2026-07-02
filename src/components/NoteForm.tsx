@@ -214,6 +214,29 @@ export function NoteForm({
 
       <AreaInput value={areaName} onChange={setAreaName} disabled={saving} />
 
+      <div>
+        <label className="mb-2 block text-sm font-medium text-slate-700">
+          Icona
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {EVENT_ICONS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => setIcon(name)}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                icon === name
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
+                  : 'border-slate-200 text-slate-500 hover:border-slate-300'
+              }`}
+              aria-label={name}
+            >
+              <EventIcon name={name} className="h-4 w-4" />
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs text-slate-600">Data inizio</label>
@@ -271,29 +294,6 @@ export function NoteForm({
       {!isChecklist && (
         <CameraCapture photo={photoBlob} onCapture={setPhotoBlob} />
       )}
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-slate-700">
-          Icona
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {EVENT_ICONS.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => setIcon(name)}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                icon === name
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
-                  : 'border-slate-200 text-slate-500 hover:border-slate-300'
-              }`}
-              aria-label={name}
-            >
-              <EventIcon name={name} className="h-4 w-4" />
-            </button>
-          ))}
-        </div>
-      </div>
 
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-700">

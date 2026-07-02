@@ -247,10 +247,6 @@ export function AreaChips({
         </div>
       </div>
 
-      <p className="mb-1.5 text-[10px] text-slate-400">
-        Tieni premuto un chip per modificarlo o eliminarlo
-      </p>
-
       {adding && (
         <form
           className="mb-2 space-y-2"
