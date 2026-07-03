@@ -698,12 +698,14 @@ export function HomeView({
       )}
 
       {!areaFilterActive && (
-        <HomeSpotlightCards
-          monthLabel={monthLabel}
-          monthPaid={monthExpensesTotal}
-          monthPlanned={monthPlannedTotal}
-          onGoToExpenses={onGoToExpenses}
-        />
+        <div className="mb-4 border-b border-slate-200/60 pb-4">
+          <HomeSpotlightCards
+            monthLabel={monthLabel}
+            monthPaid={monthExpensesTotal}
+            monthPlanned={monthPlannedTotal}
+            onGoToExpenses={onGoToExpenses}
+          />
+        </div>
       )}
 
       {!areaFilterActive && !homeFeedQuiet && homeFeedItems.length > 0 && homeFeedList}
