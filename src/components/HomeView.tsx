@@ -43,8 +43,8 @@ import {
   shareExpensesSection,
   shareImpegnoRowsSection,
 } from '../utils/share'
-import { deadlineLabel, sortNotesByUrgency } from '../utils/homeSpotlight'
-import { buildHomeFeedItems, isHomeFeedQuiet } from '../utils/homeFeed'
+import { deadlineLabel, compareDeadlineIso, eventDeadlineIso, noteKeyDate, sortNotesByUrgency } from '../utils/homeSpotlight'
+import { buildHomeFeedItems, isHomeFeedQuiet, sortExpensesByDeadline } from '../utils/homeFeed'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { AreaChips } from './AreaChips'
 import { CollapsibleSection, sectionIcon } from './CollapsibleSection'
@@ -103,8 +103,21 @@ function EmptySectionHint({
 }
 
 type ImpegnoRow =
-  | { kind: 'event'; item: Event; sortKey: string }
-  | { kind: 'note'; item: Note; sortKey: string }
+  | { kind: 'event'; item: Event }
+  | { kind: 'note'; item: Note }
+
+function impegnoRowDeadline(row: ImpegnoRow): string | undefined {
+  if (row.kind === 'event') return eventDeadlineIso(row.item)
+  return noteKeyDate(row.item)
+}
+
+function compareImpegnoRows(a: ImpegnoRow, b: ImpegnoRow): number {
+  return compareDeadlineIso(
+    impegnoRowDeadline(a),
+    impegnoRowDeadline(b),
+    b.item.updatedAt - a.item.updatedAt,
+  )
+}
 
 export function HomeView({
   onEditEvent,
@@ -152,22 +165,14 @@ export function HomeView({
       if (!matchesAreaSelection(note, areaSelection, areaList)) continue
       const linked = tasksForNote(taskList, note.id)
       if (isOverdueNoteImpegno(note, linked)) {
-        rows.push({
-          kind: 'note',
-          item: note,
-          sortKey: note.endDate!,
-        })
+        rows.push({ kind: 'note', item: note })
       }
     }
 
     for (const event of filterEventImpegni(events ?? [])) {
       if (!matchesAreaSelection(event, areaSelection, areaList)) continue
       if (isOverdueEvent(event)) {
-        rows.push({
-          kind: 'event',
-          item: event,
-          sortKey: event.endDate ?? event.renewalDate ?? event.startDate,
-        })
+        rows.push({ kind: 'event', item: event })
       }
     }
 
@@ -177,7 +182,7 @@ export function HomeView({
           ? eventInHomeMonth(row.item)
           : noteInHomeMonth(row.item),
       )
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .sort(compareImpegnoRows)
   }, [events, notes, tasks, areaSelection, areaList])
 
   const overdueEventIds = useMemo(
@@ -237,13 +242,11 @@ export function HomeView({
 
   const monthExpensesList = useMemo(
     () =>
-      [...(expenses ?? [])]
-        .filter(
+      sortExpensesByDeadline(
+        (expenses ?? []).filter(
           (e) => matchesAreaSelection(e, areaSelection, areaList) && expenseInCurrentMonth(e),
-        )
-        .sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
         ),
+      ),
     [expenses, areaSelection, areaList],
   )
 
@@ -280,48 +283,30 @@ export function HomeView({
 
   const areaExpensesList = useMemo(
     () =>
-      [...(expenses ?? [])]
-        .filter(
+      sortExpensesByDeadline(
+        (expenses ?? []).filter(
           (e) =>
             matchesAreaSelection(e, areaSelection, areaList) &&
             expenseInCurrentMonth(e),
-        )
-        .sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
         ),
+      ),
     [expenses, areaSelection, areaList],
   )
 
   const impegnoRows = useMemo((): ImpegnoRow[] => {
     const rows: ImpegnoRow[] = [
-      ...monthEvents.map((item) => ({
-        kind: 'event' as const,
-        item,
-        sortKey: item.startDate,
-      })),
-      ...monthNoteImpegni.map((item) => ({
-        kind: 'note' as const,
-        item,
-        sortKey: item.startDate!,
-      })),
+      ...monthEvents.map((item) => ({ kind: 'event' as const, item })),
+      ...monthNoteImpegni.map((item) => ({ kind: 'note' as const, item })),
     ]
-    return rows.sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+    return rows.sort(compareImpegnoRows)
   }, [monthEvents, monthNoteImpegni])
 
   const areaImpegniRows = useMemo((): ImpegnoRow[] => {
     const rows: ImpegnoRow[] = [
-      ...areaEvents.map((item) => ({
-        kind: 'event' as const,
-        item,
-        sortKey: item.startDate,
-      })),
-      ...areaNoteImpegni.map((item) => ({
-        kind: 'note' as const,
-        item,
-        sortKey: item.startDate!,
-      })),
+      ...areaEvents.map((item) => ({ kind: 'event' as const, item })),
+      ...areaNoteImpegni.map((item) => ({ kind: 'note' as const, item })),
     ]
-    return rows.sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+    return rows.sort(compareImpegnoRows)
   }, [areaEvents, areaNoteImpegni])
 
   const areaCounts = useMemo(() => {

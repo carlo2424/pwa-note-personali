@@ -1,4 +1,4 @@
-import type { Note } from '../db'
+import type { Event, Note } from '../db'
 import { countdownUrgency, daysUntil } from './countdown'
 
 export type DateUrgency = ReturnType<typeof countdownUrgency>
@@ -37,17 +37,35 @@ export function urgencyRank(urgency: DateUrgency | null): number {
 }
 
 export function sortNotesByUrgency(a: Note, b: Note): number {
-  const ua = noteDateUrgency(a)
-  const ub = noteDateUrgency(b)
-  const ra = urgencyRank(ua)
-  const rb = urgencyRank(ub)
-  if (ra !== rb) return ra - rb
-  const da = noteKeyDate(a)
-  const db = noteKeyDate(b)
-  if (da && db) return da.localeCompare(db)
-  if (da) return -1
-  if (db) return 1
-  return b.updatedAt - a.updatedAt
+  return compareDeadlineIso(
+    noteKeyDate(a),
+    noteKeyDate(b),
+    b.updatedAt - a.updatedAt,
+  )
+}
+
+export function eventDeadlineIso(
+  event: Pick<Event, 'startDate' | 'endDate' | 'renewalDate'>,
+): string {
+  return event.renewalDate ?? event.endDate ?? event.startDate
+}
+
+/** Scadenza più vicina prima; voci senza scadenza in fondo. */
+export function compareDeadlineIso(
+  isoA: string | undefined,
+  isoB: string | undefined,
+  tieBreak = 0,
+): number {
+  if (isoA && !isoB) return -1
+  if (!isoA && isoB) return 1
+  if (!isoA && !isoB) return tieBreak
+
+  const daysA = daysUntil(isoA!)
+  const daysB = daysUntil(isoB!)
+  if (daysA !== daysB) return daysA - daysB
+  const byDate = isoA!.localeCompare(isoB!)
+  if (byDate !== 0) return byDate
+  return tieBreak
 }
 
 export interface Spotlight {
