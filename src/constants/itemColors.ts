@@ -2,27 +2,31 @@
 
 export const ITEM_TYPE_STYLE = {
   note: {
-    /** Note testuali: giallo chiaro, stesso tono dell'icona "Nota" nel menu + */
-    card: 'border-amber-200 bg-amber-100',
-    /** Liste to-do: giallo più scuro per distinguerle dalle note testuali */
-    cardChecklist: 'border-amber-300 bg-amber-200',
-    /** Scadenza vicina: arancio, si distingue dal giallo di base */
+    /** Note testuali: giallo ocra come in tab Note / Home */
+    card: 'border-amber-200 bg-[#FEF5C1]',
+    /** Scadenza vicina: badge only in Home; sfondo ocra in liste piene */
     cardSoon: 'border-orange-300 bg-orange-100 ring-1 ring-orange-200',
     cardExpired: 'border-rose-300 bg-rose-100 ring-1 ring-rose-200',
-    section: 'border-amber-200/90 bg-amber-50/90 ring-1 ring-amber-100 shadow-sm',
+    section: 'border-amber-200/90 bg-[#FEF5C1]/90 ring-1 ring-amber-100 shadow-sm',
     navActive: 'text-amber-600',
     navIconBg: 'bg-amber-100 text-amber-700',
   },
+  checklist: {
+    /** Liste to-do: verde, distinto dal giallo delle note testuali */
+    card: 'border-emerald-200 bg-emerald-100',
+    section: 'border-emerald-200/90 bg-emerald-50/90 ring-1 ring-emerald-100 shadow-sm',
+    navIconBg: 'bg-emerald-100 text-emerald-700',
+  },
   event: {
-    /** Stesso violetto dell'icona "Impegno" nel menu + */
+    /** Violetto come card Impegni in tab Impegni / Home */
     card: 'border-violet-200 bg-violet-100',
-    section: 'border-violet-200/90 bg-violet-50/80 ring-1 ring-violet-100 shadow-sm',
+    section: 'border-violet-200/90 bg-violet-100/80 ring-1 ring-violet-100 shadow-sm',
     navActive: 'text-violet-600',
     navIconBg: 'bg-violet-100 text-violet-700',
   },
   expense: {
-    card: 'border-rose-100 bg-rose-50/40',
-    section: 'border-rose-200/90 bg-rose-50/80 ring-1 ring-rose-100 shadow-sm',
+    card: 'border-rose-200 bg-rose-50',
+    section: 'border-rose-200/90 bg-rose-50/90 ring-1 ring-rose-100 shadow-sm',
     navActive: 'text-rose-600',
     navIconBg: 'bg-rose-100 text-rose-700',
   },
@@ -64,9 +68,9 @@ export const NAV_SECTION_STYLE: Record<
   'home' | 'notes' | 'events' | 'expenses' | 'archive',
   { active: string; inactive: string }
 > = {
-  home: { active: ITEM_TYPE_STYLE.home.navActive, inactive: 'text-emerald-500' },
-  notes: { active: 'text-indigo-600', inactive: 'text-indigo-400' },
-  events: { active: ITEM_TYPE_STYLE.event.navActive, inactive: 'text-violet-400' },
-  expenses: { active: ITEM_TYPE_STYLE.expense.navActive, inactive: 'text-rose-400' },
-  archive: { active: ITEM_TYPE_STYLE.archive.navActive, inactive: 'text-slate-400' },
+  home: { active: 'text-slate-800', inactive: 'text-slate-400' },
+  notes: { active: 'text-slate-800', inactive: 'text-slate-400' },
+  events: { active: 'text-slate-800', inactive: 'text-slate-400' },
+  expenses: { active: 'text-slate-800', inactive: 'text-slate-400' },
+  archive: { active: 'text-slate-800', inactive: 'text-slate-400' },
 }

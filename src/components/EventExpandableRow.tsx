@@ -26,6 +26,8 @@ interface EventExpandableRowProps {
   onExpandedChange?: (expanded: boolean) => void
   areaName?: string
   compact?: boolean
+  /** Etichetta tipo sopra l'icona (Nota, Lista, Impegno, Spesa) */
+  showTypeLabel?: boolean
 }
 
 export function EventExpandableRow({
@@ -39,6 +41,7 @@ export function EventExpandableRow({
   onExpandedChange,
   areaName,
   compact = false,
+  showTypeLabel = false,
 }: EventExpandableRowProps) {
   const freqShort = recurrenceShort(event.recurrenceFrequency)
   const meta = `${freqShort ? `${freqShort} · ` : ''}${formatIsoDate(event.startDate)}${event.endDate ? ` → ${formatIsoDate(event.endDate)}` : ''}${event.labels.length > 0 ? ` · ${event.labels[0]}` : ''}${todoCount > 0 ? ` · ${todoCount} da fare` : ''}`
@@ -60,6 +63,7 @@ export function EventExpandableRow({
     <ExpandableCard
       compact={compact}
       subtitleMultiline={compact}
+      typeLabel={showTypeLabel ? 'Impegno' : undefined}
       containerClassName={containerClassName}
       defaultExpanded={defaultExpanded}
       expanded={expanded}

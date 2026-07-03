@@ -28,7 +28,6 @@ import { hasBackupableData } from './utils/backup'
 import { shouldShowBackupReminder } from './utils/backupReminder'
 import { NavBadge } from './components/NavBadge'
 import { useNavSectionCounts } from './hooks/useNavSectionCounts'
-import { NAV_SECTION_STYLE } from './constants/itemColors'
 import { useOverdueCounts } from './hooks/useOverdueCounts'
 import { type Event, type Expense, type Note } from './db'
 import type { NoteKind } from './utils/noteKind'
@@ -385,8 +384,7 @@ function App() {
               const section = sections[key]
               const Icon = section.icon
               const isActive = activeSection === key
-              const navStyle = NAV_SECTION_STYLE[key]
-              const tone = isActive ? navStyle.active : navStyle.inactive
+              const tone = isActive ? 'text-slate-800' : 'text-slate-400'
 
               return (
                 <li key={key} className="flex-1">

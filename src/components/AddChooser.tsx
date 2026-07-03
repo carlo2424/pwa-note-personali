@@ -22,7 +22,7 @@ const options = [
     label: 'Lista',
     description: 'To-do con voci da spuntare',
     icon: ListChecks,
-    iconClass: ITEM_TYPE_STYLE.note.navIconBg,
+    iconClass: ITEM_TYPE_STYLE.checklist.navIconBg,
   },
   {
     id: 'event',

@@ -23,6 +23,7 @@ interface MonthExpenseSummaryProps {
   compact?: boolean
   /** Solo contenuto interno, senza macro-card (per CollapsibleSection) */
   nested?: boolean
+  showTypeLabel?: boolean
 }
 
 export function MonthExpenseSummary({
@@ -35,6 +36,7 @@ export function MonthExpenseSummary({
   hideAreaName = false,
   compact = false,
   nested = false,
+  showTypeLabel = false,
 }: MonthExpenseSummaryProps) {
   const upcoming = upcomingFromExpenses(expenses)
   const totalSpese = sumOccurredPositiveExpenses(expenses)
@@ -80,6 +82,7 @@ export function MonthExpenseSummary({
             <ExpenseExpandableRow
               expense={expense}
               compact={compact}
+              showTypeLabel={showTypeLabel}
               areaName={
                 hideAreaName
                   ? undefined

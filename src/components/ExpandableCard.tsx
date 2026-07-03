@@ -20,6 +20,8 @@ interface ExpandableCardProps {
   comfortable?: boolean
   /** Sottotitolo su due righe (utile in Home con riassunto) */
   subtitleMultiline?: boolean
+  /** Es. Nota, Lista, Impegno, Spesa — mostrato sopra l'icona */
+  typeLabel?: string
 }
 
 /** Riga compatta stile evento — tap per espandere il contenuto */
@@ -40,6 +42,7 @@ export function ExpandableCard({
   compact = false,
   comfortable = false,
   subtitleMultiline = false,
+  typeLabel,
 }: ExpandableCardProps) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded)
   const expanded = controlledExpanded ?? internalExpanded
@@ -59,6 +62,22 @@ export function ExpandableCard({
     const next = !expanded
     if (controlledExpanded === undefined) setInternalExpanded(next)
     onExpandedChange?.(next)
+  }
+
+  function renderIcon() {
+    if (!typeLabel) return icon
+    return (
+      <div className="flex shrink-0 flex-col items-center gap-0.5">
+        <span
+          className={`font-semibold uppercase tracking-wide text-slate-500 ${
+            dense ? 'text-[7px] leading-none' : 'text-[8px] leading-none'
+          }`}
+        >
+          {typeLabel}
+        </span>
+        {icon}
+      </div>
+    )
   }
 
   return (
@@ -85,7 +104,7 @@ export function ExpandableCard({
           aria-expanded={hasBody ? expanded : undefined}
           disabled={!hasBody}
         >
-          {icon}
+          {renderIcon()}
           <div className="min-w-0 flex-1">
             <p
               className={`truncate font-medium ${

@@ -30,7 +30,6 @@ import {
 import {
   computeMonthPaidTotal,
   computeMonthPlannedTotal,
-  computeMonthUpcomingExpenses,
   sumOccurredPositiveExpenses,
 } from '../utils/monthExpenseTotals'
 import {
@@ -63,13 +62,6 @@ const AREA_SECTION_STYLE = {
   rinnovi: 'border-emerald-200/90 bg-emerald-50/80 ring-1 ring-emerald-100 shadow-sm',
   ritardo: 'border-rose-300/80 bg-rose-50/90 ring-1 ring-rose-100 shadow-sm',
 } as const
-
-function prevMonthRange(): { start: number; end: number } {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
-  const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).getTime()
-  return { start, end }
-}
 
 function sumEventCosts(events: Event[]): number {
   return events.reduce(
@@ -348,30 +340,10 @@ export function HomeView({
 
   const monthExpensesTotal = computeMonthPaidTotal(expenses ?? [])
 
-  const monthUpcomingExpenses = useMemo(
-    () => computeMonthUpcomingExpenses(expenses ?? []),
-    [expenses],
-  )
-
   const monthPlannedTotal = useMemo(
     () => computeMonthPlannedTotal(events ?? []),
     [events],
   )
-
-  const { start: prevStart, end: prevEnd } = prevMonthRange()
-  const prevMonthExpenses = (expenses ?? [])
-    .filter((e) => {
-      const t = new Date(e.date).getTime()
-      return (
-        matchesAreaSelection(e, areaSelection, areaList) &&
-        t >= prevStart &&
-        t <= prevEnd &&
-        e.amount > 0
-      )
-    })
-    .reduce((s, e) => s + e.amount, 0)
-
-  const expenseDelta = monthExpensesTotal - prevMonthExpenses
 
   const monthlySubs = (areaFilterActive ? areaEvents : monthEvents)
     .filter((e) => e.cost != null && e.cost > 0)
@@ -523,6 +495,7 @@ export function HomeView({
           <li key={`e-${row.item.id}`}>
             <EventExpandableRow
               compact
+              showTypeLabel
               event={row.item}
               areaName={
                 areaSelection.kind === 'area'
@@ -536,6 +509,7 @@ export function HomeView({
           <li key={`n-${row.item.id}`}>
             <NoteExpandableRow
               compact
+              showTypeLabel
               note={row.item}
               areaName={
                 areaSelection.kind === 'area'
@@ -561,6 +535,7 @@ export function HomeView({
           <li key={note.id}>
             <NoteExpandableRow
               compact
+              showTypeLabel
               note={note}
               promoteAreaTitle={promoteNoteAreaTitle}
               areaName={areaLabel.title}
@@ -582,6 +557,7 @@ export function HomeView({
             <li key={`feed-n-${row.item.id}`}>
               <NoteExpandableRow
                 compact
+                showTypeLabel
                 note={row.item}
                 promoteAreaTitle
                 areaName={title}
@@ -596,6 +572,7 @@ export function HomeView({
             <li key={`feed-e-${row.item.id}`}>
               <EventExpandableRow
                 compact
+                showTypeLabel
                 event={row.item}
                 areaName={areaNameById(areas ?? [], row.item.areaId)}
                 onEdit={() => onEditEvent(row.item)}
@@ -607,6 +584,7 @@ export function HomeView({
           <li key={`feed-x-${row.item.id}`}>
             <ExpenseExpandableRow
               compact
+              showTypeLabel
               expense={row.item}
               promoteAreaTitle
               areaName={areaNameById(areas ?? [], row.item.areaId)}
@@ -625,6 +603,7 @@ export function HomeView({
         <li key={expense.id}>
           <ExpenseExpandableRow
             compact
+            showTypeLabel
             expense={expense}
             onEdit={() => onEditExpense(expense)}
             onOpenEvent={onOpenEventFromExpense}
@@ -636,6 +615,7 @@ export function HomeView({
     <MonthExpenseSummary
       nested
       compact
+      showTypeLabel
       monthLabel={monthLabel}
       expenses={displayExpenses}
       areas={areas ?? []}
@@ -722,9 +702,6 @@ export function HomeView({
           monthLabel={monthLabel}
           monthPaid={monthExpensesTotal}
           monthPlanned={monthPlannedTotal}
-          upcomingExpenses={monthUpcomingExpenses}
-          expenseDelta={expenseDelta}
-          prevMonthExpenses={prevMonthExpenses}
           onGoToExpenses={onGoToExpenses}
         />
       )}
@@ -755,6 +732,7 @@ export function HomeView({
                 <li key={`od-e-${row.item.id}`}>
                   <EventExpandableRow
                     compact
+                    showTypeLabel
                     event={row.item}
                     areaName={
                       areaSelection.kind === 'area'
@@ -768,6 +746,7 @@ export function HomeView({
                 <li key={`od-n-${row.item.id}`}>
                   <NoteExpandableRow
                     compact
+                    showTypeLabel
                     note={row.item}
                     areaName={
                       areaSelection.kind === 'area'
@@ -807,6 +786,7 @@ export function HomeView({
               <li key={event.id}>
                 <EventExpandableRow
                   compact
+                  showTypeLabel
                   event={event}
                   areaName={
                     areaSelection.kind === 'area'

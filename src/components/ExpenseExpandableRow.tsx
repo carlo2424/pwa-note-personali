@@ -32,6 +32,8 @@ interface ExpenseExpandableRowProps {
   compact?: boolean
   /** In Home globale: area in titolo, data e descrizione nel sottotitolo */
   promoteAreaTitle?: boolean
+  /** Etichetta tipo sopra l'icona (Nota, Lista, Impegno, Spesa) */
+  showTypeLabel?: boolean
 }
 
 export function ExpenseExpandableRow({
@@ -41,6 +43,7 @@ export function ExpenseExpandableRow({
   areaName,
   compact = false,
   promoteAreaTitle = false,
+  showTypeLabel = false,
 }: ExpenseExpandableRowProps) {
   const linkedEvent = useDexieLiveQuery(
     async () => {
@@ -106,6 +109,9 @@ export function ExpenseExpandableRow({
     <ExpandableCard
       compact={compact}
       subtitleMultiline={compact}
+      typeLabel={
+        showTypeLabel ? (fromImpegno ? 'Impegno' : 'Spesa') : undefined
+      }
       containerClassName={cardStyle}
       icon={iconNode}
       title={title}

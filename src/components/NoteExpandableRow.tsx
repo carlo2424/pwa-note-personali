@@ -32,6 +32,8 @@ interface NoteExpandableRowProps {
   compact?: boolean
   /** In Home globale: mostra l'area (es. Lorenzo) come titolo per le liste */
   promoteAreaTitle?: boolean
+  /** Etichetta tipo sopra l'icona (Nota, Lista, Impegno, Spesa) */
+  showTypeLabel?: boolean
 }
 
 export function NoteExpandableRow({
@@ -41,6 +43,7 @@ export function NoteExpandableRow({
   areaMember,
   compact = false,
   promoteAreaTitle = true,
+  showTypeLabel = false,
 }: NoteExpandableRowProps) {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
   const archiveKind = isNoteImpegno(note) ? 'impegno' : 'nota'
@@ -153,21 +156,35 @@ export function NoteExpandableRow({
   ) : null
 
   const noteIcon = resolveNoteIcon(note, checklistNote ? 'checklist' : 'text')
+  const typeLabel = showTypeLabel
+    ? isNoteImpegno(note)
+      ? 'Impegno'
+      : checklistNote
+        ? 'Lista'
+        : 'Nota'
+    : undefined
+
+  const noteCardStyle = (() => {
+    if (isNoteImpegno(note)) return ITEM_TYPE_STYLE.event.card
+    if (compact) {
+      return checklistNote
+        ? ITEM_TYPE_STYLE.checklist.card
+        : ITEM_TYPE_STYLE.note.card
+    }
+    if (overdue || dateUrg === 'expired') return ITEM_TYPE_STYLE.note.cardExpired
+    if (soon) return ITEM_TYPE_STYLE.note.cardSoon
+    return checklistNote
+      ? ITEM_TYPE_STYLE.checklist.card
+      : ITEM_TYPE_STYLE.note.card
+  })()
 
   return (
     <>
     <ExpandableCard
       compact={compact}
       subtitleMultiline={compact}
-      containerClassName={
-        overdue || dateUrg === 'expired'
-          ? ITEM_TYPE_STYLE.note.cardExpired
-          : soon
-            ? ITEM_TYPE_STYLE.note.cardSoon
-            : checklistNote
-              ? ITEM_TYPE_STYLE.note.cardChecklist
-              : ITEM_TYPE_STYLE.note.card
-      }
+      typeLabel={typeLabel}
+      containerClassName={noteCardStyle}
       icon={
         <ItemIconCircle
           icon={noteIcon}
