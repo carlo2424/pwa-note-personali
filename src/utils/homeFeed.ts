@@ -1,5 +1,5 @@
 import type { Event, Expense, Note } from '../db'
-import { filterEventImpegni, filterNoteImpegni, filterPlainNotes } from './impegno'
+import { filterPlainNotes } from './impegno'
 import {
   compareDeadlineIso,
   eventDeadlineIso,
@@ -38,7 +38,7 @@ function compareFeedItems(a: HomeFeedItem, b: HomeFeedItem): number {
 
 export function buildHomeFeedItems(
   notes: Note[],
-  events: Event[],
+  _events: Event[],
   _expenses: Expense[],
 ): HomeFeedItem[] {
   const items: HomeFeedItem[] = []
@@ -46,36 +46,18 @@ export function buildHomeFeedItems(
   for (const note of filterPlainNotes(notes)) {
     items.push({ kind: 'note', item: note, activityAt: note.updatedAt })
   }
-  for (const note of filterNoteImpegni(notes)) {
-    items.push({ kind: 'note', item: note, activityAt: note.updatedAt })
-  }
-  for (const event of filterEventImpegni(events)) {
-    items.push({
-      kind: 'event',
-      item: event,
-      activityAt: event.updatedAt,
-    })
-  }
 
   return items.filter(itemInHomeMonth).sort(compareFeedItems)
 }
 
 export function isHomeFeedQuiet(
   notes: Note[],
-  events: Event[],
+  _events: Event[],
   _expenses: Expense[],
 ): boolean {
   const items: HomeFeedItem[] = []
   for (const note of filterPlainNotes(notes)) {
     if (noteInHomeMonth(note)) items.push({ kind: 'note', item: note, activityAt: note.updatedAt })
-  }
-  for (const note of filterNoteImpegni(notes)) {
-    if (noteInHomeMonth(note)) items.push({ kind: 'note', item: note, activityAt: note.updatedAt })
-  }
-  for (const event of filterEventImpegni(events)) {
-    if (eventInHomeMonth(event)) {
-      items.push({ kind: 'event', item: event, activityAt: event.updatedAt })
-    }
   }
   return items.length === 0
 }

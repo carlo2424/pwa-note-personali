@@ -1,7 +1,9 @@
 import {
   AlertTriangle,
   CalendarDays,
+  ListChecks,
   Plus,
+  StickyNote,
   Wallet,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -15,7 +17,7 @@ import {
   selectionLabel,
 } from '../utils/areaSelection'
 import { countdownUrgency } from '../utils/countdown'
-import { formatAmount, sentenceCase } from '../utils/format'
+import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
 import {
   filterEventImpegni,
   filterNoteImpegni,
@@ -42,7 +44,8 @@ import {
   shareImpegnoRowsSection,
 } from '../utils/share'
 import { deadlineLabel, compareDeadlineIso, eventDeadlineIso, noteKeyDate, sortNotesByUrgency } from '../utils/homeSpotlight'
-import { buildHomeFeedItems, isHomeFeedQuiet, sortExpensesByDeadline } from '../utils/homeFeed'
+import { sortExpensesByDeadline } from '../utils/homeFeed'
+import { isNoteChecklist } from '../utils/noteKind'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { AreaChips } from './AreaChips'
 import { CollapsibleSection, sectionIcon } from './CollapsibleSection'
@@ -99,6 +102,22 @@ type ImpegnoRow =
 function impegnoRowDeadline(row: ImpegnoRow): string | undefined {
   if (row.kind === 'event') return eventDeadlineIso(row.item)
   return noteKeyDate(row.item)
+}
+
+function homeCategoryDetailLine(iso: string | undefined): string | undefined {
+  if (!iso) return undefined
+  const label = deadlineLabel(iso)
+  return label ? `${label} · ${formatIsoDate(iso)}` : formatIsoDate(iso)
+}
+
+function notesAreUrgent(notes: Note[]): boolean {
+  for (const note of notes) {
+    const iso = noteKeyDate(note)
+    if (!iso) continue
+    const u = countdownUrgency(iso)
+    if (u === 'expired' || u === 'today' || u === 'soon') return true
+  }
+  return false
 }
 
 function compareImpegnoRows(a: ImpegnoRow, b: ImpegnoRow): number {
@@ -350,46 +369,102 @@ export function HomeView({
     expenses === undefined ||
     notes === undefined
 
-  const isEmpty =
-    !loading &&
-    impegnoCount === 0 &&
-    noteCount === 0 &&
-    expenseCount === 0 &&
-    !areaFilterActive
+  const homePlainNotes = useMemo(
+    () =>
+      filterPlainNotes(
+        (notes ?? []).filter(
+          (n) =>
+            matchesAreaSelection(n, areaSelection, areaList) &&
+            noteInHomeMonth(n) &&
+            !overdueNoteIds.has(n.id!),
+        ),
+      ),
+    [notes, areaSelection, areaList, overdueNoteIds],
+  )
+
+  const homeTextNotes = useMemo(
+    () =>
+      [...homePlainNotes]
+        .filter((n) => !isNoteChecklist(n))
+        .sort(sortNotesByUrgency),
+    [homePlainNotes],
+  )
+
+  const homeChecklists = useMemo(
+    () =>
+      [...homePlainNotes]
+        .filter((n) => isNoteChecklist(n))
+        .sort(sortNotesByUrgency),
+    [homePlainNotes],
+  )
+
+  const textNoteCount = homeTextNotes.length
+  const checklistCount = homeChecklists.length
 
   const sortedDisplayNotes = useMemo(
     () => [...displayNotes].sort(sortNotesByUrgency),
     [displayNotes],
   )
 
-  const homeFeedQuiet = useMemo(
+  const homeImpegniSubtitle = useMemo(() => {
+    const total = sumImpegnoCosts(displayImpegni)
+    const parts = [
+      `${impegnoCount} ${impegnoCount === 1 ? 'impegno' : 'impegni'}`,
+    ]
+    if (total > 0) parts.push(`${formatAmount(total)}/mese`)
+    return parts.join(' · ')
+  }, [displayImpegni, impegnoCount])
+
+  const homeImpegniDetailLine = useMemo(() => {
+    if (displayImpegni.length === 0) return undefined
+    return homeCategoryDetailLine(impegnoRowDeadline(displayImpegni[0]))
+  }, [displayImpegni])
+
+  const homeNoteSubtitle = useMemo(
     () =>
-      areaFilterActive ||
-      isHomeFeedQuiet(notes ?? [], events ?? [], expenses ?? []),
-    [areaFilterActive, notes, events, expenses],
+      `${textNoteCount} ${textNoteCount === 1 ? 'nota' : 'note'}`,
+    [textNoteCount],
   )
 
-  const homeFeedItems = useMemo(() => {
-    if (areaFilterActive) return []
-    return buildHomeFeedItems(notes ?? [], events ?? [], expenses ?? []).filter(
-      (row) => {
-        if (row.kind === 'note' && row.item.id && overdueNoteIds.has(row.item.id)) {
-          return false
-        }
-        if (row.kind === 'event' && row.item.id && overdueEventIds.has(row.item.id)) {
-          return false
-        }
-        return true
-      },
-    )
-  }, [
-    areaFilterActive,
-    notes,
-    events,
-    expenses,
-    overdueNoteIds,
-    overdueEventIds,
-  ])
+  const homeNoteDetailLine = useMemo(
+    () =>
+      homeTextNotes.length > 0
+        ? homeCategoryDetailLine(noteKeyDate(homeTextNotes[0]))
+        : undefined,
+    [homeTextNotes],
+  )
+
+  const homeChecklistSubtitle = useMemo(
+    () =>
+      `${checklistCount} ${checklistCount === 1 ? 'lista' : 'liste'}`,
+    [checklistCount],
+  )
+
+  const homeChecklistDetailLine = useMemo(
+    () =>
+      homeChecklists.length > 0
+        ? homeCategoryDetailLine(noteKeyDate(homeChecklists[0]))
+        : undefined,
+    [homeChecklists],
+  )
+
+  const noteSectionUrgent = useMemo(
+    () => notesAreUrgent(homeTextNotes),
+    [homeTextNotes],
+  )
+
+  const checklistSectionUrgent = useMemo(
+    () => notesAreUrgent(homeChecklists),
+    [homeChecklists],
+  )
+
+  const homeIsEmpty =
+    !loading &&
+    !areaFilterActive &&
+    impegnoCount === 0 &&
+    textNoteCount === 0 &&
+    checklistCount === 0 &&
+    expenseCount === 0
 
   const impegnoSectionSubtitle = useMemo(() => {
     for (const row of displayImpegni) {
@@ -515,39 +590,23 @@ export function HomeView({
     </ul>
   )
 
-  const homeFeedList = (
-    <ul className="space-y-2">
-      {homeFeedItems.map((row) => {
-        if (row.kind === 'note') {
-          const { title, member } = areaHomeLabel(areas ?? [], row.item.areaId)
-          return (
-            <li key={`feed-n-${row.item.id}`}>
-              <NoteExpandableRow
-                compact
-                showTypeLabel
-                note={row.item}
-                promoteAreaTitle
-                areaName={title}
-                areaMember={member}
-                onEdit={() => onEditNote(row.item)}
-              />
-            </li>
-          )
-        }
-        if (row.kind === 'event') {
-          return (
-            <li key={`feed-e-${row.item.id}`}>
-              <EventExpandableRow
-                compact
-                showTypeLabel
-                event={row.item}
-                areaName={areaNameById(areas ?? [], row.item.areaId)}
-                onEdit={() => onEditEvent(row.item)}
-              />
-            </li>
-          )
-        }
-        return null
+  const renderHomeNoteList = (noteItems: Note[]) => (
+    <ul className="space-y-1">
+      {noteItems.map((note) => {
+        const { title, member } = areaHomeLabel(areas ?? [], note.areaId)
+        return (
+          <li key={note.id}>
+            <NoteExpandableRow
+              compact
+              showTypeLabel
+              note={note}
+              promoteAreaTitle
+              areaName={title}
+              areaMember={member}
+              onEdit={() => onEditNote(note)}
+            />
+          </li>
+        )
       })}
     </ul>
   )
@@ -587,6 +646,14 @@ export function HomeView({
   const impegnoSectionIcon = sectionIcon(
     'bg-indigo-100 text-indigo-700 h-9 w-9',
     <CalendarDays className="h-4 w-4" />,
+  )
+  const noteSectionIcon = sectionIcon(
+    'bg-amber-100 text-amber-700 h-9 w-9',
+    <StickyNote className="h-4 w-4" />,
+  )
+  const checklistSectionIcon = sectionIcon(
+    'bg-emerald-100 text-emerald-700 h-9 w-9',
+    <ListChecks className="h-4 w-4" />,
   )
   const speseSectionIcon = sectionIcon(
     'bg-rose-100 text-rose-600 h-9 w-9',
@@ -662,9 +729,67 @@ export function HomeView({
         </div>
       )}
 
-      {!areaFilterActive && !homeFeedQuiet && homeFeedItems.length > 0 && homeFeedList}
+      {!areaFilterActive && impegnoCount > 0 && (
+        <CollapsibleSection
+          {...sectionComfort}
+          title="Impegni"
+          count={impegnoCount}
+          typeLabel="Impegno"
+          homeLayout
+          subtitle={homeImpegniSubtitle}
+          detailLine={homeImpegniDetailLine}
+          icon={impegnoSectionIcon}
+          containerClassName={
+            impegnoSectionUrgent
+              ? `${ITEM_TYPE_STYLE.event.card} ring-1 ring-indigo-200`
+              : ITEM_TYPE_STYLE.event.card
+          }
+        >
+          {impegnoList}
+        </CollapsibleSection>
+      )}
 
-      {!homeFeedQuiet && overdueRows.length > 0 && (
+      {!areaFilterActive && textNoteCount > 0 && (
+        <CollapsibleSection
+          {...sectionComfort}
+          title="Note"
+          count={textNoteCount}
+          typeLabel="Nota"
+          homeLayout
+          subtitle={homeNoteSubtitle}
+          detailLine={homeNoteDetailLine}
+          icon={noteSectionIcon}
+          containerClassName={
+            noteSectionUrgent
+              ? `${ITEM_TYPE_STYLE.note.cardSoon} ring-1 ring-orange-200`
+              : ITEM_TYPE_STYLE.note.card
+          }
+        >
+          {renderHomeNoteList(homeTextNotes)}
+        </CollapsibleSection>
+      )}
+
+      {!areaFilterActive && checklistCount > 0 && (
+        <CollapsibleSection
+          {...sectionComfort}
+          title="Liste"
+          count={checklistCount}
+          typeLabel="Lista"
+          homeLayout
+          subtitle={homeChecklistSubtitle}
+          detailLine={homeChecklistDetailLine}
+          icon={checklistSectionIcon}
+          containerClassName={
+            checklistSectionUrgent
+              ? `${ITEM_TYPE_STYLE.checklist.card} ring-1 ring-emerald-300`
+              : ITEM_TYPE_STYLE.checklist.card
+          }
+        >
+          {renderHomeNoteList(homeChecklists)}
+        </CollapsibleSection>
+      )}
+
+      {overdueRows.length > 0 && (
         <CollapsibleSection
           {...sectionComfort}
           title="In ritardo"
@@ -775,7 +900,7 @@ export function HomeView({
         </div>
       ) : null}
 
-      {!homeFeedQuiet && isEmpty && (
+      {homeIsEmpty && (
         <p className="py-4 text-center text-sm text-slate-400">
           Niente in questo mese. Aggiungi con{' '}
           <span className="font-semibold text-indigo-600">+</span>.

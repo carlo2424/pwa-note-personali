@@ -18,6 +18,9 @@ interface CollapsibleSectionProps {
   emptyContent?: ReactNode
   containerClassName?: string
   comfortable?: boolean
+  typeLabel?: string
+  homeLayout?: boolean
+  detailLine?: string
 }
 
 export function CollapsibleSection({
@@ -35,6 +38,9 @@ export function CollapsibleSection({
   emptyContent,
   containerClassName = 'border-slate-100 bg-white',
   comfortable = false,
+  typeLabel,
+  homeLayout = false,
+  detailLine,
 }: CollapsibleSectionProps) {
   if (!alwaysShow && count === 0) return null
 
@@ -88,13 +94,16 @@ export function CollapsibleSection({
     <ExpandableCard
       compact={!comfortable}
       comfortable={comfortable}
+      homeLayout={homeLayout}
+      detailLine={detailLine}
+      typeLabel={typeLabel}
       defaultExpanded={false}
       containerClassName={containerClassName}
       icon={icon}
       title={title}
       subtitle={resolvedSubtitle}
       trailing={
-        showTotal ? (
+        homeLayout || !showTotal ? undefined : (
           <span
             className={`shrink-0 font-bold text-rose-600 ${
               comfortable ? 'text-xs' : 'text-[10px]'
@@ -105,9 +114,9 @@ export function CollapsibleSection({
               <span className="font-normal text-slate-400">{totalSuffix}</span>
             ) : null}
           </span>
-        ) : undefined
+        )
       }
-      actions={actions}
+      actions={homeLayout ? undefined : actions}
     >
       {count > 0 ? children : emptyContent}
     </ExpandableCard>
