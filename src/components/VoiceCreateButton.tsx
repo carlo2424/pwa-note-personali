@@ -116,7 +116,7 @@ export function VoiceCreateButton({
     if (!text) {
       setFeedback({
         message:
-          'Non ho sentito nulla. Riprova dicendo ad es. «Crea una nota titolo …».',
+          'Non ho sentito nulla. Riprova dettando tipo, titolo o messaggio in qualsiasi ordine.',
       })
       return
     }
@@ -159,31 +159,13 @@ export function VoiceCreateButton({
     <div className="flex flex-col items-center gap-1">
       {listening ? (
         <div className="mb-1 w-full max-w-sm rounded-xl border border-indigo-200 bg-white px-3 py-2.5 shadow-lg shadow-indigo-100/80">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-600">
-            Detta il comando
+          <p className="text-xs leading-snug text-slate-700">
+            Inizia a parlare e descrivi cosa vuoi creare:{' '}
+            <span className="text-slate-500">
+              {transcript ||
+                'bolletta luce impegno scadenza 15 luglio · oppure titolo spesa messaggio latte e pane…'}
+            </span>
           </p>
-          <p className="mt-1 min-h-[2.5rem] text-xs leading-snug text-slate-700">
-            {transcript ||
-              'Es: Crea un impegno, titolo bolletta luce, scadenza 15 luglio, costo 50 euro…'}
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => void finishAndCreate()}
-              disabled={busy}
-              className="flex-1 rounded-lg bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {busy ? 'Salvo…' : 'Crea voce'}
-            </button>
-            <button
-              type="button"
-              onClick={stopListening}
-              className="flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50"
-              aria-label="Annulla"
-            >
-              <Square className="h-4 w-4" />
-            </button>
-          </div>
         </div>
       ) : feedback ? (
         <div className="mb-1 w-full max-w-sm rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 shadow-sm">
@@ -212,13 +194,15 @@ export function VoiceCreateButton({
         }`}
         aria-label={
           listening
-            ? 'Crea da dettatura'
+            ? 'Termina e crea da dettatura'
             : 'Detta per creare nota, lista, impegno o spesa'
         }
       >
         {listening ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
       </button>
-      <p className="text-[9px] font-medium text-slate-400">Detta e crea</p>
+      <p className="text-[9px] font-medium text-slate-400">
+        {listening ? 'Tap per creare' : 'Detta e crea'}
+      </p>
     </div>
   )
 }

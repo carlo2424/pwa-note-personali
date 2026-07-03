@@ -44,37 +44,92 @@ const MONTHS: Record<string, number> = {
   dicembre: 11,
 }
 
-const STOP_WORDS = [
-  ' area ',
-  ' ambito ',
-  ' categoria ',
-  ' cat ',
-  ' titolo ',
-  ' nome ',
-  ' importo ',
-  ' costo ',
-  ' euro ',
-  ' euri ',
-  ' contenuto ',
-  ' testo ',
-  ' descrizione ',
-  ' scadenza ',
-  ' data ',
-  ' inizio ',
-  ' fine ',
-  ' rinnovo ',
-  ' elementi ',
-  ' voci ',
-  ' etichetta ',
-  ' label ',
+const KIND_RULES: { kind: VoiceCreateKind; words: string[]; weight: number }[] = [
+  { kind: 'expense', words: ['spesa', 'spese', 'pagamento', 'pagare', 'acquisto', 'uscita'], weight: 4 },
+  { kind: 'checklist', words: ['lista', 'checklist', 'elenco', 'to do', 'todo', 'compere'], weight: 3 },
+  { kind: 'event', words: ['impegno', 'impegni', 'abbonamento', 'evento', 'scadenza', 'rinnovo'], weight: 2 },
+  { kind: 'note', words: ['nota', 'note', 'appunto', 'appunti', 'promemoria', 'memo'], weight: 1 },
 ]
 
-const KIND_RULES: { kind: VoiceCreateKind; words: string[] }[] = [
-  { kind: 'expense', words: ['spesa', 'spese', 'pagamento', 'acquisto'] },
-  { kind: 'checklist', words: ['lista', 'checklist', 'elenco', 'to do', 'todo'] },
-  { kind: 'event', words: ['impegno', 'impegni', 'abbonamento', 'rinnovo', 'evento'] },
-  { kind: 'note', words: ['nota', 'note', 'appunto', 'promemoria'] },
+/** Campi etichettati: riconosciuti ovunque nel testo, in qualsiasi ordine */
+const LABELED_FIELDS: { field: keyof ParsedFields; aliases: string[] }[] = [
+  { field: 'title', aliases: ['titolo', 'nome', 'intitolata', 'intitolato', 'chiamata', 'chiamato', 'oggetto'] },
+  { field: 'content', aliases: ['messaggio', 'contenuto', 'testo', 'descrizione', 'corpo', 'dettagli', 'appunto'] },
+  { field: 'area', aliases: ['area', 'ambito'] },
+  { field: 'category', aliases: ['categoria', 'cat', 'etichetta', 'label'] },
+  { field: 'amountText', aliases: ['importo', 'spesa di', 'prezzo', 'pagato'] },
+  { field: 'costText', aliases: ['costo', 'abbonamento di', 'canone'] },
+  { field: 'endDateText', aliases: ['scadenza', 'data fine', 'fine', 'entro il', 'entro', 'fino al', 'fino a', 'per il', 'per'] },
+  { field: 'startDateText', aliases: ['data inizio', 'inizio', 'partendo dal', 'partendo da', 'dal', 'da'] },
+  { field: 'renewalDateText', aliases: ['rinnovo', 'prossimo addebito', 'addebito', 'prossimo pagamento'] },
+  { field: 'listItemsText', aliases: ['elementi', 'voci', 'punti'] },
 ]
+
+interface ParsedFields {
+  title?: string
+  content?: string
+  area?: string
+  category?: string
+  amountText?: string
+  costText?: string
+  endDateText?: string
+  startDateText?: string
+  renewalDateText?: string
+  listItemsText?: string
+}
+
+interface TextSpan {
+  start: number
+  end: number
+}
+
+interface MarkerMatch {
+  field: keyof ParsedFields | 'kind'
+  alias: string
+  start: number
+  valueStart: number
+  valueEnd: number
+  value: string
+}
+
+const NOISE_WORDS = new Set([
+  'crea',
+  'creare',
+  'creo',
+  'aggiungi',
+  'aggiungere',
+  'inserisci',
+  'inserire',
+  'nuova',
+  'nuovo',
+  'nuove',
+  'nuovi',
+  'una',
+  'uno',
+  'un',
+  "un'",
+  'il',
+  'lo',
+  'la',
+  'i',
+  'gli',
+  'le',
+  'per',
+  'favore',
+  'voce',
+  'elemento',
+  'qualcosa',
+  'vorrei',
+  'voglio',
+  'metti',
+  'mettere',
+  'registra',
+  'registrare',
+  'con',
+  'e',
+  'poi',
+  'anche',
+])
 
 function padIso(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -86,12 +141,30 @@ function addDaysIso(iso: string, days: number): string {
   return padIso(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
+function normalizeTranscript(raw: string): string {
+  return raw
+    .replace(/\s+/g, ' ')
+    .replace(/[""]/g, '"')
+    .replace(/['']/g, "'")
+    .replace(/\beuri\b/gi, 'euro')
+    .replace(/\beur\b/gi, 'euro')
+    .trim()
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function parseItalianDateFragment(fragment: string): string | undefined {
   const t = fragment.toLowerCase().trim()
   if (!t) return undefined
   if (/\boggi\b/.test(t)) return todayIso()
   if (/\bdomani\b/.test(t)) return addDaysIso(todayIso(), 1)
   if (/\bdopodomani\b/.test(t)) return addDaysIso(todayIso(), 2)
+  if (/\bfine mese\b/.test(t)) {
+    const now = new Date()
+    return padIso(now.getFullYear(), now.getMonth() + 1, 0)
+  }
 
   const slash = t.match(/(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?/)
   if (slash) {
@@ -114,125 +187,227 @@ function parseItalianDateFragment(fragment: string): string | undefined {
     return padIso(year, month, day)
   }
 
+  const monthOnly = t.match(
+    /\b(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/,
+  )
+  if (monthOnly) {
+    const month = MONTHS[monthOnly[1]]
+    const year = new Date().getFullYear()
+    return padIso(year, month, 1)
+  }
+
   return undefined
 }
 
 function parseAmount(text: string): number | undefined {
-  const m = text.match(/(\d+(?:[.,]\d{1,2})?)/)
-  if (!m) return undefined
-  const n = parseFloat(m[1].replace(',', '.'))
-  return Number.isFinite(n) && n > 0 ? n : undefined
+  const patterns = [
+    /(\d+(?:[.,]\d{1,2})?)\s*(?:euro|€)\b/i,
+    /\b(?:euro|€)\s*(\d+(?:[.,]\d{1,2})?)/i,
+    /\b(?:importo|costo|prezzo|spesa|pagare|canone)\s*(?:di\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+    /\b(\d+(?:[.,]\d{1,2})?)\b/,
+  ]
+  for (const pattern of patterns) {
+    const m = text.match(pattern)
+    if (!m?.[1]) continue
+    const n = parseFloat(m[1].replace(',', '.'))
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return undefined
 }
 
-function normalizeTranscript(raw: string): string {
-  return raw
-    .replace(/\s+/g, ' ')
-    .replace(/[""]/g, '"')
-    .replace(/['']/g, "'")
-    .trim()
-}
-
-function detectKind(text: string): VoiceCreateKind | undefined {
-  const lower = ` ${text.toLowerCase()} `
+function buildAllAliases(): { field: keyof ParsedFields | 'kind'; alias: string }[] {
+  const out: { field: keyof ParsedFields | 'kind'; alias: string }[] = []
   for (const rule of KIND_RULES) {
     for (const word of rule.words) {
-      if (lower.includes(` ${word} `) || lower.includes(` ${word},`)) {
-        return rule.kind
+      out.push({ field: 'kind', alias: word })
+    }
+  }
+  for (const def of LABELED_FIELDS) {
+    for (const alias of def.aliases) {
+      out.push({ field: def.field, alias })
+    }
+  }
+  return out.sort((a, b) => b.alias.length - a.alias.length)
+}
+
+const ALL_ALIASES = buildAllAliases()
+
+function findMarkers(text: string): MarkerMatch[] {
+  const lower = text.toLowerCase()
+  const hits: { field: keyof ParsedFields | 'kind'; alias: string; index: number }[] = []
+
+  for (const { field, alias } of ALL_ALIASES) {
+    const re = new RegExp(`(?:^|[\\s,;])${escapeRegExp(alias)}(?:\\s*[:=])?(?=\\s|$|[,;])`, 'gi')
+    let m: RegExpExecArray | null
+    while ((m = re.exec(lower)) !== null) {
+      const index = m.index + (m[0].startsWith(' ') || m[0].startsWith(',') || m[0].startsWith(';') ? 1 : 0)
+      hits.push({ field, alias, index })
+    }
+  }
+
+  hits.sort((a, b) => a.index - b.index || b.alias.length - a.alias.length)
+
+  const used: MarkerMatch[] = []
+  const occupied: TextSpan[] = []
+
+  for (const hit of hits) {
+    const spanStart = hit.index
+    const spanEnd = spanStart + hit.alias.length
+    if (occupied.some((s) => spanStart < s.end && spanEnd > s.start)) continue
+
+    const next = hits.find((h) => h.index > spanEnd && !occupied.some((s) => h.index >= s.start && h.index < s.end))
+    const valueEnd =
+      hit.field === 'kind' ? spanEnd : next ? next.index : text.length
+    let value =
+      hit.field === 'kind' ? '' : text.slice(spanEnd, valueEnd).replace(/^[\s,:;=]+/, '').trim()
+    value = value.replace(/[\s,;]+$/, '').trim()
+
+    if (hit.field !== 'kind' && value.length === 0) continue
+
+    used.push({
+      field: hit.field,
+      alias: hit.alias,
+      start: spanStart,
+      valueStart: spanEnd,
+      valueEnd,
+      value,
+    })
+    occupied.push({ start: spanStart, end: valueEnd })
+  }
+
+  return used
+}
+
+function detectKind(text: string, markers: MarkerMatch[]): VoiceCreateKind | undefined {
+  const kindMarkers = markers.filter((m) => m.field === 'kind')
+  if (kindMarkers.length > 0) {
+    const first = kindMarkers[0]
+    const rule = KIND_RULES.find((r) => r.words.some((w) => w === first.alias))
+    if (rule) return rule.kind
+  }
+
+  const lower = ` ${text.toLowerCase()} `
+  let best: { kind: VoiceCreateKind; score: number; index: number } | undefined
+
+  for (const rule of KIND_RULES) {
+    for (const word of rule.words) {
+      const idx = lower.indexOf(` ${word} `)
+      if (idx === -1) continue
+      const score = rule.weight * 10 - idx / 1000
+      if (!best || score > best.score || (score === best.score && idx < best.index)) {
+        best = { kind: rule.kind, score, index: idx }
       }
     }
   }
-  return undefined
+
+  return best?.kind
 }
 
-function extractField(
-  text: string,
-  keywords: string[],
-): string | undefined {
-  const lower = text.toLowerCase()
-  for (const kw of keywords) {
-    const patterns = [
-      new RegExp(`${kw}\\s*[:=]\\s*["']([^"']+)["']`, 'i'),
-      new RegExp(`${kw}\\s+["']([^"']+)["']`, 'i'),
-      new RegExp(`${kw}\\s*[:=]\\s*([^,]+)`, 'i'),
-      new RegExp(`${kw}\\s+([^,]+)`, 'i'),
-    ]
-    for (const pattern of patterns) {
-      const m = text.match(pattern)
-      if (!m?.[1]) continue
-      let value = m[1].trim()
-      const valueLower = ` ${value.toLowerCase()} `
-      for (const stop of STOP_WORDS) {
-        const idx = valueLower.indexOf(stop)
-        if (idx > 0) {
-          value = value.slice(0, idx).trim()
-        }
-      }
-      value = value.replace(/\s+(e|poi|con)\s*$/i, '').trim()
-      if (value.length > 0) return value
-    }
-    const idx = lower.indexOf(kw)
-    if (idx === -1) continue
+function inferKind(fields: ParsedFields, text: string): VoiceCreateKind {
+  if (fields.listItemsText) return 'checklist'
+  if (fields.amountText || /\b\d+(?:[.,]\d+)?\s*(?:euro|€)\b/i.test(text)) return 'expense'
+  if (
+    fields.endDateText ||
+    fields.startDateText ||
+    fields.renewalDateText ||
+    fields.costText ||
+    /\b(scadenza|rinnovo|abbonamento)\b/i.test(text)
+  ) {
+    return 'event'
   }
-  return undefined
+  if (/\b(lista|checklist|elenco)\b/i.test(text)) return 'checklist'
+  return 'note'
 }
 
-function extractTitle(text: string, kind: VoiceCreateKind): string | undefined {
-  const fromField = extractField(text, [
-    'titolo',
-    'titoli',
-    'nome',
-    'intitolata',
-    'intitolato',
-    'chiamata',
-    'chiamato',
-  ])
-  if (fromField) return fromField
-
-  const lower = text.toLowerCase()
-  const kindWord =
-    KIND_RULES.find((r) => r.kind === kind)?.words[0] ?? kind
-  const creaMatch = lower.match(
-    new RegExp(
-      `(?:crea(?:re)?|aggiungi|inserisci|nuova|nuovo)\\s+(?:un[a]?\\s+)?(?:${kindWord}|${kind})\\s+(?:con\\s+)?(?:titolo\\s+)?(.+)`,
-      'i',
-    ),
-  )
-  if (creaMatch?.[1]) {
-    let rest = creaMatch[1].trim()
-    const restLower = ` ${rest.toLowerCase()} `
-    for (const stop of STOP_WORDS) {
-      const idx = restLower.indexOf(stop)
-      if (idx > 0) rest = rest.slice(0, idx).trim()
-    }
-    if (rest) return rest
-  }
-
-  return undefined
-}
-
-function extractListItems(text: string): string[] | undefined {
-  const raw =
-    extractField(text, ['elementi', 'voci', 'punti', 'elenco']) ??
-    extractField(text, ['contenuto', 'testo'])
-  if (!raw) return undefined
-  const parts = raw
+function splitListItems(raw: string): string[] {
+  return raw
     .split(/[,;]|(?:\s+e\s+)/i)
     .map((p) => p.trim())
     .filter((p) => p.length > 0)
-  return parts.length > 0 ? parts : undefined
+}
+
+function cleanRemainder(raw: string): string {
+  let t = raw
+  t = t.replace(/\b(\d+(?:[.,]\d{1,2})?)\s*(?:euro|€)\b/gi, ' ')
+  t = t.replace(/\b(?:euro|€)\s*(\d+(?:[.,]\d{1,2})?)\b/gi, ' ')
+  t = t.replace(
+    /\b(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/gi,
+    ' ',
+  )
+  t = t.replace(/\b(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?\b/g, ' ')
+  t = t.replace(/\b(oggi|domani|dopodomani|fine mese)\b/gi, ' ')
+  for (const rule of KIND_RULES) {
+    for (const word of rule.words) {
+      t = t.replace(new RegExp(`\\b${escapeRegExp(word)}\\b`, 'gi'), ' ')
+    }
+  }
+  const words = t
+    .split(/\s+/)
+    .map((w) => w.replace(/^[,;:]+|[,;:]+$/g, '').trim())
+    .filter((w) => w.length > 0 && !NOISE_WORDS.has(w.toLowerCase()))
+  return words.join(' ').trim()
+}
+
+function inferTitleAndContent(
+  remainder: string,
+  fields: ParsedFields,
+  kind: VoiceCreateKind,
+): { title?: string; content?: string; checklistItems?: string[] } {
+  if (fields.title) {
+    return {
+      title: fields.title,
+      content: fields.content,
+      checklistItems: fields.listItemsText ? splitListItems(fields.listItemsText) : undefined,
+    }
+  }
+
+  const cleaned = cleanRemainder(remainder)
+  if (!cleaned) {
+    return {
+      title: fields.content ? fields.content.slice(0, 80) : undefined,
+      content: fields.content,
+      checklistItems: fields.listItemsText ? splitListItems(fields.listItemsText) : undefined,
+    }
+  }
+
+  if (fields.content) {
+    return {
+      title: cleaned,
+      content: fields.content,
+      checklistItems: fields.listItemsText ? splitListItems(fields.listItemsText) : undefined,
+    }
+  }
+
+  const parts = cleaned.split(/\s*,\s*|\s+-\s+/).map((p) => p.trim()).filter(Boolean)
+
+  if (kind === 'checklist' && parts.length > 1) {
+    return { title: parts[0], checklistItems: parts.slice(1) }
+  }
+
+  if (parts.length >= 2 && parts[0].length <= 60) {
+    return { title: parts[0], content: parts.slice(1).join(', ') }
+  }
+
+  const words = cleaned.split(/\s+/)
+  if (words.length >= 6) {
+    const mid = Math.min(4, Math.ceil(words.length / 3))
+    return {
+      title: words.slice(0, mid).join(' '),
+      content: words.slice(mid).join(' '),
+    }
+  }
+
+  return {
+    title: cleaned,
+    content: fields.content,
+    checklistItems: fields.listItemsText ? splitListItems(fields.listItemsText) : undefined,
+  }
 }
 
 function matchCategory(raw?: string): string | undefined {
   if (!raw) return undefined
   const t = raw.toLowerCase()
-  const expenseCategories = [
-    'cibo',
-    'trasporti',
-    'svago',
-    'casa',
-    'salute',
-    'altro',
-  ]
+  const expenseCategories = ['cibo', 'trasporti', 'svago', 'casa', 'salute', 'altro']
   for (const c of expenseCategories) {
     if (t.includes(c)) return c.charAt(0).toUpperCase() + c.slice(1)
   }
@@ -248,83 +423,97 @@ function matchCategory(raw?: string): string | undefined {
   ]
   for (const l of labels) {
     if (t.includes(l.replace('à', 'a'))) {
-      return l.charAt(0).toUpperCase() + l.slice(1)
+      return l.charAt(0).toUpperCase() + l.slice(1).replace('utilita', 'Utilità')
     }
   }
-  return raw
+  return raw.trim()
+}
+
+function normalizeEventLabel(raw?: string): string | undefined {
+  if (!raw) return undefined
+  return matchCategory(raw) ?? raw.charAt(0).toUpperCase() + raw.slice(1)
+}
+
+function extractInlineDate(text: string): string | undefined {
+  return parseItalianDateFragment(text)
 }
 
 export function parseVoiceCreateCommand(
   rawTranscript: string,
 ): VoiceParseResult | VoiceParseFailure {
   const text = normalizeTranscript(rawTranscript)
-  if (text.length < 4) {
+  if (text.length < 3) {
     return {
       ok: false,
       reason: 'Messaggio troppo corto.',
-      hint: 'Esempio: «Crea una spesa, titolo benzina, importo 50 euro, categoria trasporti».',
+      hint: 'Detta liberamente: tipo, titolo e messaggio in qualsiasi ordine.',
     }
   }
 
-  const kind = detectKind(text)
-  if (!kind) {
+  const markers = findMarkers(text)
+  const fields: ParsedFields = {}
+
+  for (const m of markers) {
+    if (m.field === 'kind') continue
+    if (!fields[m.field]) fields[m.field] = m.value
+  }
+
+  const kind = detectKind(text, markers) ?? inferKind(fields, text)
+
+  const remainder = markers.reduce((acc, m) => {
+    return acc.slice(0, m.start) + ' '.repeat(m.valueEnd - m.start) + acc.slice(m.valueEnd)
+  }, text)
+
+  const inferred = inferTitleAndContent(remainder, fields, kind)
+  let title = inferred.title?.trim()
+  let content = inferred.content?.trim()
+  const checklistItems =
+    kind === 'checklist'
+      ? inferred.checklistItems ??
+        (fields.listItemsText ? splitListItems(fields.listItemsText) : undefined) ??
+        (content ? splitListItems(content) : undefined)
+      : undefined
+
+  if (!title && content) {
+    title = content.length > 80 ? content.slice(0, 80) : content
+    if (kind === 'note') content = undefined
+  }
+
+  if (!title) {
+    const fallback = cleanRemainder(text)
+    if (fallback.length >= 2) title = fallback
+  }
+
+  if (!title) {
     return {
       ok: false,
-      reason: 'Non ho capito il tipo di voce.',
-      hint: 'Inizia con: nota, lista, impegno o spesa. Es: «Crea un impegno titolo Bolletta luce».',
+      reason: 'Non ho trovato un titolo o un testo da salvare.',
+      hint: 'Detta ad es. «lista spesa latte e pane» oppure «titolo bolletta messaggio da pagare entro venerdì».',
     }
   }
 
-  let title = extractTitle(text, kind)
-  if (!title) {
-    if (kind === 'expense') {
-      title =
-        extractField(text, ['descrizione', 'testo']) ??
-        extractField(text, ['spesa', 'pagamento'])
-    }
-  }
-  if (!title) {
-    return {
-      ok: false,
-      reason: 'Manca il titolo.',
-      hint: 'Aggiungi «titolo …» oppure «crea una spesa benzina importo 20».',
-    }
-  }
+  const area = fields.area?.trim()
+  const category = matchCategory(fields.category)
 
-  const area = extractField(text, ['area', 'ambito', 'in area'])
-  const categoryRaw = extractField(text, ['categoria', 'cat', 'etichetta', 'label'])
-  const category = matchCategory(categoryRaw)
-  const content = extractField(text, ['contenuto', 'testo', 'descrizione', 'nota'])
+  const amount =
+    kind === 'expense'
+      ? parseAmount(fields.amountText ?? text)
+      : undefined
+  const cost =
+    kind === 'event'
+      ? parseAmount(fields.costText ?? fields.amountText ?? text)
+      : undefined
 
-  const amountRaw =
-    extractField(text, ['importo', 'costo', 'euro', 'euri', 'spesa di', 'pagare']) ??
-    text
-  const amount = parseAmount(amountRaw)
-  const costRaw = extractField(text, ['costo', 'importo', 'euro', 'abbonamento'])
-  const cost = kind === 'event' ? parseAmount(costRaw ?? text) : undefined
-
-  const scadenzaRaw = extractField(text, [
-    'scadenza',
-    'data fine',
-    'fine',
-    'fino al',
-    'fino a',
-  ])
-  const inizioRaw = extractField(text, ['data inizio', 'inizio', 'dal', 'da'])
-  const rinnovoRaw = extractField(text, ['rinnovo', 'prossimo addebito', 'addebito'])
-
-  const startDate = parseItalianDateFragment(inizioRaw ?? '')
-  const endDate = parseItalianDateFragment(scadenzaRaw ?? '')
-  const renewalDate = parseItalianDateFragment(rinnovoRaw ?? '')
-
-  const checklistItems = kind === 'checklist' ? extractListItems(text) : undefined
+  const startDate = extractInlineDate(fields.startDateText ?? '')
+  const endDate = extractInlineDate(fields.endDateText ?? '') ?? extractInlineDate(text)
+  const renewalDate = extractInlineDate(fields.renewalDateText ?? '')
 
   const eventLabel =
-    kind === 'event'
-      ? normalizeEventLabel(
-          extractField(text, ['etichetta', 'label', 'categoria', 'cat']),
-        )
-      : undefined
+    kind === 'event' ? normalizeEventLabel(fields.category) : undefined
+
+  if (kind === 'checklist' && checklistItems?.length && !content) {
+    content = checklistItems.join('\n')
+  }
 
   return {
     ok: true,
@@ -333,8 +522,8 @@ export function parseVoiceCreateCommand(
       title,
       area,
       category: kind === 'expense' ? category ?? 'Altro' : category,
-      amount: kind === 'expense' ? amount : undefined,
-      cost: kind === 'event' ? cost : undefined,
+      amount,
+      cost,
       content,
       startDate,
       endDate,
@@ -344,26 +533,4 @@ export function parseVoiceCreateCommand(
       rawTranscript: text,
     },
   }
-}
-
-function normalizeEventLabel(raw?: string): string | undefined {
-  if (!raw) return undefined
-  const t = raw.toLowerCase()
-  const presets = [
-    'abbonamenti',
-    'streaming',
-    'fitness',
-    'assicurazione',
-    'utilità',
-    'utilita',
-    'software',
-    'telefonia',
-    'altro',
-  ]
-  for (const label of presets) {
-    if (t.includes(label.replace('à', 'a'))) {
-      return label.charAt(0).toUpperCase() + label.slice(1).replace('utilita', 'Utilità')
-    }
-  }
-  return raw.charAt(0).toUpperCase() + raw.slice(1)
 }
