@@ -46,13 +46,25 @@ export function periodOverlapsCurrentMonth(
 export function eventInCurrentMonth(
   event: Pick<Event, 'startDate' | 'endDate' | 'renewalDate' | 'updatedAt'>,
 ): boolean {
-  if (timestampInCurrentMonth(event.updatedAt)) return true
-  if (periodOverlapsCurrentMonth(event.startDate, event.endDate)) return true
+  return eventInHomeMonth(event)
+}
+
+/** Impegni/eventi visibili in Home: periodo o rinnovo nel mese corrente (non per data modifica). */
+export function eventInHomeMonth(
+  event: Pick<Event, 'startDate' | 'endDate' | 'renewalDate'>,
+): boolean {
   if (event.renewalDate && isoInCurrentMonth(event.renewalDate)) return true
-  return false
+  return periodOverlapsCurrentMonth(event.startDate, event.endDate)
 }
 
 export function noteInCurrentMonth(
+  note: Pick<Note, 'startDate' | 'endDate' | 'updatedAt'>,
+): boolean {
+  return noteInHomeMonth(note)
+}
+
+/** Note/liste in Home: date nel mese corrente; senza date, solo se aggiornate nel mese. */
+export function noteInHomeMonth(
   note: Pick<Note, 'startDate' | 'endDate' | 'updatedAt'>,
 ): boolean {
   if (isNoteImpegno(note)) {
@@ -60,10 +72,18 @@ export function noteInCurrentMonth(
   }
   if (note.endDate && isoInCurrentMonth(note.endDate)) return true
   if (note.startDate && isoInCurrentMonth(note.startDate)) return true
-  return timestampInCurrentMonth(note.updatedAt)
+  if (!note.startDate && !note.endDate) {
+    return timestampInCurrentMonth(note.updatedAt)
+  }
+  return false
 }
 
 export function expenseInCurrentMonth(expense: Pick<Expense, 'date'>): boolean {
+  return expenseInHomeMonth(expense)
+}
+
+/** Spese in Home: solo data pagamento nel mese corrente. */
+export function expenseInHomeMonth(expense: Pick<Expense, 'date'>): boolean {
   return isoInCurrentMonth(expense.date)
 }
 

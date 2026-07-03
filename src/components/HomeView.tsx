@@ -24,8 +24,9 @@ import {
 } from '../utils/impegno'
 import {
   currentMonthBounds,
-  eventInCurrentMonth,
+  eventInHomeMonth,
   expenseInCurrentMonth,
+  noteInHomeMonth,
 } from '../utils/monthFilter'
 import {
   computeMonthPaidTotal,
@@ -45,7 +46,6 @@ import {
 import { deadlineLabel, sortNotesByUrgency } from '../utils/homeSpotlight'
 import { buildHomeFeedItems, isHomeFeedQuiet } from '../utils/homeFeed'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
-import { noteVisibleOnHome } from '../utils/homeReminders'
 import { AreaChips } from './AreaChips'
 import { CollapsibleSection, sectionIcon } from './CollapsibleSection'
 import { EventExpandableRow } from './EventExpandableRow'
@@ -171,7 +171,13 @@ export function HomeView({
       }
     }
 
-    return rows.sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    return rows
+      .filter((row) =>
+        row.kind === 'event'
+          ? eventInHomeMonth(row.item)
+          : noteInHomeMonth(row.item),
+      )
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
   }, [events, notes, tasks, areaSelection, areaList])
 
   const overdueEventIds = useMemo(
@@ -201,7 +207,7 @@ export function HomeView({
       filterEventImpegni(events ?? []).filter(
         (e) =>
           matchesAreaSelection(e, areaSelection, areaList) &&
-          eventInCurrentMonth(e) &&
+          eventInHomeMonth(e) &&
           !overdueEventIds.has(e.id!),
       ),
     [events, areaSelection, areaList, overdueEventIds],
@@ -212,7 +218,7 @@ export function HomeView({
       filterNoteImpegni(notes ?? []).filter(
         (n) =>
           matchesAreaSelection(n, areaSelection, areaList) &&
-          noteVisibleOnHome(n) &&
+          noteInHomeMonth(n) &&
           !overdueNoteIds.has(n.id!),
       ),
     [notes, areaSelection, areaList, overdueNoteIds],
@@ -223,7 +229,7 @@ export function HomeView({
       (notes ?? []).filter(
         (n) =>
           matchesAreaSelection(n, areaSelection, areaList) &&
-          noteVisibleOnHome(n) &&
+          noteInHomeMonth(n) &&
           !overdueNoteIds.has(n.id!),
       ),
     [notes, areaSelection, areaList, overdueNoteIds],
@@ -245,7 +251,9 @@ export function HomeView({
     () =>
       filterEventImpegni(events ?? []).filter(
         (e) =>
-          matchesAreaSelection(e, areaSelection, areaList) && !overdueEventIds.has(e.id!),
+          matchesAreaSelection(e, areaSelection, areaList) &&
+          eventInHomeMonth(e) &&
+          !overdueEventIds.has(e.id!),
       ),
     [events, areaSelection, areaList, overdueEventIds],
   )
@@ -254,15 +262,18 @@ export function HomeView({
     () =>
       filterNoteImpegni(notes ?? []).filter(
         (n) =>
-          matchesAreaSelection(n, areaSelection, areaList) && !overdueNoteIds.has(n.id!),
+          matchesAreaSelection(n, areaSelection, areaList) &&
+          noteInHomeMonth(n) &&
+          !overdueNoteIds.has(n.id!),
       ),
     [notes, areaSelection, areaList, overdueNoteIds],
   )
 
   const areaPlainNotes = useMemo(
     () =>
-      filterPlainNotes(notes ?? []).filter((n) =>
-        matchesAreaSelection(n, areaSelection, areaList),
+      filterPlainNotes(notes ?? []).filter(
+        (n) =>
+          matchesAreaSelection(n, areaSelection, areaList) && noteInHomeMonth(n),
       ),
     [notes, areaSelection, areaList],
   )
@@ -270,7 +281,11 @@ export function HomeView({
   const areaExpensesList = useMemo(
     () =>
       [...(expenses ?? [])]
-        .filter((e) => matchesAreaSelection(e, areaSelection, areaList))
+        .filter(
+          (e) =>
+            matchesAreaSelection(e, areaSelection, areaList) &&
+            expenseInCurrentMonth(e),
+        )
         .sort(
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
         ),
@@ -311,8 +326,8 @@ export function HomeView({
 
   const areaCounts = useMemo(() => {
     const counts = new Map<number, number>()
-    const noteList = (notes ?? []).filter((n) => noteVisibleOnHome(n))
-    const eventList = (events ?? []).filter((e) => eventInCurrentMonth(e))
+    const noteList = (notes ?? []).filter((n) => noteInHomeMonth(n))
+    const eventList = (events ?? []).filter((e) => eventInHomeMonth(e))
     const expenseList = (expenses ?? []).filter((e) => expenseInCurrentMonth(e))
     for (const area of areas ?? []) {
       if (!area.id) continue
@@ -325,8 +340,8 @@ export function HomeView({
   }, [areas, notes, events, expenses])
 
   const totalAreaItems = countDistinctAreaItems(
-    (notes ?? []).filter((n) => noteVisibleOnHome(n)),
-    (events ?? []).filter((e) => eventInCurrentMonth(e)),
+    (notes ?? []).filter((n) => noteInHomeMonth(n)),
+    (events ?? []).filter((e) => eventInHomeMonth(e)),
     (expenses ?? []).filter((e) => expenseInCurrentMonth(e)),
   )
 

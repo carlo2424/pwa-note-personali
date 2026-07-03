@@ -2,22 +2,16 @@ import type { Event, Expense, Note } from '../db'
 import { daysUntil } from './countdown'
 import { filterEventImpegni, filterNoteImpegni, filterPlainNotes } from './impegno'
 import { noteDateUrgency, noteKeyDate, urgencyRank } from './homeSpotlight'
-
-/** Giorni senza attività recente → Home minimal (solo card spese) */
-export const HOME_FRESH_DAYS = 2
+import {
+  eventInHomeMonth,
+  expenseInHomeMonth,
+  noteInHomeMonth,
+} from './monthFilter'
 
 export type HomeFeedItem =
   | { kind: 'note'; item: Note; activityAt: number }
   | { kind: 'event'; item: Event; activityAt: number }
   | { kind: 'expense'; item: Expense; activityAt: number }
-
-function freshCutoffMs(): number {
-  return Date.now() - HOME_FRESH_DAYS * 24 * 60 * 60 * 1000
-}
-
-export function isRecentlyActive(timestamp: number): boolean {
-  return timestamp >= freshCutoffMs()
-}
 
 function noteIsImminent(note: Pick<Note, 'startDate' | 'endDate'>): boolean {
   const urg = noteDateUrgency(note)
@@ -38,6 +32,12 @@ function feedItemIsImminent(item: HomeFeedItem): boolean {
   if (item.kind === 'note') return noteIsImminent(item.item)
   if (item.kind === 'event') return eventIsImminent(item.item)
   return false
+}
+
+function itemInHomeMonth(item: HomeFeedItem): boolean {
+  if (item.kind === 'expense') return expenseInHomeMonth(item.item)
+  if (item.kind === 'event') return eventInHomeMonth(item.item)
+  return noteInHomeMonth(item.item)
 }
 
 function compareFeedItems(a: HomeFeedItem, b: HomeFeedItem): number {
@@ -85,12 +85,7 @@ export function buildHomeFeedItems(
     })
   }
 
-  return items
-    .filter(
-      (item) =>
-        isRecentlyActive(item.activityAt) || feedItemIsImminent(item),
-    )
-    .sort(compareFeedItems)
+  return items.filter(itemInHomeMonth).sort(compareFeedItems)
 }
 
 export function isHomeFeedQuiet(
@@ -98,17 +93,5 @@ export function isHomeFeedQuiet(
   events: Event[],
   expenses: Expense[],
 ): boolean {
-  const hasRecent =
-    notes.some((n) => isRecentlyActive(n.updatedAt)) ||
-    events.some((e) => isRecentlyActive(e.updatedAt)) ||
-    expenses.some((e) => isRecentlyActive(e.createdAt))
-
-  if (hasRecent) return false
-
-  const hasImminent =
-    filterPlainNotes(notes).some(noteIsImminent) ||
-    filterNoteImpegni(notes).some(noteIsImminent) ||
-    filterEventImpegni(events).some(eventIsImminent)
-
-  return !hasImminent
+  return buildHomeFeedItems(notes, events, expenses).length === 0
 }
