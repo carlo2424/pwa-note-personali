@@ -15,6 +15,32 @@ export function appBuildLabel(): string {
   return id.length > 7 ? id.slice(0, 7) : id
 }
 
+function versionJsonUrl(): string {
+  const base = import.meta.env.BASE_URL || '/'
+  return `${base}version.json`.replace(/([^:]\/)\/+/g, '$1')
+}
+
+/** Build pubblicata su GitHub Pages (non dalla cache del bundle locale). */
+export async function fetchRemoteBuildId(): Promise<string | null> {
+  try {
+    const res = await fetch(`${versionJsonUrl()}?_${Date.now()}`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { build?: string }
+    return typeof data.build === 'string' && data.build.length > 0
+      ? data.build
+      : null
+  } catch {
+    return null
+  }
+}
+
+export function isUpdateAvailable(remoteBuild: string | null): boolean {
+  if (!remoteBuild) return false
+  return remoteBuild !== appBuildId()
+}
+
 async function purgeAppShellCache(): Promise<void> {
   if ('serviceWorker' in navigator) {
     try {
@@ -34,30 +60,58 @@ async function purgeAppShellCache(): Promise<void> {
   }
 }
 
-/** Se la build online è cambiata, svuota cache e chiedi un reload (non tocca IndexedDB). */
+function reloadWithCacheBust(): void {
+  const url = new URL(window.location.href)
+  url.searchParams.set('_refresh', String(Date.now()))
+  window.location.replace(url.toString())
+}
+
+export function applyAppUpdateReload(): void {
+  reloadWithCacheBust()
+}
+
+/** Confronta con version.json online: rileva deploy anche con bundle PWA in cache. */
 export async function prepareAppUpdate(): Promise<'reload' | 'continue'> {
   if (!import.meta.env.PROD) return 'continue'
 
-  const build = appBuildId()
-  const prev = localStorage.getItem(BUILD_KEY)
+  const remote = await fetchRemoteBuildId()
+  if (!remote) {
+    const stored = localStorage.getItem(BUILD_KEY)
+    if (!stored) localStorage.setItem(BUILD_KEY, appBuildId())
+    return 'continue'
+  }
 
-  if (prev && prev !== build) {
-    localStorage.setItem(BUILD_KEY, build)
+  const embedded = appBuildId()
+  const stored = localStorage.getItem(BUILD_KEY)
+
+  if (embedded !== remote || (stored && stored !== remote)) {
+    localStorage.setItem(BUILD_KEY, remote)
     await purgeAppShellCache()
     return 'reload'
   }
 
-  if (!prev) localStorage.setItem(BUILD_KEY, build)
+  if (!stored) localStorage.setItem(BUILD_KEY, remote)
   return 'continue'
 }
 
-/** Aggiornamento manuale da Impostazioni: cache + reload senza bloccare il service worker. */
+/** Aggiornamento manuale da Impostazioni: cache + reload senza bloccare IndexedDB. */
 export async function forceAppUpdateAndReload(): Promise<void> {
-  localStorage.setItem(BUILD_KEY, appBuildId())
+  const remote = await fetchRemoteBuildId()
+  if (remote) localStorage.setItem(BUILD_KEY, remote)
+  else localStorage.removeItem(BUILD_KEY)
   await purgeAppShellCache()
-  const url = new URL(window.location.href)
-  url.searchParams.set('_refresh', String(Date.now()))
-  window.location.replace(url.toString())
+  reloadWithCacheBust()
+}
+
+function scheduleServiceWorkerUpdateChecks(
+  registration: ServiceWorkerRegistration,
+): void {
+  const check = () => void registration.update()
+  check()
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check()
+  })
+  window.setInterval(check, 5 * 60 * 1000)
 }
 
 export function registerProductionServiceWorker(): void {
@@ -72,14 +126,10 @@ export function registerProductionServiceWorker(): void {
         registerSW({
           immediate: true,
           onRegisteredSW(_swUrl, registration) {
-            if (registration) {
-              window.setInterval(() => {
-                void registration.update()
-              }, 60 * 60 * 1000)
-            }
+            if (registration) scheduleServiceWorkerUpdateChecks(registration)
           },
           onNeedRefresh() {
-            window.location.reload()
+            reloadWithCacheBust()
           },
         })
       })

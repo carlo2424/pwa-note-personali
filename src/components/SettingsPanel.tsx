@@ -1,5 +1,5 @@
 import { Bell } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   checkRenewalNotifications,
   getNotificationPermission,
@@ -13,7 +13,9 @@ import { FileImportPanel } from './FileImportPanel'
 import { AreaGroupsSettings } from './AreaGroupsSettings'
 import {
   appBuildLabel,
+  fetchRemoteBuildId,
   forceAppUpdateAndReload,
+  isUpdateAvailable,
 } from '../utils/appUpdate'
 
 interface SettingsPanelProps {
@@ -23,6 +25,13 @@ interface SettingsPanelProps {
 export function SettingsPanel({ onBackupDone }: SettingsPanelProps) {
   const [notifEnabled, setNotifEnabled] = useState(isRenewalNotifEnabled())
   const [permission, setPermission] = useState(getNotificationPermission())
+  const [remoteBuild, setRemoteBuild] = useState<string | null>(null)
+
+  useEffect(() => {
+    void fetchRemoteBuildId().then(setRemoteBuild)
+  }, [])
+
+  const updateAvailable = isUpdateAvailable(remoteBuild)
 
   async function handleNotifToggle(enabled: boolean) {
     if (enabled) {
@@ -91,6 +100,14 @@ export function SettingsPanel({ onBackupDone }: SettingsPanelProps) {
         <p className="mt-1 text-xs text-slate-500">
           Versione installata: <span className="font-mono">{appBuildLabel()}</span>
         </p>
+        {updateAvailable && remoteBuild && (
+          <p className="mt-1 text-xs font-medium text-amber-700">
+            Nuova versione online:{' '}
+            <span className="font-mono">
+              {remoteBuild.length > 7 ? remoteBuild.slice(0, 7) : remoteBuild}
+            </span>
+          </p>
+        )}
         <p className="mt-1 text-xs text-slate-400">
           Se vedi ancora la versione vecchia, usa il pulsante qui sotto. I tuoi
           dati locali non vengono cancellati.

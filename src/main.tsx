@@ -14,6 +14,7 @@ import { syncChecklistForNote } from './utils/noteTasks'
 import { resolveNoteKind } from './utils/noteKind'
 import { requestPersistentStorage } from './utils/storagePersistence'
 import {
+  applyAppUpdateReload,
   prepareAppUpdate,
   registerProductionServiceWorker,
 } from './utils/appUpdate'
@@ -152,7 +153,7 @@ function Bootstrap() {
 async function startApp(): Promise<void> {
   const action = await prepareAppUpdate()
   if (action === 'reload') {
-    window.location.reload()
+    applyAppUpdateReload()
     return
   }
 
