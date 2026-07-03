@@ -1,7 +1,7 @@
 import type { Event } from '../db'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { countdownLabel, countdownUrgency } from '../utils/countdown'
-import { formatAmount, formatIsoDate, formatModifiedLong, sentenceCase } from '../utils/format'
+import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
 import { recurrenceShort } from '../utils/recurring'
 import { summarizeText } from '../utils/textSummary'
 import { EventDetailBody } from './EventDetailBody'
@@ -52,22 +52,36 @@ export function EventExpandableRow({
     descriptionExcerpt.toLowerCase() !== titleNorm &&
     !descriptionExcerpt.toLowerCase().startsWith(`${titleNorm}…`)
 
-  const dateRangeLabel = event.endDate
-    ? `${formatIsoDate(event.startDate)} – ${formatIsoDate(event.endDate)}`
-    : formatIsoDate(event.startDate)
-
   const homeCard = compact && showTypeLabel
 
   let title = event.title
   let subtitle: string | undefined
+  let detailLine: string | undefined
 
   if (homeCard) {
-    const titleParts: string[] = [sentenceCase(event.title)]
-    if (areaName) titleParts.push(areaName)
-    titleParts.push(dateRangeLabel)
-    if (showDescriptionExcerpt) titleParts.push(descriptionExcerpt)
-    title = titleParts.join(' · ')
-    subtitle = formatModifiedLong(event.updatedAt)
+    title = event.title
+    const line2Parts: string[] = []
+    if (areaName) line2Parts.push(areaName)
+    if (event.cost != null && event.cost > 0) {
+      line2Parts.push(
+        `−${formatAmount(event.cost)}${freqShort ? `/${freqShort}` : ''}`,
+      )
+    } else if (freqShort) {
+      line2Parts.push(freqShort)
+    }
+    if (todoCount > 0) {
+      line2Parts.push(`${todoCount} attività`)
+    }
+    subtitle = line2Parts.length > 0 ? line2Parts.join(' · ') : undefined
+
+    const deadlineIso = event.renewalDate ?? event.endDate ?? event.startDate
+    const line3Parts: string[] = []
+    const countdown = countdownLabel(deadlineIso)
+    line3Parts.push(
+      countdown ? `${countdown} · ${formatIsoDate(deadlineIso)}` : formatIsoDate(deadlineIso),
+    )
+    if (showDescriptionExcerpt) line3Parts.push(descriptionExcerpt)
+    detailLine = line3Parts.join(' · ')
   } else {
     const subtitleParts: string[] = []
     if (areaName) subtitleParts.push(areaName)
@@ -79,7 +93,9 @@ export function EventExpandableRow({
   return (
     <ExpandableCard
       compact={compact}
-      subtitleMultiline={compact}
+      homeLayout={homeCard}
+      detailLine={detailLine}
+      subtitleMultiline={compact && !homeCard}
       typeLabel={showTypeLabel ? 'Impegno' : undefined}
       containerClassName={containerClassName}
       defaultExpanded={defaultExpanded}
@@ -95,7 +111,9 @@ export function EventExpandableRow({
       title={title}
       subtitle={subtitle}
       badge={
-        event.renewalDate ? (
+        homeCard
+          ? undefined
+          : event.renewalDate ? (
           <span
             className={`shrink-0 rounded-full font-medium ${URGENCY_BADGE[countdownUrgency(event.renewalDate)]} ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}
           >
@@ -108,7 +126,9 @@ export function EventExpandableRow({
         ) : undefined
       }
       trailing={
-        event.cost != null ? (
+        homeCard
+          ? undefined
+          : event.cost != null ? (
           <span className={`shrink-0 font-semibold text-rose-600 ${compact ? 'text-[10px]' : 'text-xs'}`}>
             −{formatAmount(event.cost)}
             {freqShort ? (

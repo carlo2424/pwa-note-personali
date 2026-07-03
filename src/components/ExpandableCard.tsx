@@ -20,6 +20,10 @@ interface ExpandableCardProps {
   comfortable?: boolean
   /** Sottotitolo su due righe (utile in Home con riassunto) */
   subtitleMultiline?: boolean
+  /** Layout Home chiuso: titolo + sottotitolo + terza riga */
+  homeLayout?: boolean
+  /** Terza riga (es. scadenza e riassunto) — con homeLayout */
+  detailLine?: string
   /** Es. Nota, Lista, Impegno, Spesa — mostrato sopra l'icona */
   typeLabel?: string
 }
@@ -42,6 +46,8 @@ export function ExpandableCard({
   compact = false,
   comfortable = false,
   subtitleMultiline = false,
+  homeLayout = false,
+  detailLine,
   typeLabel,
 }: ExpandableCardProps) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded)
@@ -85,7 +91,9 @@ export function ExpandableCard({
       className={`overflow-hidden border ${dense ? 'rounded-lg shadow-none' : comfortable ? 'rounded-xl shadow-sm' : compact ? 'rounded-lg shadow-none' : 'rounded-xl shadow-sm'} ${containerClassName}`}
     >
       <div
-        className={`flex min-w-0 items-center ${
+        className={`flex min-w-0 ${
+          homeLayout ? 'items-start' : 'items-center'
+        } ${
           dense
             ? 'gap-1 px-2 py-1.5'
             : comfortable
@@ -98,46 +106,78 @@ export function ExpandableCard({
         <button
           type="button"
           onClick={toggleExpanded}
-          className={`flex min-w-0 flex-1 items-center text-left ${
-            dense ? 'gap-2' : comfortable ? 'gap-3' : compact ? 'gap-2' : 'gap-3'
-          }`}
+          className={`flex min-w-0 flex-1 text-left ${
+            homeLayout ? 'items-start' : 'items-center'
+          } ${dense ? 'gap-2' : comfortable ? 'gap-3' : compact ? 'gap-2' : 'gap-3'}`}
           aria-expanded={hasBody ? expanded : undefined}
           disabled={!hasBody}
         >
           {renderIcon()}
           <div className="min-w-0 flex-1">
-            <p
-              className={`font-medium ${
-                subtitleMultiline ? 'line-clamp-2 whitespace-normal' : 'truncate'
-              } ${
-                dense
-                  ? 'text-xs'
-                  : comfortable
-                    ? 'text-sm'
-                    : compact
+            {homeLayout ? (
+              <div className="space-y-0.5">
+                <p
+                  className={`line-clamp-1 font-semibold leading-tight text-slate-900 ${
+                    dense ? 'text-xs' : 'text-sm'
+                  } ${titleClassName}`}
+                >
+                  {sentenceCase(title)}
+                </p>
+                {subtitle ? (
+                  <p
+                    className={`line-clamp-1 leading-tight text-slate-600 ${
+                      dense ? 'text-[10px]' : 'text-xs'
+                    }`}
+                  >
+                    {subtitle}
+                  </p>
+                ) : null}
+                {detailLine ? (
+                  <p
+                    className={`line-clamp-1 leading-tight text-slate-500 ${
+                      dense ? 'text-[10px]' : 'text-xs'
+                    }`}
+                  >
+                    {detailLine}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <>
+                <p
+                  className={`font-medium ${
+                    subtitleMultiline ? 'line-clamp-2 whitespace-normal' : 'truncate'
+                  } ${
+                    dense
                       ? 'text-xs'
-                      : 'text-sm'
-              } ${titleClassName}`}
-            >
-              {sentenceCase(title)}
-            </p>
-            {subtitle && (
-              <p
-                className={`text-slate-500 truncate ${
-                  dense
-                    ? 'text-[10px] leading-tight'
-                    : comfortable
-                      ? 'text-xs leading-snug'
-                      : compact
-                        ? 'text-[10px] leading-snug'
-                        : 'text-xs'
-                }`}
-              >
-                {subtitle}
-              </p>
+                      : comfortable
+                        ? 'text-sm'
+                        : compact
+                          ? 'text-xs'
+                          : 'text-sm'
+                  } ${titleClassName}`}
+                >
+                  {sentenceCase(title)}
+                </p>
+                {subtitle && (
+                  <p
+                    className={`text-slate-500 truncate ${
+                      dense
+                        ? 'text-[10px] leading-tight'
+                        : comfortable
+                          ? 'text-xs leading-snug'
+                          : compact
+                            ? 'text-[10px] leading-snug'
+                            : 'text-xs'
+                    }`}
+                  >
+                    {subtitle}
+                  </p>
+                )}
+              </>
             )}
           </div>
-          {badge}
+          {!homeLayout ? badge : null}
           {hasBody &&
             (expanded ? (
               <ChevronDown
@@ -153,7 +193,7 @@ export function ExpandableCard({
               />
             ))}
         </button>
-        {trailing ? <div className="shrink-0">{trailing}</div> : null}
+        {!homeLayout && trailing ? <div className="shrink-0">{trailing}</div> : null}
         {actions ? <div className="flex shrink-0 items-center">{actions}</div> : null}
       </div>
 

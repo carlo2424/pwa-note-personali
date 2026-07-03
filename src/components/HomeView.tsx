@@ -2,7 +2,6 @@ import {
   AlertTriangle,
   CalendarDays,
   Plus,
-  RefreshCw,
   Wallet,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -39,7 +38,6 @@ import {
   tasksForNote,
 } from '../utils/overdue'
 import {
-  shareEventsSection,
   shareExpensesSection,
   shareImpegnoRowsSection,
 } from '../utils/share'
@@ -59,16 +57,8 @@ const AREA_SECTION_STYLE = {
   note: ITEM_TYPE_STYLE.note.section,
   impegno: ITEM_TYPE_STYLE.event.section,
   spesa: ITEM_TYPE_STYLE.expense.section,
-  rinnovi: 'border-emerald-200/90 bg-emerald-50/80 ring-1 ring-emerald-100 shadow-sm',
   ritardo: 'border-rose-300/80 bg-rose-50/90 ring-1 ring-rose-100 shadow-sm',
 } as const
-
-function sumEventCosts(events: Event[]): number {
-  return events.reduce(
-    (s, e) => s + (e.cost != null && e.cost > 0 ? e.cost : 0),
-    0,
-  )
-}
 
 function sumImpegnoCosts(rows: ImpegnoRow[]): number {
   return rows.reduce((s, row) => {
@@ -349,11 +339,6 @@ export function HomeView({
     .filter((e) => e.cost != null && e.cost > 0)
     .reduce((s, e) => s + e.cost!, 0)
 
-  const renewalSource = areaFilterActive ? areaEvents : monthEvents
-  const urgentRenewals = renewalSource
-    .filter((e) => e.renewalDate && !overdueEventIds.has(e.id!))
-    .sort((a, b) => a.renewalDate!.localeCompare(b.renewalDate!))
-
   const areaExpensesTotal = areaExpensesList
     .filter((e) => e.amount > 0)
     .reduce((s, e) => s + e.amount, 0)
@@ -386,17 +371,13 @@ export function HomeView({
 
   const homeFeedItems = useMemo(() => {
     if (areaFilterActive) return []
-    const renewalIds = new Set(
-      urgentRenewals.map((e) => e.id).filter((id): id is number => id != null),
-    )
     return buildHomeFeedItems(notes ?? [], events ?? [], expenses ?? []).filter(
       (row) => {
         if (row.kind === 'note' && row.item.id && overdueNoteIds.has(row.item.id)) {
           return false
         }
-        if (row.kind === 'event' && row.item.id) {
-          if (overdueEventIds.has(row.item.id)) return false
-          if (renewalIds.has(row.item.id)) return false
+        if (row.kind === 'event' && row.item.id && overdueEventIds.has(row.item.id)) {
+          return false
         }
         return true
       },
@@ -408,7 +389,6 @@ export function HomeView({
     expenses,
     overdueNoteIds,
     overdueEventIds,
-    urgentRenewals,
   ])
 
   const impegnoSectionSubtitle = useMemo(() => {
@@ -465,19 +445,6 @@ export function HomeView({
       sectionTitle: shareAreaContext ? `Spese · ${shareAreaContext}` : 'Spese',
       monthLabel: areaFilterActive ? undefined : sentenceCase(monthLabel),
       footer: speseTotal > 0 ? `Totale: ${formatAmount(speseTotal)}` : undefined,
-    })
-
-  const shareSectionRenewals = () =>
-    void shareEventsSection(urgentRenewals, {
-      sectionTitle: 'Rinnovi in arrivo',
-      context: shareAreaContext ? `Area: ${shareAreaContext}` : undefined,
-      resolveArea: areaFilterActive && areaSelection.kind === 'area'
-        ? undefined
-        : (e) => areaNameById(areas ?? [], e.areaId),
-      footer:
-        renewalsTotal > 0
-          ? `Totale: ${formatAmount(renewalsTotal)}/mese`
-          : undefined,
     })
 
   const shareSectionOverdue = () =>
@@ -580,19 +547,7 @@ export function HomeView({
             </li>
           )
         }
-        return (
-          <li key={`feed-x-${row.item.id}`}>
-            <ExpenseExpandableRow
-              compact
-              showTypeLabel
-              expense={row.item}
-              promoteAreaTitle
-              areaName={areaNameById(areas ?? [], row.item.areaId)}
-              onEdit={() => onEditExpense(row.item)}
-              onOpenEvent={onOpenEventFromExpense}
-            />
-          </li>
-        )
+        return null
       })}
     </ul>
   )
@@ -625,7 +580,6 @@ export function HomeView({
     />
   )
 
-  const renewalsTotal = sumEventCosts(urgentRenewals)
   const overdueTotal = sumImpegnoCosts(overdueRows)
   const impegnoTotal = sumImpegnoCosts(displayImpegni)
   const speseTotal = sumOccurredPositiveExpenses(displayExpenses)
@@ -830,48 +784,6 @@ export function HomeView({
     </div>
   )
 
-  const renewalsDock =
-    !homeFeedQuiet && urgentRenewals.length > 0 ? (
-      <div className="shrink-0 border-t border-slate-200/80 bg-white/95 pt-3 backdrop-blur-sm">
-        <CollapsibleSection
-          {...sectionComfort}
-          title="Rinnovi in arrivo"
-          count={urgentRenewals.length}
-          icon={sectionIcon(
-            'bg-emerald-100 text-emerald-700',
-            <RefreshCw className="h-3.5 w-3.5" />,
-          )}
-          containerClassName={
-            areaFilterActive
-              ? AREA_SECTION_STYLE.rinnovi
-              : 'border-slate-100 bg-white'
-          }
-          totalAmount={renewalsTotal > 0 ? renewalsTotal : undefined}
-          totalSuffix="/mese"
-          onSeeAll={onGoToEvents}
-          onShare={shareSectionRenewals}
-        >
-          <ul className="space-y-1">
-            {urgentRenewals.map((event) => (
-              <li key={event.id}>
-                <EventExpandableRow
-                  compact
-                  showTypeLabel
-                  event={event}
-                  areaName={
-                    areaSelection.kind === 'area'
-                      ? undefined
-                      : areaNameById(areas ?? [], event.areaId)
-                  }
-                  onEdit={() => onEditEvent(event)}
-                />
-              </li>
-            ))}
-          </ul>
-        </CollapsibleSection>
-      </div>
-    ) : null
-
   return (
     <div className="flex min-h-0 flex-1 flex-col min-w-0">
       <div className="shrink-0">
@@ -893,7 +805,6 @@ export function HomeView({
         />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">{mainContent}</div>
-      {renewalsDock}
     </div>
   )
 }

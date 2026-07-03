@@ -6,7 +6,7 @@ import { archiveConfirmCopy } from '../utils/confirmMessages'
 import { isPastDue } from '../utils/countdown'
 import { deadlineLabel, noteDateUrgency } from '../utils/homeSpotlight'
 import { toggleTask } from '../utils/eventTasks'
-import { formatDate, formatDateRange, formatIsoDate, formatModifiedAt, formatModifiedLong, sentenceCase } from '../utils/format'
+import { formatDate, formatDateRange, formatIsoDate, formatModifiedAt, sentenceCase } from '../utils/format'
 import { isNoteImpegno } from '../utils/impegno'
 import { isNoteChecklist } from '../utils/noteKind'
 import { resolveNoteIcon } from '../utils/noteIcon'
@@ -102,24 +102,41 @@ export function NoteExpandableRow({
         : null
 
   const showAreaAsTitle = Boolean(areaName && promoteAreaTitle && !(compact && showTypeLabel))
+  const homeCard = compact && showTypeLabel
 
   let primaryTitle: string
   let resolvedSubtitle: string | undefined
+  let detailLine: string | undefined
 
-  if (compact && showTypeLabel) {
-    const titleParts: string[] = [sentenceCase(note.title)]
+  if (homeCard) {
+    primaryTitle = note.title
+
+    const line2Parts: string[] = []
     if (areaName) {
-      titleParts.push(areaMember ? `${areaName} · ${areaMember}` : areaName)
+      line2Parts.push(areaMember ? `${areaName} · ${areaMember}` : areaName)
     }
-    if (dueDateLabel) {
-      titleParts.push(overdue ? `Scadenza ${dueDateLabel}` : dueDateLabel)
+    if (checklistNote && totalCount > 0) {
+      line2Parts.push(`${totalCount} ${totalCount === 1 ? 'elemento' : 'elementi'}`)
+    } else if (checklistPreview) {
+      line2Parts.push(checklistPreview)
+    }
+    resolvedSubtitle = line2Parts.length > 0 ? line2Parts.join(' · ') : undefined
+
+    const line3Parts: string[] = []
+    if (keyDate) {
+      const countdown = deadlineLabel(keyDate)
+      if (overdue) {
+        line3Parts.push(`Scaduta · ${formatIsoDate(keyDate)}`)
+      } else if (countdown) {
+        line3Parts.push(`${countdown} · ${formatIsoDate(keyDate)}`)
+      } else {
+        line3Parts.push(formatIsoDate(keyDate))
+      }
     } else if (soonLabel && (soon || overdue)) {
-      titleParts.push(soonLabel)
+      line3Parts.push(soonLabel)
     }
-    if (checklistPreview) titleParts.push(checklistPreview)
-    if (showContentExcerpt) titleParts.push(contentExcerpt)
-    primaryTitle = titleParts.join(' · ')
-    resolvedSubtitle = formatModifiedLong(note.updatedAt)
+    if (showContentExcerpt) line3Parts.push(contentExcerpt)
+    detailLine = line3Parts.length > 0 ? line3Parts.join(' · ') : undefined
   } else if (showAreaAsTitle) {
     const areaLabel = areaMember ? `${areaName} · ${areaMember}` : areaName!
     const homeParts: string[] = []
@@ -196,7 +213,9 @@ export function NoteExpandableRow({
     <>
     <ExpandableCard
       compact={compact}
-      subtitleMultiline={compact}
+      homeLayout={homeCard}
+      detailLine={detailLine}
+      subtitleMultiline={compact && !homeCard}
       typeLabel={typeLabel}
       containerClassName={noteCardStyle}
       icon={
@@ -216,7 +235,9 @@ export function NoteExpandableRow({
       }
       subtitle={resolvedSubtitle}
       badge={
-        overdue || dateUrg === 'expired' ? (
+        homeCard
+          ? undefined
+          : overdue || dateUrg === 'expired' ? (
           <span className={`shrink-0 rounded-full bg-rose-600 font-bold text-white ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
             Scaduta
           </span>
@@ -233,11 +254,13 @@ export function NoteExpandableRow({
         )
       }
       actions={
-        <ItemActions
-          onEdit={onEdit}
-          onShare={() => void shareNote(note, areaName)}
-          onArchive={() => setShowArchiveConfirm(true)}
-        />
+        homeCard ? undefined : (
+          <ItemActions
+            onEdit={onEdit}
+            onShare={() => void shareNote(note, areaName)}
+            onArchive={() => setShowArchiveConfirm(true)}
+          />
+        )
       }
     >
       {photoUrl && (
@@ -281,6 +304,15 @@ export function NoteExpandableRow({
       <p className={`text-slate-400 ${compact ? 'text-[10px]' : 'text-xs'}`}>
         Aggiornata {formatDate(note.updatedAt)}
       </p>
+      {homeCard && (
+        <div className={`border-t border-slate-100 ${compact ? 'pt-1.5' : 'pt-2'}`}>
+          <ItemActions
+            onEdit={onEdit}
+            onShare={() => void shareNote(note, areaName)}
+            onArchive={() => setShowArchiveConfirm(true)}
+          />
+        </div>
+      )}
     </ExpandableCard>
 
     {showArchiveConfirm && (

@@ -39,7 +39,7 @@ function compareFeedItems(a: HomeFeedItem, b: HomeFeedItem): number {
 export function buildHomeFeedItems(
   notes: Note[],
   events: Event[],
-  expenses: Expense[],
+  _expenses: Expense[],
 ): HomeFeedItem[] {
   const items: HomeFeedItem[] = []
 
@@ -56,13 +56,6 @@ export function buildHomeFeedItems(
       activityAt: event.updatedAt,
     })
   }
-  for (const expense of expenses) {
-    items.push({
-      kind: 'expense',
-      item: expense,
-      activityAt: expense.createdAt,
-    })
-  }
 
   return items.filter(itemInHomeMonth).sort(compareFeedItems)
 }
@@ -70,9 +63,21 @@ export function buildHomeFeedItems(
 export function isHomeFeedQuiet(
   notes: Note[],
   events: Event[],
-  expenses: Expense[],
+  _expenses: Expense[],
 ): boolean {
-  return buildHomeFeedItems(notes, events, expenses).length === 0
+  const items: HomeFeedItem[] = []
+  for (const note of filterPlainNotes(notes)) {
+    if (noteInHomeMonth(note)) items.push({ kind: 'note', item: note, activityAt: note.updatedAt })
+  }
+  for (const note of filterNoteImpegni(notes)) {
+    if (noteInHomeMonth(note)) items.push({ kind: 'note', item: note, activityAt: note.updatedAt })
+  }
+  for (const event of filterEventImpegni(events)) {
+    if (eventInHomeMonth(event)) {
+      items.push({ kind: 'event', item: event, activityAt: event.updatedAt })
+    }
+  }
+  return items.length === 0
 }
 
 export function sortExpensesByDeadline<T extends Pick<Expense, 'date'>>(
