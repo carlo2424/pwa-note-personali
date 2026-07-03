@@ -1,7 +1,7 @@
 import type { Event } from '../db'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { countdownLabel, countdownUrgency } from '../utils/countdown'
-import { formatAmount, formatIsoDate, formatModifiedAt, sentenceCase } from '../utils/format'
+import { formatAmount, formatIsoDate, formatModifiedLong, sentenceCase } from '../utils/format'
 import { recurrenceShort } from '../utils/recurring'
 import { summarizeText } from '../utils/textSummary'
 import { EventDetailBody } from './EventDetailBody'
@@ -52,12 +52,29 @@ export function EventExpandableRow({
     descriptionExcerpt.toLowerCase() !== titleNorm &&
     !descriptionExcerpt.toLowerCase().startsWith(`${titleNorm}…`)
 
-  const subtitleParts: string[] = []
-  if (areaName) subtitleParts.push(areaName)
-  subtitleParts.push(meta)
-  if (showDescriptionExcerpt) subtitleParts.push(descriptionExcerpt)
-  if (compact) subtitleParts.push(formatModifiedAt(event.updatedAt))
-  const subtitle = subtitleParts.join(' · ')
+  const dateRangeLabel = event.endDate
+    ? `${formatIsoDate(event.startDate)} – ${formatIsoDate(event.endDate)}`
+    : formatIsoDate(event.startDate)
+
+  const homeCard = compact && showTypeLabel
+
+  let title = event.title
+  let subtitle: string | undefined
+
+  if (homeCard) {
+    const titleParts: string[] = [sentenceCase(event.title)]
+    if (areaName) titleParts.push(areaName)
+    titleParts.push(dateRangeLabel)
+    if (showDescriptionExcerpt) titleParts.push(descriptionExcerpt)
+    title = titleParts.join(' · ')
+    subtitle = formatModifiedLong(event.updatedAt)
+  } else {
+    const subtitleParts: string[] = []
+    if (areaName) subtitleParts.push(areaName)
+    subtitleParts.push(meta)
+    if (showDescriptionExcerpt) subtitleParts.push(descriptionExcerpt)
+    subtitle = subtitleParts.join(' · ')
+  }
 
   return (
     <ExpandableCard
@@ -75,7 +92,7 @@ export function EventExpandableRow({
           compact={compact}
         />
       }
-      title={event.title}
+      title={title}
       subtitle={subtitle}
       badge={
         event.renewalDate ? (

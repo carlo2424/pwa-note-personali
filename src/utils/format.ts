@@ -58,3 +58,13 @@ export function formatAmount(amount: number): string {
 export function formatModifiedAt(timestamp: number): string {
   return `Mod. ${formatDate(timestamp)}`
 }
+
+/** Etichetta completa per card Home (seconda riga) */
+export function formatModifiedLong(timestamp: number): string {
+  const when = new Date(timestamp).toLocaleDateString('it-IT', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  return `Modificato ${when}`
+}

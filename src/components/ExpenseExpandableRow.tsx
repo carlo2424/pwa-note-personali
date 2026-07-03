@@ -2,7 +2,7 @@ import type { Event, Expense, PaymentMethod } from '../db'
 import { db } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { daysUntil } from '../utils/countdown'
-import { formatAmount, formatDate, formatModifiedAt, sentenceCase } from '../utils/format'
+import { formatAmount, formatDate, formatModifiedAt, formatModifiedLong, sentenceCase } from '../utils/format'
 import { expenseHasOccurred } from '../utils/monthExpenseTotals'
 import { summarizeText } from '../utils/textSummary'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
@@ -61,13 +61,27 @@ export function ExpenseExpandableRow({
   const meta = `${expense.category} · ${expenseDate}`
   const descriptionExcerpt = summarizeText(expense.description)
   const categoryLabel = sentenceCase(expense.category)
+  const homeCard = compact && showTypeLabel
 
-  const title = promoteAreaTitle && areaName
+  let title = promoteAreaTitle && areaName && !homeCard
     ? areaName
     : expense.description
 
   let subtitle: string
-  if (promoteAreaTitle && areaName) {
+
+  if (homeCard) {
+    const titleParts = [sentenceCase(expense.description)]
+    if (areaName) titleParts.push(areaName)
+    titleParts.push(expenseDate)
+    if (
+      descriptionExcerpt &&
+      descriptionExcerpt.toLowerCase() !== sentenceCase(expense.description).toLowerCase()
+    ) {
+      titleParts.push(descriptionExcerpt)
+    }
+    title = titleParts.join(' · ')
+    subtitle = formatModifiedLong(expense.createdAt)
+  } else if (promoteAreaTitle && areaName) {
     const parts = [expenseDate]
     if (categoryLabel && categoryLabel.toLowerCase() !== descriptionExcerpt.toLowerCase()) {
       parts.push(categoryLabel)
@@ -124,6 +138,14 @@ export function ExpenseExpandableRow({
             Tra {upcomingDays}{' '}
             {upcomingDays === 1 ? 'giorno' : 'giorni'}
           </span>
+        ) : showTypeLabel ? (
+          fromImpegno ? undefined : (
+            <span
+              className={`shrink-0 rounded-full font-medium ${METHOD_COLOR[method]} ${compact ? 'px-1.5 py-px text-[9px]' : 'px-1.5 py-0.5 text-[10px]'}`}
+            >
+              {METHOD_LABELS[method]}
+            </span>
+          )
         ) : expense.eventId ? (
           <span
             className={`shrink-0 rounded-full bg-violet-100 font-medium text-violet-700 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-1.5 py-0.5 text-[10px]'}`}

@@ -6,7 +6,7 @@ import { archiveConfirmCopy } from '../utils/confirmMessages'
 import { isPastDue } from '../utils/countdown'
 import { deadlineLabel, noteDateUrgency } from '../utils/homeSpotlight'
 import { toggleTask } from '../utils/eventTasks'
-import { formatDate, formatDateRange, formatIsoDate, formatModifiedAt, sentenceCase } from '../utils/format'
+import { formatDate, formatDateRange, formatIsoDate, formatModifiedAt, formatModifiedLong, sentenceCase } from '../utils/format'
 import { isNoteImpegno } from '../utils/impegno'
 import { isNoteChecklist } from '../utils/noteKind'
 import { resolveNoteIcon } from '../utils/noteIcon'
@@ -101,12 +101,26 @@ export function NoteExpandableRow({
         ? formatIsoDate(keyDate)
         : null
 
-  const showAreaAsTitle = Boolean(areaName && promoteAreaTitle)
+  const showAreaAsTitle = Boolean(areaName && promoteAreaTitle && !(compact && showTypeLabel))
 
   let primaryTitle: string
   let resolvedSubtitle: string | undefined
 
-  if (showAreaAsTitle) {
+  if (compact && showTypeLabel) {
+    const titleParts: string[] = [sentenceCase(note.title)]
+    if (areaName) {
+      titleParts.push(areaMember ? `${areaName} · ${areaMember}` : areaName)
+    }
+    if (dueDateLabel) {
+      titleParts.push(overdue ? `Scadenza ${dueDateLabel}` : dueDateLabel)
+    } else if (soonLabel && (soon || overdue)) {
+      titleParts.push(soonLabel)
+    }
+    if (checklistPreview) titleParts.push(checklistPreview)
+    if (showContentExcerpt) titleParts.push(contentExcerpt)
+    primaryTitle = titleParts.join(' · ')
+    resolvedSubtitle = formatModifiedLong(note.updatedAt)
+  } else if (showAreaAsTitle) {
     const areaLabel = areaMember ? `${areaName} · ${areaMember}` : areaName!
     const homeParts: string[] = []
     if (dueDateLabel) {
@@ -214,7 +228,7 @@ export function NoteExpandableRow({
           <span className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
             Fatto
           </span>
-        ) : (
+        ) : showTypeLabel ? undefined : (
           typeBadge
         )
       }

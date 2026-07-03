@@ -762,45 +762,6 @@ export function HomeView({
         </CollapsibleSection>
       )}
 
-      {!homeFeedQuiet && urgentRenewals.length > 0 && (
-        <CollapsibleSection
-          {...sectionComfort}
-          title="Rinnovi in arrivo"
-          count={urgentRenewals.length}
-          icon={sectionIcon(
-            'bg-emerald-100 text-emerald-700',
-            <RefreshCw className="h-3.5 w-3.5" />,
-          )}
-          containerClassName={
-            areaFilterActive
-              ? AREA_SECTION_STYLE.rinnovi
-              : 'border-slate-100 bg-white'
-          }
-          totalAmount={renewalsTotal > 0 ? renewalsTotal : undefined}
-          totalSuffix="/mese"
-          onSeeAll={onGoToEvents}
-          onShare={shareSectionRenewals}
-        >
-          <ul className="space-y-1">
-            {urgentRenewals.map((event) => (
-              <li key={event.id}>
-                <EventExpandableRow
-                  compact
-                  showTypeLabel
-                  event={event}
-                  areaName={
-                    areaSelection.kind === 'area'
-                      ? undefined
-                      : areaNameById(areas ?? [], event.areaId)
-                  }
-                  onEdit={() => onEditEvent(event)}
-                />
-              </li>
-            ))}
-          </ul>
-        </CollapsibleSection>
-      )}
-
       {areaFilterActive ? (
         <div className="space-y-2.5">
           {noteCount > 0 ? (
@@ -867,25 +828,70 @@ export function HomeView({
     </div>
   )
 
-  return (
-    <div className="min-w-0">
-      <AreaChips
-        areas={areas ?? []}
-        selection={areaSelection}
-        onSelect={setAreaSelection}
-        counts={areaCounts}
-        totalCount={totalAreaItems}
-        headerTrailing={<MiniMonthCalendar compact />}
-        onAreaDeleted={(areaId) => {
-          if (
-            areaSelection.kind === 'area' &&
-            areaSelection.areaId === areaId
-          ) {
-            setAreaSelection({ kind: 'all' })
+  const renewalsDock =
+    !homeFeedQuiet && urgentRenewals.length > 0 ? (
+      <div className="shrink-0 border-t border-slate-200/80 bg-white/95 pt-3 backdrop-blur-sm">
+        <CollapsibleSection
+          {...sectionComfort}
+          title="Rinnovi in arrivo"
+          count={urgentRenewals.length}
+          icon={sectionIcon(
+            'bg-emerald-100 text-emerald-700',
+            <RefreshCw className="h-3.5 w-3.5" />,
+          )}
+          containerClassName={
+            areaFilterActive
+              ? AREA_SECTION_STYLE.rinnovi
+              : 'border-slate-100 bg-white'
           }
-        }}
-      />
-      {mainContent}
+          totalAmount={renewalsTotal > 0 ? renewalsTotal : undefined}
+          totalSuffix="/mese"
+          onSeeAll={onGoToEvents}
+          onShare={shareSectionRenewals}
+        >
+          <ul className="space-y-1">
+            {urgentRenewals.map((event) => (
+              <li key={event.id}>
+                <EventExpandableRow
+                  compact
+                  showTypeLabel
+                  event={event}
+                  areaName={
+                    areaSelection.kind === 'area'
+                      ? undefined
+                      : areaNameById(areas ?? [], event.areaId)
+                  }
+                  onEdit={() => onEditEvent(event)}
+                />
+              </li>
+            ))}
+          </ul>
+        </CollapsibleSection>
+      </div>
+    ) : null
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col min-w-0">
+      <div className="shrink-0">
+        <AreaChips
+          areas={areas ?? []}
+          selection={areaSelection}
+          onSelect={setAreaSelection}
+          counts={areaCounts}
+          totalCount={totalAreaItems}
+          headerTrailing={<MiniMonthCalendar compact />}
+          onAreaDeleted={(areaId) => {
+            if (
+              areaSelection.kind === 'area' &&
+              areaSelection.areaId === areaId
+            ) {
+              setAreaSelection({ kind: 'all' })
+            }
+          }}
+        />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{mainContent}</div>
+      {renewalsDock}
     </div>
   )
 }

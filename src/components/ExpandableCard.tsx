@@ -107,7 +107,9 @@ export function ExpandableCard({
           {renderIcon()}
           <div className="min-w-0 flex-1">
             <p
-              className={`truncate font-medium ${
+              className={`font-medium ${
+                subtitleMultiline ? 'line-clamp-2 whitespace-normal' : 'truncate'
+              } ${
                 dense
                   ? 'text-xs'
                   : comfortable
@@ -121,9 +123,7 @@ export function ExpandableCard({
             </p>
             {subtitle && (
               <p
-                className={`text-slate-500 ${
-                  subtitleMultiline ? 'line-clamp-2 whitespace-normal' : 'truncate'
-                } ${
+                className={`text-slate-500 truncate ${
                   dense
                     ? 'text-[10px] leading-tight'
                     : comfortable

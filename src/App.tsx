@@ -326,7 +326,13 @@ function App() {
           </div>
         </header>
 
-        <main className={`flex-1 px-4 ${activeSection === 'home' ? 'py-4' : 'py-6'}`}>
+        <main
+          className={`min-h-0 flex-1 ${
+            activeSection === 'home'
+              ? 'flex flex-col px-4 py-4'
+              : 'px-4 py-6'
+          }`}
+        >
           {activeSection !== 'home' && (
             <div className="mb-6 flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
