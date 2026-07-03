@@ -24,6 +24,8 @@ interface ExpandableCardProps {
   homeLayout?: boolean
   /** Terza riga (es. scadenza e riassunto) — con homeLayout */
   detailLine?: string
+  /** Quarta riga opzionale — con homeLayout */
+  extraLine?: string
   /** Es. Nota, Lista, Impegno, Spesa — mostrato sopra l'icona */
   typeLabel?: string
 }
@@ -48,6 +50,7 @@ export function ExpandableCard({
   subtitleMultiline = false,
   homeLayout = false,
   detailLine,
+  extraLine,
   typeLabel,
 }: ExpandableCardProps) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded)
@@ -125,7 +128,7 @@ export function ExpandableCard({
                 </p>
                 {subtitle ? (
                   <p
-                    className={`line-clamp-1 leading-tight text-slate-600 ${
+                    className={`line-clamp-2 whitespace-normal leading-snug text-slate-600 ${
                       dense ? 'text-[10px]' : 'text-xs'
                     }`}
                   >
@@ -134,11 +137,20 @@ export function ExpandableCard({
                 ) : null}
                 {detailLine ? (
                   <p
-                    className={`line-clamp-1 leading-tight text-slate-500 ${
+                    className={`line-clamp-2 whitespace-normal leading-snug text-slate-500 ${
                       dense ? 'text-[10px]' : 'text-xs'
                     }`}
                   >
                     {detailLine}
+                  </p>
+                ) : null}
+                {extraLine ? (
+                  <p
+                    className={`line-clamp-2 whitespace-normal leading-snug text-slate-500 ${
+                      dense ? 'text-[10px]' : 'text-xs'
+                    }`}
+                  >
+                    {extraLine}
                   </p>
                 ) : null}
               </div>

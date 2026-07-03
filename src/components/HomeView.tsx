@@ -17,7 +17,7 @@ import {
   selectionLabel,
 } from '../utils/areaSelection'
 import { countdownUrgency } from '../utils/countdown'
-import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
+import { formatAmount, formatDate, formatIsoDate, sentenceCase } from '../utils/format'
 import {
   filterEventImpegni,
   filterNoteImpegni,
@@ -104,10 +104,24 @@ function impegnoRowDeadline(row: ImpegnoRow): string | undefined {
   return noteKeyDate(row.item)
 }
 
-function homeCategoryDetailLine(iso: string | undefined): string | undefined {
+function impegnoRowTitle(row: ImpegnoRow): string {
+  return sentenceCase(row.item.title)
+}
+
+function noteItemTitle(note: Note): string {
+  return sentenceCase(note.title)
+}
+
+function homeNearestDeadlineIntro(iso: string | undefined): string | undefined {
   if (!iso) return undefined
-  const label = deadlineLabel(iso)
-  return label ? `${label} · ${formatIsoDate(iso)}` : formatIsoDate(iso)
+  const when = deadlineLabel(iso)
+  const date = formatIsoDate(iso)
+  if (when) return `Scadenza più vicina: ${when}, ${date}`
+  return `Scadenza più vicina: ${date}`
+}
+
+function homeNearestDeadlineTitleLine(title: string): string {
+  return `→ ${title}`
 }
 
 function notesAreUrgent(notes: Note[]): boolean {
@@ -407,46 +421,102 @@ export function HomeView({
   )
 
   const homeImpegniSubtitle = useMemo(() => {
-    const total = sumImpegnoCosts(displayImpegni)
     const parts = [
       `${impegnoCount} ${impegnoCount === 1 ? 'impegno' : 'impegni'}`,
     ]
-    if (total > 0) parts.push(`${formatAmount(total)}/mese`)
+    if (monthPlannedTotal > 0) {
+      parts.push(
+        `Spese previste per il mese ${formatAmount(monthPlannedTotal)}`,
+      )
+    } else {
+      const total = sumImpegnoCosts(displayImpegni)
+      if (total > 0) {
+        parts.push(`Costi stimati ${formatAmount(total)}/mese`)
+      }
+    }
     return parts.join(' · ')
-  }, [displayImpegni, impegnoCount])
+  }, [displayImpegni, impegnoCount, monthPlannedTotal])
 
   const homeImpegniDetailLine = useMemo(() => {
     if (displayImpegni.length === 0) return undefined
-    return homeCategoryDetailLine(impegnoRowDeadline(displayImpegni[0]))
+    return homeNearestDeadlineIntro(impegnoRowDeadline(displayImpegni[0]))
   }, [displayImpegni])
 
-  const homeNoteSubtitle = useMemo(
-    () =>
+  const homeImpegniExtraLine = useMemo(() => {
+    if (displayImpegni.length === 0) return undefined
+    return homeNearestDeadlineTitleLine(impegnoRowTitle(displayImpegni[0]))
+  }, [displayImpegni])
+
+  const homeNoteSubtitle = useMemo(() => {
+    const parts = [
       `${textNoteCount} ${textNoteCount === 1 ? 'nota' : 'note'}`,
-    [textNoteCount],
-  )
+    ]
+    const withDeadline = homeTextNotes.filter((n) => noteKeyDate(n)).length
+    if (withDeadline > 0) {
+      parts.push(`${withDeadline} con scadenza`)
+    }
+    if (homeTextNotes[0]) {
+      const { title, member } = areaHomeLabel(areas ?? [], homeTextNotes[0].areaId)
+      const areaLabel = member ? `${title} · ${member}` : title
+      if (areaLabel) parts.push(areaLabel)
+    }
+    return parts.join(' · ')
+  }, [textNoteCount, homeTextNotes, areas])
 
-  const homeNoteDetailLine = useMemo(
-    () =>
-      homeTextNotes.length > 0
-        ? homeCategoryDetailLine(noteKeyDate(homeTextNotes[0]))
-        : undefined,
-    [homeTextNotes],
-  )
+  const homeNoteDetailLine = useMemo(() => {
+    if (homeTextNotes.length === 0) return undefined
+    const note = homeTextNotes[0]
+    const iso = noteKeyDate(note)
+    if (iso) return homeNearestDeadlineIntro(iso)
+    return `Aggiornata ${formatDate(note.updatedAt)}`
+  }, [homeTextNotes])
 
-  const homeChecklistSubtitle = useMemo(
-    () =>
+  const homeNoteExtraLine = useMemo(() => {
+    if (homeTextNotes.length === 0) return undefined
+    return homeNearestDeadlineTitleLine(noteItemTitle(homeTextNotes[0]))
+  }, [homeTextNotes])
+
+  const homeChecklistItemCount = useMemo(() => {
+    const noteIds = new Set(
+      homeChecklists.map((n) => n.id).filter((id): id is number => id != null),
+    )
+    return (tasks ?? []).filter((t) => t.noteId != null && noteIds.has(t.noteId!))
+      .length
+  }, [tasks, homeChecklists])
+
+  const homeChecklistSubtitle = useMemo(() => {
+    const parts = [
       `${checklistCount} ${checklistCount === 1 ? 'lista' : 'liste'}`,
-    [checklistCount],
-  )
+    ]
+    if (homeChecklistItemCount > 0) {
+      parts.push(
+        `${homeChecklistItemCount} ${homeChecklistItemCount === 1 ? 'elemento' : 'elementi'}`,
+      )
+    }
+    const done = (tasks ?? []).filter(
+      (t) =>
+        t.noteId != null &&
+        homeChecklists.some((n) => n.id === t.noteId) &&
+        t.done,
+    ).length
+    if (homeChecklistItemCount > 0) {
+      parts.push(`${done}/${homeChecklistItemCount} completati`)
+    }
+    return parts.join(' · ')
+  }, [checklistCount, homeChecklistItemCount, tasks, homeChecklists])
 
-  const homeChecklistDetailLine = useMemo(
-    () =>
-      homeChecklists.length > 0
-        ? homeCategoryDetailLine(noteKeyDate(homeChecklists[0]))
-        : undefined,
-    [homeChecklists],
-  )
+  const homeChecklistDetailLine = useMemo(() => {
+    if (homeChecklists.length === 0) return undefined
+    const note = homeChecklists[0]
+    const iso = noteKeyDate(note)
+    if (iso) return homeNearestDeadlineIntro(iso)
+    return `Aggiornata ${formatDate(note.updatedAt)}`
+  }, [homeChecklists])
+
+  const homeChecklistExtraLine = useMemo(() => {
+    if (homeChecklists.length === 0) return undefined
+    return homeNearestDeadlineTitleLine(noteItemTitle(homeChecklists[0]))
+  }, [homeChecklists])
 
   const noteSectionUrgent = useMemo(
     () => notesAreUrgent(homeTextNotes),
@@ -738,6 +808,7 @@ export function HomeView({
           homeLayout
           subtitle={homeImpegniSubtitle}
           detailLine={homeImpegniDetailLine}
+          extraLine={homeImpegniExtraLine}
           icon={impegnoSectionIcon}
           containerClassName={
             impegnoSectionUrgent
@@ -758,6 +829,7 @@ export function HomeView({
           homeLayout
           subtitle={homeNoteSubtitle}
           detailLine={homeNoteDetailLine}
+          extraLine={homeNoteExtraLine}
           icon={noteSectionIcon}
           containerClassName={
             noteSectionUrgent
@@ -778,6 +850,7 @@ export function HomeView({
           homeLayout
           subtitle={homeChecklistSubtitle}
           detailLine={homeChecklistDetailLine}
+          extraLine={homeChecklistExtraLine}
           icon={checklistSectionIcon}
           containerClassName={
             checklistSectionUrgent

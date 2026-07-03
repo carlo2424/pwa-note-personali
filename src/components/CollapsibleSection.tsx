@@ -21,6 +21,7 @@ interface CollapsibleSectionProps {
   typeLabel?: string
   homeLayout?: boolean
   detailLine?: string
+  extraLine?: string
 }
 
 export function CollapsibleSection({
@@ -41,6 +42,7 @@ export function CollapsibleSection({
   typeLabel,
   homeLayout = false,
   detailLine,
+  extraLine,
 }: CollapsibleSectionProps) {
   if (!alwaysShow && count === 0) return null
 
@@ -96,6 +98,7 @@ export function CollapsibleSection({
       comfortable={comfortable}
       homeLayout={homeLayout}
       detailLine={detailLine}
+      extraLine={extraLine}
       typeLabel={typeLabel}
       defaultExpanded={false}
       containerClassName={containerClassName}
