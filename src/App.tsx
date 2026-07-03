@@ -23,6 +23,7 @@ import { Modal } from './components/Modal'
 import { NoteForm } from './components/NoteForm'
 import { NoteList } from './components/NoteList'
 import { SettingsPanel } from './components/SettingsPanel'
+import { VoiceCreateButton } from './components/VoiceCreateButton'
 import { BackupReminderBanner } from './components/BackupReminderBanner'
 import { hasBackupableData } from './utils/backup'
 import { shouldShowBackupReminder } from './utils/backupReminder'
@@ -380,6 +381,16 @@ function App() {
           )}
           {activeSection === 'archive' && <ArchiveList />}
         </main>
+
+        {activeSection === 'home' && (
+          <div className="relative z-20 flex justify-center border-t border-transparent bg-gradient-to-t from-white via-white/95 to-transparent px-4 pb-0.5 pt-1">
+            <VoiceCreateButton
+              onEditNote={openEditNote}
+              onEditEvent={openEditEvent}
+              onEditExpense={openEditExpense}
+            />
+          </div>
+        )}
 
         <nav
           className="sticky bottom-0 border-t border-slate-200/80 bg-white/95 px-0.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md"
