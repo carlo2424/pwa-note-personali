@@ -24,6 +24,7 @@ interface CollapsibleSectionProps {
   detailLine?: string
   extraLine?: string
   deadlineLines?: HomeDeadlineLine[]
+  deadlineOverflowLabel?: (hidden: number) => string
   summaryLines?: HomeDeadlineLine[]
   summaryOverflowLabel?: (hidden: number) => string
 }
@@ -48,6 +49,7 @@ export function CollapsibleSection({
   detailLine,
   extraLine,
   deadlineLines,
+  deadlineOverflowLabel,
   summaryLines,
   summaryOverflowLabel,
 }: CollapsibleSectionProps) {
@@ -107,6 +109,7 @@ export function CollapsibleSection({
       detailLine={detailLine}
       extraLine={extraLine}
       deadlineLines={deadlineLines}
+      deadlineOverflowLabel={deadlineOverflowLabel}
       summaryLines={summaryLines}
       summaryOverflowLabel={summaryOverflowLabel}
       typeLabel={typeLabel}

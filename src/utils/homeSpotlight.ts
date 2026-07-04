@@ -56,6 +56,35 @@ export function buildHomeDeadlineLine(
   return { label, tone, iso }
 }
 
+/** Card Home Impegni: prossima scadenza + righe per ogni scadenza di oggi. */
+export function buildHomeImpegniCardLines(
+  items: { title: string; iso: string }[],
+): HomeDeadlineLine[] {
+  const dated = [...items]
+    .filter((item) => item.iso)
+    .sort((a, b) => compareDeadlineIso(a.iso, b.iso, a.title.localeCompare(b.title, 'it-IT')))
+
+  const todayItems = dated.filter((item) => daysUntil(item.iso) === 0)
+  const upcoming = dated.filter((item) => daysUntil(item.iso) >= 0)
+
+  const lines: HomeDeadlineLine[] = []
+
+  const prossima = upcoming[0]
+  if (prossima) {
+    const base = buildHomeDeadlineLine(prossima.title, prossima.iso)
+    lines.push({
+      ...base,
+      label: `Prossima scadenza · ${base.label}`,
+    })
+  }
+
+  for (const item of todayItems) {
+    lines.push(buildHomeDeadlineLine(item.title, item.iso))
+  }
+
+  return lines
+}
+
 export function sortHomeDeadlineLines(lines: HomeDeadlineLine[]): HomeDeadlineLine[] {
   return [...lines].sort((a, b) => {
     if (a.iso && b.iso) {
@@ -89,38 +118,6 @@ export function buildHomeItemSummaryLine(
     label: `${title} · ${formatModifiedAt(updatedAt)}`,
     tone,
   }
-}
-
-export interface ImpegniHomeCardLines {
-  todayLines: HomeDeadlineLine[]
-  nextLine: HomeDeadlineLine | null
-}
-
-/** Card Impegni chiusa: oggi (se presente) + prossima scadenza. */
-export function buildImpegniHomeCardLines(
-  items: { title: string; iso: string }[],
-): ImpegniHomeCardLines {
-  const allLines = items
-    .filter((item) => item.iso)
-    .map((item) => buildHomeDeadlineLine(item.title, item.iso))
-
-  if (allLines.length === 0) {
-    return { todayLines: [], nextLine: null }
-  }
-
-  const sorted = sortHomeDeadlineLines(allLines)
-  const todayLines = sorted.filter(
-    (line) => line.iso != null && daysUntil(line.iso) === 0,
-  )
-
-  if (todayLines.length === 0) {
-    return { todayLines: [], nextLine: sorted[0] ?? null }
-  }
-
-  const nextLine =
-    sorted.find((line) => line.iso != null && daysUntil(line.iso) > 0) ?? null
-
-  return { todayLines, nextLine }
 }
 
 export type DateUrgency = ReturnType<typeof countdownUrgency>
