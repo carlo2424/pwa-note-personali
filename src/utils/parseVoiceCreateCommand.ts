@@ -278,12 +278,38 @@ function findMarkers(text: string): MarkerMatch[] {
   return used
 }
 
+function detectKindFromCreatePhrase(text: string): VoiceCreateKind | undefined {
+  const kindWords = KIND_RULES.flatMap((r) => r.words)
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp)
+    .join('|')
+  const m = text.match(
+    new RegExp(
+      `(?:^|[\\s,;])(?:crea(?:re)?|aggiungi(?:ere)?|inserisci(?:ere)?|nuov[oa]|metti(?:ere)?|registra(?:re)?)\\s+(?:un[a]?|una|uno|un|l')?\\s*(${kindWords})\\b`,
+      'i',
+    ),
+  )
+  if (!m?.[1]) return undefined
+  const word = m[1].toLowerCase()
+  return KIND_RULES.find((r) => r.words.includes(word))?.kind
+}
+
 function detectKind(text: string, markers: MarkerMatch[]): VoiceCreateKind | undefined {
+  const fromPhrase = detectKindFromCreatePhrase(text)
+  if (fromPhrase) return fromPhrase
+
   const kindMarkers = markers.filter((m) => m.field === 'kind')
   if (kindMarkers.length > 0) {
-    const first = kindMarkers[0]
-    const rule = KIND_RULES.find((r) => r.words.some((w) => w === first.alias))
-    if (rule) return rule.kind
+    let best: { kind: VoiceCreateKind; score: number; index: number } | undefined
+    for (const marker of kindMarkers) {
+      const rule = KIND_RULES.find((r) => r.words.some((w) => w === marker.alias))
+      if (!rule) continue
+      const score = rule.weight * 10 - marker.start / 1000
+      if (!best || score > best.score || (score === best.score && marker.start < best.index)) {
+        best = { kind: rule.kind, score, index: marker.start }
+      }
+    }
+    if (best) return best.kind
   }
 
   const lower = ` ${text.toLowerCase()} `
@@ -407,6 +433,18 @@ function inferTitleAndContent(
     }
   }
 
+  if (kind === 'checklist' && cleaned) {
+    const parts = cleaned.split(/\s*,\s*|\s+-\s+/).map((p) => p.trim()).filter(Boolean)
+    if (parts.length > 1) {
+      return { title: parts[0], checklistItems: parts.slice(1) }
+    }
+    const items = splitListItems(cleaned)
+    if (items.length >= 2) {
+      return { title: items[0], checklistItems: items.slice(1) }
+    }
+    return { title: 'Lista', checklistItems: items.length ? items : [cleaned] }
+  }
+
   if (kind === 'note' && cleaned) {
     return {
       title: makeNoteTitle(cleaned),
@@ -477,16 +515,20 @@ function extractInlineDate(text: string): string | undefined {
 export function parseVoiceCreateCommand(
   rawTranscript: string,
 ): VoiceParseResult | VoiceParseFailure {
-  const text = collapseRepeatedWords(
-    stripCreateCommandPrefix(normalizeTranscript(rawTranscript)),
-  )
-  if (text.length < 3) {
+  const normalized = collapseRepeatedWords(normalizeTranscript(rawTranscript))
+  if (normalized.length < 3) {
     return {
       ok: false,
       reason: 'Messaggio troppo corto.',
       hint: 'Detta liberamente: tipo, titolo e messaggio in qualsiasi ordine.',
     }
   }
+
+  const kindHint =
+    detectKindFromCreatePhrase(normalized) ??
+    detectKind(normalized, findMarkers(normalized))
+
+  const text = stripCreateCommandPrefix(normalized)
 
   const markers = findMarkers(text)
   const fields: ParsedFields = {}
@@ -496,7 +538,7 @@ export function parseVoiceCreateCommand(
     if (!fields[m.field]) fields[m.field] = m.value
   }
 
-  const kind = detectKind(text, markers) ?? inferKind(fields, text)
+  const kind = kindHint ?? detectKind(text, markers) ?? inferKind(fields, text)
 
   const remainder = markers.reduce((acc, m) => {
     return acc.slice(0, m.start) + ' '.repeat(m.valueEnd - m.start) + acc.slice(m.valueEnd)
@@ -567,7 +609,7 @@ export function parseVoiceCreateCommand(
       renewalDate,
       checklistItems,
       labels: eventLabel ? [eventLabel] : undefined,
-      rawTranscript: text,
+      rawTranscript: normalized,
     },
   }
 }
