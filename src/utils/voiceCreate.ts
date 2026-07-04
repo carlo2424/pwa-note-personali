@@ -5,7 +5,7 @@ import { todayIso } from './countdown'
 import { sentenceCase } from './format'
 import { syncExpensesForEvent } from './eventExpenses'
 import { defaultNoteIcon } from './noteIcon'
-import { syncChecklistForNote } from './noteTasks'
+import { syncChecklistForNote, buildChecklistContent, parseVoiceChecklistItems } from './noteTasks'
 import type { VoiceCreateCommand, VoiceCreateKind } from './parseVoiceCreateCommand'
 
 export interface VoiceCreateResult {
@@ -42,13 +42,27 @@ export async function createFromVoiceCommand(
 
   if (cmd.kind === 'note' || cmd.kind === 'checklist') {
     const kind = cmd.kind === 'note' ? 'text' : 'checklist'
-    const content =
-      kind === 'checklist' && cmd.checklistItems?.length
-        ? cmd.checklistItems.join('\n')
+    let noteTitle = title
+    let content =
+      kind === 'checklist'
+        ? buildChecklistContent(
+            cmd.checklistItems?.join('\n') ?? cmd.content ?? cmd.title,
+          )
         : sentenceCase(cmd.content ?? '')
 
+    if (kind === 'checklist') {
+      const items = parseVoiceChecklistItems(content)
+      if (
+        items.length >= 2 &&
+        noteTitle.toLowerCase() === 'lista' &&
+        ['spesa', 'compere', 'elenco'].includes(items[0].toLowerCase())
+      ) {
+        noteTitle = sentenceCase(items[0])
+      }
+    }
+
     const id = await db.notes.add({
-      title,
+      title: noteTitle,
       content,
       kind,
       color: 'indigo',
@@ -66,7 +80,7 @@ export async function createFromVoiceCommand(
       await syncChecklistForNote(id, content, 'checklist')
     }
 
-    return { kind: cmd.kind, id, title }
+    return { kind: cmd.kind, id, title: noteTitle }
   }
 
   if (cmd.kind === 'expense') {

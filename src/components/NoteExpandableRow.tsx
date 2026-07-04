@@ -5,7 +5,7 @@ import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { archiveConfirmCopy } from '../utils/confirmMessages'
 import { isPastDue } from '../utils/countdown'
 import { deadlineLabel, noteDateUrgency } from '../utils/homeSpotlight'
-import { toggleTask } from '../utils/eventTasks'
+import { toggleTask, parseTaskLines } from '../utils/eventTasks'
 import { formatDate, formatDateRange, formatIsoDate, formatModifiedAt, sentenceCase } from '../utils/format'
 import { isNoteImpegno } from '../utils/impegno'
 import { isNoteChecklist } from '../utils/noteKind'
@@ -58,7 +58,13 @@ export function NoteExpandableRow({
     [note.id, checklistNote],
   )
 
-  const hasChecklist = checklistNote && (checklistTasks?.length ?? 0) > 0
+  const contentLines =
+    checklistNote && note.content ? parseTaskLines(note.content) : []
+  const effectiveTotal =
+    (checklistTasks?.length ?? 0) > 0
+      ? (checklistTasks?.length ?? 0)
+      : contentLines.length
+  const hasChecklist = checklistNote && effectiveTotal > 0
 
   const displayContent =
     !checklistNote && note.content ? sentenceCase(note.content) : ''
@@ -70,7 +76,7 @@ export function NoteExpandableRow({
   const dateRange = formatDateRange(note.startDate, note.endDate)
 
   const doneCount = checklistTasks?.filter((t) => t.done).length ?? 0
-  const totalCount = checklistTasks?.length ?? 0
+  const totalCount = effectiveTotal
 
   const checklistPreview =
     hasChecklist && totalCount > 0
@@ -80,7 +86,11 @@ export function NoteExpandableRow({
         : null
 
   const contentExcerpt = checklistNote
-    ? summarizeChecklistTasks(checklistTasks ?? [])
+    ? summarizeChecklistTasks(
+        checklistTasks?.length
+          ? checklistTasks
+          : contentLines.map((line) => ({ title: line, done: false })),
+      )
     : summarizeText(displayContent)
 
   const titleNorm = sentenceCase(note.title.trim()).toLowerCase()
@@ -285,6 +295,14 @@ export function NoteExpandableRow({
               </li>
             ) : null,
           )}
+        </ul>
+      ) : hasChecklist && contentLines.length > 0 ? (
+        <ul className={compact ? 'space-y-0.5' : 'space-y-1'}>
+          {contentLines.map((line) => (
+            <li key={line}>
+              <TaskRow compact={compact} nested done={false} title={line} onToggle={() => {}} />
+            </li>
+          ))}
         </ul>
       ) : (
         displayContent && (

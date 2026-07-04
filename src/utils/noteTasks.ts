@@ -9,6 +9,66 @@ export function isNoteChecklistContent(content: string): boolean {
   return parseTaskLines(content).length >= MIN_CHECKLIST_LINES
 }
 
+const CHECKLIST_ITEM_NOISE = new Set([
+  'il',
+  'lo',
+  'la',
+  'i',
+  'gli',
+  'le',
+  'un',
+  'una',
+  'uno',
+  'e',
+  'di',
+  'del',
+  'della',
+  'dei',
+  'delle',
+  'in',
+  'su',
+  'a',
+  'al',
+  'alla',
+])
+
+/** Interpreta voci lista dettate a voce (virgole, «e», spazi tra parole) */
+export function parseVoiceChecklistItems(raw: string): string[] {
+  const normalized = raw.replace(/\s+/g, ' ').trim()
+  if (!normalized) return []
+
+  let parts = normalized
+    .split(/\r?\n|[,;]|(?:\s+e\s+)/i)
+    .map((p) => p.trim())
+    .filter(Boolean)
+
+  if (parts.length === 1) {
+    const words = parts[0].split(/\s+/).filter(Boolean)
+    const looksLikeList =
+      words.length >= 2 &&
+      words.length <= 12 &&
+      words.every((w) => w.length <= 18) &&
+      !/\b(lasciare|ricordare|chiamare|portare|pagare|andare)\b/i.test(parts[0])
+    if (looksLikeList) parts = words
+  }
+
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const part of parts) {
+    const cleaned = part.trim()
+    if (!cleaned || CHECKLIST_ITEM_NOISE.has(cleaned.toLowerCase())) continue
+    const key = cleaned.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(cleaned)
+  }
+  return out
+}
+
+export function buildChecklistContent(raw: string): string {
+  return parseVoiceChecklistItems(raw).join('\n')
+}
+
 export async function deleteTasksForNote(noteId: number): Promise<void> {
   const linked = await db.tasks.where('noteId').equals(noteId).toArray()
   for (const t of linked) {

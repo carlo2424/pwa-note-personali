@@ -1,4 +1,5 @@
 import { todayIso } from './countdown'
+import { parseVoiceChecklistItems } from './noteTasks'
 
 export type VoiceCreateKind = 'note' | 'checklist' | 'event' | 'expense'
 
@@ -346,10 +347,7 @@ function inferKind(fields: ParsedFields, text: string): VoiceCreateKind {
 }
 
 function splitListItems(raw: string): string[] {
-  return raw
-    .split(/[,;]|(?:\s+e\s+)/i)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0)
+  return parseVoiceChecklistItems(raw)
 }
 
 function stripCreateCommandPrefix(text: string): string {
@@ -434,13 +432,15 @@ function inferTitleAndContent(
   }
 
   if (kind === 'checklist' && cleaned) {
-    const parts = cleaned.split(/\s*,\s*|\s+-\s+/).map((p) => p.trim()).filter(Boolean)
-    if (parts.length > 1) {
-      return { title: parts[0], checklistItems: parts.slice(1) }
-    }
     const items = splitListItems(cleaned)
+    if (items.length >= 3 && ['lista', 'spesa', 'compere', 'elenco'].includes(items[0].toLowerCase())) {
+      return {
+        title: items[0],
+        checklistItems: items.slice(1),
+      }
+    }
     if (items.length >= 2) {
-      return { title: items[0], checklistItems: items.slice(1) }
+      return { title: 'Lista', checklistItems: items }
     }
     return { title: 'Lista', checklistItems: items.length ? items : [cleaned] }
   }
@@ -547,7 +547,7 @@ export function parseVoiceCreateCommand(
   const inferred = inferTitleAndContent(remainder, fields, kind)
   let title = inferred.title?.trim()
   let content = inferred.content?.trim()
-  const checklistItems =
+  let checklistItems =
     kind === 'checklist'
       ? inferred.checklistItems ??
         (fields.listItemsText ? splitListItems(fields.listItemsText) : undefined) ??
@@ -590,8 +590,23 @@ export function parseVoiceCreateCommand(
   const eventLabel =
     kind === 'event' ? normalizeEventLabel(fields.category) : undefined
 
-  if (kind === 'checklist' && checklistItems?.length && !content) {
-    content = checklistItems.join('\n')
+  if (kind === 'checklist') {
+    const items = splitListItems(
+      checklistItems?.join('\n') ?? content ?? title ?? text,
+    )
+    if (items.length >= 2) {
+      content = items.join('\n')
+      checklistItems = items
+      if (
+        title.toLowerCase() === 'lista' &&
+        ['spesa', 'compere', 'elenco'].includes(items[0].toLowerCase())
+      ) {
+        title = items[0]
+      }
+    } else if (items.length > 0) {
+      content = items.join('\n')
+      checklistItems = items
+    }
   }
 
   return {
