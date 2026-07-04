@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { PAYMENT_METHODS } from '../constants/events'
 import { db, type Expense, type PaymentMethod } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
+import { useDictationField } from '../hooks/useDictationField'
 import { sentenceCase } from '../utils/format'
 import { resolveAreaId, areaNameById } from '../utils/areas'
 import { AreaInput } from './AreaInput'
+import { SpeechDictation } from './SpeechDictation'
 
 const inputClass =
   'w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
@@ -38,6 +40,7 @@ export function ExpenseForm({ expense, defaultAreaName, onSave, onClose }: Expen
   )
   const [areaName, setAreaName] = useState('')
   const [saving, setSaving] = useState(false)
+  const descriptionDictation = useDictationField(setDescription)
 
   const cards = useDexieLiveQuery(() => db.paymentCards.toArray())
   const areas = useDexieLiveQuery(() => db.areas.toArray())
@@ -122,9 +125,16 @@ export function ExpenseForm({ expense, defaultAreaName, onSave, onClose }: Expen
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">
-          Descrizione
-        </label>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <label className="text-sm font-medium text-slate-700">
+            Descrizione
+          </label>
+          <SpeechDictation
+            onTranscript={descriptionDictation.onTranscript}
+            onListeningChange={descriptionDictation.onListeningChange}
+            disabled={saving}
+          />
+        </div>
         <input
           type="text"
           value={description}

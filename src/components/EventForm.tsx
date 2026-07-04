@@ -7,12 +7,14 @@ import {
 import { iconColorClass } from '../constants/itemColors'
 import { db, type Event, type PaymentMethod, type RecurrenceFrequency } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
+import { useDictationField } from '../hooks/useDictationField'
 import { addToCalendar } from '../utils/calendar'
 import { sentenceCase } from '../utils/format'
 import { countdownLabel } from '../utils/countdown'
 import { CameraCapture } from './CameraCapture'
 import { EventIcon } from './EventIcon'
 import { VoiceRecorder } from './VoiceRecorder'
+import { SpeechDictation } from './SpeechDictation'
 import { syncExpensesForEvent } from '../utils/eventExpenses'
 import { syncTasksForEvent, type TodoInput } from '../utils/eventTasks'
 import { resolveAreaId, areaNameById } from '../utils/areas'
@@ -69,6 +71,7 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
   const [todos, setTodos] = useState<TodoInput[]>([])
   const [areaName, setAreaName] = useState('')
   const [saving, setSaving] = useState(false)
+  const writtenNoteDictation = useDictationField(setWrittenNote)
 
   const areas = useDexieLiveQuery(() => db.areas.toArray())
 
@@ -516,9 +519,16 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
 
       {/* Note scritte */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">
-          Note scritte
-        </label>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <label className="text-sm font-medium text-slate-700">
+            Note scritte
+          </label>
+          <SpeechDictation
+            onTranscript={writtenNoteDictation.onTranscript}
+            onListeningChange={writtenNoteDictation.onListeningChange}
+            disabled={saving}
+          />
+        </div>
         <textarea
           value={writtenNote}
           onChange={(e) => setWrittenNote(e.target.value)}
