@@ -43,7 +43,7 @@ import {
   shareExpensesSection,
   shareImpegnoRowsSection,
 } from '../utils/share'
-import { deadlineLabel, compareDeadlineIso, eventDeadlineIso, noteKeyDate, sortNotesByUrgency, buildHomeDeadlineLine, isDeadlineThisWeek, sortHomeDeadlineLines, type HomeDeadlineLine } from '../utils/homeSpotlight'
+import { deadlineLabel, compareDeadlineIso, eventDeadlineIso, noteKeyDate, sortNotesByUrgency, buildHomeDeadlineLine, buildHomeItemSummaryLine, isDeadlineThisWeek, noteSummaryLineTone, sortHomeDeadlineLines, type HomeDeadlineLine } from '../utils/homeSpotlight'
 import { sortExpensesByDeadline } from '../utils/homeFeed'
 import { isNoteChecklist } from '../utils/noteKind'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
@@ -466,20 +466,17 @@ export function HomeView({
     )
   }, [displayImpegni, areas])
 
-  const homeNoteDeadlineLines = useMemo(() => {
-    return buildWeekDeadlineLines(
-      homeTextNotes.flatMap((note) => {
-        const iso = noteKeyDate(note)
-        if (!iso) return []
-        return [
-          {
-            title: itemDisplayTitle(noteItemTitle(note), note.areaId, areas),
-            iso,
-          },
-        ]
-      }),
-    )
-  }, [homeTextNotes, areas])
+  const homeNoteSummaryLines = useMemo(() => {
+    return [...homeTextNotes]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((note) =>
+        buildHomeItemSummaryLine(
+          noteItemTitle(note),
+          note.updatedAt,
+          noteSummaryLineTone(note),
+        ),
+      )
+  }, [homeTextNotes])
 
   const homeNoteSubtitle = useMemo(() => {
     const parts = [
@@ -489,13 +486,8 @@ export function HomeView({
     if (withDeadline > 0) {
       parts.push(`${withDeadline} con scadenza`)
     }
-    if (homeTextNotes[0]) {
-      const { title, member } = areaHomeLabel(areas ?? [], homeTextNotes[0].areaId)
-      const areaLabel = member ? `${title} · ${member}` : title
-      if (areaLabel) parts.push(areaLabel)
-    }
     return parts.join(' · ')
-  }, [textNoteCount, homeTextNotes, areas])
+  }, [textNoteCount, homeTextNotes])
 
   const homeChecklistDeadlineLines = useMemo(() => {
     return buildWeekDeadlineLines(
@@ -862,7 +854,10 @@ export function HomeView({
           typeLabel="Nota"
           homeLayout
           subtitle={homeNoteSubtitle}
-          deadlineLines={homeNoteDeadlineLines}
+          summaryLines={homeNoteSummaryLines}
+          summaryOverflowLabel={(hidden) =>
+            `+${hidden} ${hidden === 1 ? 'altra nota' : 'altre note'}`
+          }
           icon={noteSectionIcon}
           containerClassName={
             noteSectionUrgent

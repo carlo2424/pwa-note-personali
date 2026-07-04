@@ -1,6 +1,6 @@
 import type { Event, Expense } from '../db'
 import { daysUntil, todayIso } from './countdown'
-import { formatAmount } from './format'
+import { formatAmount, sentenceCase } from './format'
 import { filterEventImpegni } from './impegno'
 import { expenseInCurrentMonth, isoInCurrentMonth } from './monthFilter'
 
@@ -62,6 +62,40 @@ export function computeMonthUpcomingExpenses(
   return upcomingFromExpenses(expenses).filter((u) =>
     isoInCurrentMonth(u.date),
   )
+}
+
+export interface MonthExpenseOverviewItem {
+  expense: Expense
+  occurred: boolean
+}
+
+/** Spese positive del mese corrente, ordinate per data. */
+export function listMonthPositiveExpenses(
+  expenses: Expense[],
+): MonthExpenseOverviewItem[] {
+  return expenses
+    .filter((e) => e.amount > 0 && expenseInCurrentMonth(e))
+    .sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        a.description.localeCompare(b.description, 'it-IT'),
+    )
+    .map((expense) => ({
+      expense,
+      occurred: expenseHasOccurred(expense),
+    }))
+}
+
+export function formatMonthExpenseOverviewLabel(
+  expense: Expense,
+  occurred: boolean,
+): string {
+  const desc = sentenceCase(expense.description)
+  const amount = formatAmount(expense.amount)
+  if (occurred) return `${desc} · ${amount}`
+  const days = daysUntil(expense.date)
+  const giorni = days === 1 ? 'giorno' : 'giorni'
+  return `${desc} · ${amount} fra ${days} ${giorni}`
 }
 
 /**

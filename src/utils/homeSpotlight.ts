@@ -1,4 +1,5 @@
 import type { Event, Note } from '../db'
+import { formatModifiedAt } from './format'
 import { countdownUrgency, daysUntil } from './countdown'
 
 export type HomeDeadlineTone = 'today' | 'overdue' | 'soon' | 'default'
@@ -65,6 +66,29 @@ export function sortHomeDeadlineLines(lines: HomeDeadlineLine[]): HomeDeadlineLi
       t === 'today' ? 0 : t === 'overdue' ? 1 : t === 'soon' ? 2 : 3
     return toneRank(a.tone) - toneRank(b.tone)
   })
+}
+
+export function noteSummaryLineTone(
+  note: Pick<Note, 'endDate' | 'startDate'>,
+): HomeDeadlineTone {
+  const iso = noteKeyDate(note)
+  if (!iso || !isDeadlineThisWeek(iso)) return 'default'
+  const days = daysUntil(iso)
+  if (days < 0) return 'overdue'
+  if (days === 0) return 'today'
+  return 'soon'
+}
+
+/** Riga riepilogo Home: titolo voce + ultima modifica */
+export function buildHomeItemSummaryLine(
+  title: string,
+  updatedAt: number,
+  tone: HomeDeadlineTone = 'default',
+): HomeDeadlineLine {
+  return {
+    label: `${title} · ${formatModifiedAt(updatedAt)}`,
+    tone,
+  }
 }
 
 export type DateUrgency = ReturnType<typeof countdownUrgency>

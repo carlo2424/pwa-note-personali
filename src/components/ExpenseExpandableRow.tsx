@@ -54,7 +54,8 @@ export function ExpenseExpandableRow({
   )
 
   const isIncome = expense.amount < 0
-  const isUpcoming = !isIncome && !expenseHasOccurred(expense)
+  const isOccurred = expenseHasOccurred(expense)
+  const isUpcoming = !isIncome && !isOccurred
   const upcomingDays = isUpcoming ? daysUntil(expense.date) : 0
   const method = (expense.paymentMethod ?? 'altro') as PaymentMethod
   const expenseDate = formatDate(new Date(expense.date).getTime())
@@ -130,6 +131,9 @@ export function ExpenseExpandableRow({
       icon={iconNode}
       title={title}
       subtitle={subtitle}
+      titleClassName={
+        isOccurred && !isIncome ? 'line-through text-slate-400' : undefined
+      }
       badge={
         isUpcoming ? (
           <span

@@ -4,7 +4,9 @@ import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import {
   currentMonthBounds,
   groupExpensesByMonth,
+  monthKeyFromIso,
 } from '../utils/monthFilter'
+import { todayIso } from '../utils/countdown'
 import { MonthExpenseSummary } from './MonthExpenseSummary'
 import { PaymentOverview } from './PaymentOverview'
 import { SearchBar } from './SearchBar'
@@ -18,6 +20,7 @@ export function ExpenseList({ onEdit, onOpenEvent }: ExpenseListProps) {
   const [search, setSearch] = useState('')
   const [methodFilter, setMethodFilter] = useState<PaymentMethod | null>(null)
   const { label: monthLabel } = currentMonthBounds()
+  const currentMonthKey = monthKeyFromIso(todayIso())
 
   const expenses = useDexieLiveQuery(
     () => db.expenses.orderBy('date').reverse().toArray(),
@@ -96,6 +99,7 @@ export function ExpenseList({ onEdit, onOpenEvent }: ExpenseListProps) {
                     areas={areas ?? []}
                     onEdit={onEdit}
                     onOpenEvent={onOpenEvent}
+                    defaultExpanded={group.key === currentMonthKey}
                   />
                 </li>
               ))}

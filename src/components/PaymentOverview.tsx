@@ -11,12 +11,11 @@ import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { formatAmount } from '../utils/format'
 import {
   computeMonthPaidTotal,
-  computeMonthUpcomingExpenses,
 } from '../utils/monthExpenseTotals'
 import {
   sumByPaymentMethod,
 } from '../utils/paymentTotals'
-import { UpcomingExpenseHints } from './UpcomingExpenseHints'
+import { MonthExpenseOverviewList } from './MonthExpenseOverviewList'
 import { CardManager } from './CardManager'
 
 const METHOD_ICON: Record<
@@ -55,10 +54,13 @@ export function PaymentOverview({
     [expenses],
   )
 
-  const monthUpcoming = useMemo(
-    () => computeMonthUpcomingExpenses(expenses ?? []),
-    [expenses],
-  )
+  const monthExpensesForList = useMemo(() => {
+    const list = expenses ?? []
+    if (!filterMethod) return list
+    return list.filter(
+      (e) => (e.paymentMethod ?? 'altro') === filterMethod,
+    )
+  }, [expenses, filterMethod])
 
   const showCards = filterMethod === null || filterMethod === 'carta'
 
@@ -73,12 +75,7 @@ export function PaymentOverview({
           Totale · {monthLabel}
         </p>
         <p className="text-2xl font-bold">{formatAmount(monthPaid)}</p>
-        {monthUpcoming.length > 0 && (
-          <UpcomingExpenseHints
-            items={monthUpcoming}
-            className="mt-2 [&_p]:text-rose-100"
-          />
-        )}
+        <MonthExpenseOverviewList expenses={monthExpensesForList} />
       </div>
 
       <div className="grid grid-cols-2 gap-2">
