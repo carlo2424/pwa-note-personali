@@ -835,8 +835,9 @@ export function HomeView({
           homeLayout
           subtitle={homeImpegniSubtitle}
           deadlineLines={homeImpegniDeadlineLines}
+          deadlineMaxLines={undefined}
           deadlineOverflowLabel={(hidden) =>
-            `+${hidden} ${hidden === 1 ? 'altra scadenza oggi' : 'altre scadenze oggi'}`
+            `+${hidden} ${hidden === 1 ? 'altra scadenza' : 'altre scadenze'}`
           }
           icon={impegnoSectionIcon}
           containerClassName={

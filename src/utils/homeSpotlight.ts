@@ -56,30 +56,35 @@ export function buildHomeDeadlineLine(
   return { label, tone, iso }
 }
 
-/** Card Home Impegni: prossima scadenza + righe per ogni scadenza di oggi. */
+/** Card Home Impegni: scadenze di oggi in rosso, le successive in grigio. */
 export function buildHomeImpegniCardLines(
   items: { title: string; iso: string }[],
 ): HomeDeadlineLine[] {
   const dated = [...items]
     .filter((item) => item.iso)
-    .sort((a, b) => compareDeadlineIso(a.iso, b.iso, a.title.localeCompare(b.title, 'it-IT')))
+    .sort((a, b) =>
+      compareDeadlineIso(a.iso, b.iso, a.title.localeCompare(b.title, 'it-IT')),
+    )
 
   const todayItems = dated.filter((item) => daysUntil(item.iso) === 0)
-  const upcoming = dated.filter((item) => daysUntil(item.iso) >= 0)
+  const futureItems = dated.filter((item) => daysUntil(item.iso) > 0)
 
   const lines: HomeDeadlineLine[] = []
 
-  const prossima = upcoming[0]
-  if (prossima) {
-    const base = buildHomeDeadlineLine(prossima.title, prossima.iso)
-    lines.push({
-      ...base,
-      label: `Prossima scadenza · ${base.label}`,
-    })
-  }
-
   for (const item of todayItems) {
     lines.push(buildHomeDeadlineLine(item.title, item.iso))
+  }
+
+  for (const item of futureItems) {
+    const line = buildHomeDeadlineLine(item.title, item.iso)
+    lines.push({ ...line, tone: 'default' })
+  }
+
+  if (lines.length === 0) {
+    const overdue = dated.filter((item) => daysUntil(item.iso) < 0)
+    for (const item of overdue) {
+      lines.push(buildHomeDeadlineLine(item.title, item.iso))
+    }
   }
 
   return lines

@@ -31,6 +31,8 @@ interface ExpandableCardProps {
   /** Righe scadenza settimana (home) */
   deadlineLines?: HomeDeadlineLine[]
   deadlineOverflowLabel?: (hidden: number) => string
+  /** Se omesso con deadlineLines, mostra tutte le righe (es. Impegni Home) */
+  deadlineMaxLines?: number
   /** Righe riepilogo voci (es. titolo + ultima modifica) */
   summaryLines?: HomeDeadlineLine[]
   summaryOverflowLabel?: (hidden: number) => string
@@ -61,6 +63,7 @@ export function ExpandableCard({
   extraLine,
   deadlineLines,
   deadlineOverflowLabel,
+  deadlineMaxLines = 5,
   summaryLines,
   summaryOverflowLabel,
   typeLabel,
@@ -176,7 +179,7 @@ export function ExpandableCard({
                   <HomeDeadlineLines
                     lines={deadlineLines}
                     compact={dense}
-                    maxLines={5}
+                    maxLines={deadlineMaxLines}
                     overflowLabel={deadlineOverflowLabel}
                   />
                 ) : null}
