@@ -1,0 +1,101 @@
+---
+description: Baseline UI e logica PWA Note Personali (agg. 4 lug 2026, commit bb791ff). Non alterare grafica non richiesta.
+alwaysApply: true
+---
+
+# PWA Note Personali — baseline UI & logica
+
+**Riferimento:** ultima revisione accettata `bb791ff` (4 lug 2026).  
+**Regola d’oro:** modifiche mirate solo al task. **Non** cambiare classi Tailwind, layout Home, card o colori se non esplicitamente richiesto.
+
+---
+
+## Colori per tipo (fonte unica: `src/constants/itemColors.ts`)
+
+| Tipo | Card Home / liste |
+|------|-------------------|
+| Nota testuale | `ITEM_TYPE_STYLE.note.card` — giallo ocra `#FEF5C1`, bordo amber |
+| Lista | `ITEM_TYPE_STYLE.checklist.card` — emerald |
+| Impegno | `ITEM_TYPE_STYLE.event.card` — violet |
+| Spesa | `ITEM_TYPE_STYLE.expense.card` — rose |
+
+Non introdurre palette parallele. Usare sempre `ITEM_TYPE_STYLE`.
+
+---
+
+## Home globale (`!areaFilterActive`)
+
+Ordine sezioni:
+1. `HomeSpotlightCards` — riepilogo spese mese (pulsante → tab Spese)
+2. `CollapsibleSection` **Impegni** (card unica espandibile)
+3. `CollapsibleSection` **Note**
+4. `CollapsibleSection` **Liste**
+5. Sezione **In ritardo** se presente
+
+**Non** mostrare feed piatto di singole voci per categoria. **Non** reintrodurre dock «Rinnovi in arrivo».
+
+### Card categoria chiuse (`homeLayout` + `CollapsibleSection`)
+
+- `typeLabel` sopra icona (Impegno / Nota / Lista / Spesa)
+- Riga 1: titolo sezione (`Impegni`, `Note`, `Liste`)
+- Riga 2: `subtitle` (conteggi, spese previste, ecc.)
+- Righe scadenze: `deadlineLines` via `HomeDeadlineLines` (max 5 + «+N altre scadenze»)
+- **Nessuna** azione header (edit/share) sulle card chiuse Home
+- Item espansi dentro la sezione: `NoteExpandableRow` / `EventExpandableRow` con `showTypeLabel` + `homeLayout`; azioni solo **dentro** il corpo espanso
+
+### Contorni card Home — NON cambiare senza richiesta esplicita
+
+| Sezione | Ring bordo card |
+|---------|-----------------|
+| Impegni | `ring-indigo-200` **solo** se `impegnoSectionUrgent` |
+| Note | `ring-orange-200` **solo** se `noteSectionUrgent` |
+| Liste | `ring-emerald-300` **solo** se `checklistSectionUrgent` |
+| Spese (`HomeSpotlightCards`) | **nessun** `ring-*` |
+
+**Vietato:** `ring-rose-*` sul bordo card per scadenze di oggi. Il rosso per «oggi» va **solo** nel testo riga scadenza (`deadlineToneClassName` → `text-rose-600`).
+
+### Righe scadenza settimana (`src/utils/homeSpotlight.ts`)
+
+- Intervallo: oggi → 7 giorni (`isDeadlineThisWeek`)
+- Formato: `{titolo} - oggi 4 luglio 2026` (mese lungo, `when` minuscolo)
+- Con area famiglia: `{member} {titolo}` es. `Lorenzo paghetta`
+- Colori testo: oggi/scaduto rosso, domani/tra N giorni amber, resto slate
+- Logica in `HomeView` → `buildWeekDeadlineLines`; render in `HomeDeadlineLines`
+
+---
+
+## Microfono Home (`VoiceCreateButton` in `App.tsx`)
+
+- Posizione: tra `</main>` e `<nav>`, centrato, solo su tab Home
+- Flusso: tap mic → parla → **tap di nuovo** sul mic rosso per salvare
+- Popup ascolto: **solo testo** «Inizia a parlare e descrivi cosa vuoi creare: …» — **senza** pulsante «Crea voce»
+- Sotto mic: «Detta e crea» / in ascolto «Tap per creare»
+- STT: accumulare solo segmenti `isFinal` da `event.resultIndex` (`appendSpeechSegment`); non concatenare tutti i results da 0
+
+### Parser vocale (`parseVoiceCreateCommand.ts`)
+
+- Tipo rilevato sulla frase **completa** prima di `stripCreateCommandPrefix`
+- Priorità: `detectKindFromCreatePhrase` («crea una lista/impegno/spesa/nota»)
+- Ordine campi libero; liste: `parseVoiceChecklistItems` (virgole, «e», parole separate)
+- Checklist in DB: `kind: 'checklist'`, contenuto righe `\n`, min 2 righe → `syncChecklistForNote`
+- Nota in DB: `kind: 'text'` (non `'note'`)
+
+---
+
+## Ordinamento e scadenze
+
+- Home impegni/note: `compareDeadlineIso` / `sortNotesByUrgency` — scadenza più vicina prima
+- Feed home (`homeFeed.ts`): note plain only, no spese nel feed piatto
+
+## PWA update
+
+- `version.json` remoto vs bundle; reload se diverso (`prepareAppUpdate`)
+
+---
+
+## Checklist prima di ogni PR / modifica UI
+
+1. Il task richiede davvero cambi grafici?
+2. Ho toccato `containerClassName`, `ring-*`, `ITEM_TYPE_STYLE` per errore?
+3. Le card Home rispettano tabella contorni sopra?
+4. Scadenze oggi: rosso solo nel testo, non nel bordo card?
