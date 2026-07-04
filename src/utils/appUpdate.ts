@@ -103,6 +103,34 @@ export async function forceAppUpdateAndReload(): Promise<void> {
   reloadWithCacheBust()
 }
 
+/** Se online c'è una build più recente del bundle installato, svuota cache e ricarica. */
+export async function applyRemoteUpdateIfNeeded(): Promise<boolean> {
+  if (!import.meta.env.PROD) return false
+
+  const remote = await fetchRemoteBuildId()
+  if (!remote || remote === appBuildId()) return false
+
+  localStorage.setItem(BUILD_KEY, remote)
+  await purgeAppShellCache()
+  reloadWithCacheBust()
+  return true
+}
+
+/** Controlla version.json quando l'app torna in primo piano (e ogni 5 min). */
+export function scheduleRemoteBuildChecks(): void {
+  if (!import.meta.env.PROD) return
+
+  const check = () => {
+    void applyRemoteUpdateIfNeeded()
+  }
+
+  check()
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check()
+  })
+  window.setInterval(check, 5 * 60 * 1000)
+}
+
 function scheduleServiceWorkerUpdateChecks(
   registration: ServiceWorkerRegistration,
 ): void {

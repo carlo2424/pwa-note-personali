@@ -17,6 +17,7 @@ import {
   applyAppUpdateReload,
   prepareAppUpdate,
   registerProductionServiceWorker,
+  scheduleRemoteBuildChecks,
 } from './utils/appUpdate'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
@@ -158,6 +159,7 @@ async function startApp(): Promise<void> {
   }
 
   registerProductionServiceWorker()
+  scheduleRemoteBuildChecks()
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>

@@ -51,6 +51,20 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Pubblica su GitHub Pages
+      - name: Pubblica su GitHub Pages (tentativo 1)
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Attendi prima del secondo tentativo
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 45
+
+      - name: Pubblica su GitHub Pages (tentativo 2)
+        if: steps.deployment.outcome == 'failure'
+        id: deployment_retry
+        uses: actions/deploy-pages@v4
+
+      - name: Verifica deploy riuscito
+        if: steps.deployment.outcome == 'failure' && steps.deployment_retry.outcome == 'failure'
+        run: exit 1
