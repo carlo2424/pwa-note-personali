@@ -8,6 +8,8 @@ interface HomeDeadlineLinesProps {
   compact?: boolean
   /** Se omesso, mostra tutte le righe */
   maxLines?: number
+  /** Scadenze non mostrate (es. date successive alla prossima) */
+  overflowCount?: number
   overflowLabel?: (hidden: number) => string
 }
 
@@ -15,12 +17,14 @@ export function HomeDeadlineLines({
   lines,
   compact = false,
   maxLines,
+  overflowCount,
   overflowLabel,
 }: HomeDeadlineLinesProps) {
   if (lines.length === 0) return null
 
   const visible = maxLines == null ? lines : lines.slice(0, maxLines)
-  const hidden = lines.length - visible.length
+  const hidden =
+    overflowCount ?? Math.max(0, lines.length - visible.length)
 
   return (
     <div className="space-y-0.5">

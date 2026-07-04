@@ -447,7 +447,7 @@ export function HomeView({
     return parts.join(' · ')
   }, [displayImpegni, impegnoCount, monthPlannedTotal])
 
-  const homeImpegniDeadlineLines = useMemo(() => {
+  const homeImpegniCardLines = useMemo(() => {
     return buildHomeImpegniCardLines(
       displayImpegni.flatMap((row) => {
         const iso = impegnoRowDeadline(row)
@@ -834,7 +834,8 @@ export function HomeView({
           typeLabel="Impegno"
           homeLayout
           subtitle={homeImpegniSubtitle}
-          deadlineLines={homeImpegniDeadlineLines}
+          deadlineLines={homeImpegniCardLines.lines}
+          deadlineOverflowCount={homeImpegniCardLines.hiddenCount}
           deadlineMaxLines={undefined}
           deadlineOverflowLabel={(hidden) =>
             `+${hidden} ${hidden === 1 ? 'altra scadenza' : 'altre scadenze'}`

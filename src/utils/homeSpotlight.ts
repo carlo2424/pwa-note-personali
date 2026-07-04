@@ -56,10 +56,15 @@ export function buildHomeDeadlineLine(
   return { label, tone, iso }
 }
 
-/** Card Home Impegni: scadenze di oggi in rosso, le successive in grigio. */
+/** Card Home Impegni: oggi in rosso, solo la data futura più vicina in grigio. */
+export interface HomeImpegniCardLinesResult {
+  lines: HomeDeadlineLine[]
+  hiddenCount: number
+}
+
 export function buildHomeImpegniCardLines(
   items: { title: string; iso: string }[],
-): HomeDeadlineLine[] {
+): HomeImpegniCardLinesResult {
   const dated = [...items]
     .filter((item) => item.iso)
     .sort((a, b) =>
@@ -75,7 +80,15 @@ export function buildHomeImpegniCardLines(
     lines.push(buildHomeDeadlineLine(item.title, item.iso))
   }
 
-  for (const item of futureItems) {
+  const nextDateIso = futureItems[0]?.iso
+  const nextDateItems = nextDateIso
+    ? futureItems.filter((item) => item.iso === nextDateIso)
+    : []
+  const laterItems = nextDateIso
+    ? futureItems.filter((item) => item.iso !== nextDateIso)
+    : []
+
+  for (const item of nextDateItems) {
     const line = buildHomeDeadlineLine(item.title, item.iso)
     lines.push({ ...line, tone: 'default' })
   }
@@ -85,9 +98,10 @@ export function buildHomeImpegniCardLines(
     for (const item of overdue) {
       lines.push(buildHomeDeadlineLine(item.title, item.iso))
     }
+    return { lines, hiddenCount: 0 }
   }
 
-  return lines
+  return { lines, hiddenCount: laterItems.length }
 }
 
 export function sortHomeDeadlineLines(lines: HomeDeadlineLine[]): HomeDeadlineLine[] {
