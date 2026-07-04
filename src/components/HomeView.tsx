@@ -845,9 +845,7 @@ export function HomeView({
           deadlineLines={homeImpegniDeadlineLines}
           icon={impegnoSectionIcon}
           containerClassName={
-            homeImpegniDeadlineLines.some((line) => line.tone === 'today')
-              ? `${ITEM_TYPE_STYLE.event.card} ring-1 ring-rose-300`
-              : impegnoSectionUrgent
+            impegnoSectionUrgent
               ? `${ITEM_TYPE_STYLE.event.card} ring-1 ring-indigo-200`
               : ITEM_TYPE_STYLE.event.card
           }
@@ -867,9 +865,7 @@ export function HomeView({
           deadlineLines={homeNoteDeadlineLines}
           icon={noteSectionIcon}
           containerClassName={
-            homeNoteDeadlineLines.some((line) => line.tone === 'today')
-              ? `${ITEM_TYPE_STYLE.note.cardSoon} ring-1 ring-rose-300`
-              : noteSectionUrgent
+            noteSectionUrgent
               ? `${ITEM_TYPE_STYLE.note.cardSoon} ring-1 ring-orange-200`
               : ITEM_TYPE_STYLE.note.card
           }
@@ -889,9 +885,7 @@ export function HomeView({
           deadlineLines={homeChecklistDeadlineLines}
           icon={checklistSectionIcon}
           containerClassName={
-            homeChecklistDeadlineLines.some((line) => line.tone === 'today')
-              ? `${ITEM_TYPE_STYLE.checklist.card} ring-1 ring-rose-300`
-              : checklistSectionUrgent
+            checklistSectionUrgent
               ? `${ITEM_TYPE_STYLE.checklist.card} ring-1 ring-emerald-300`
               : ITEM_TYPE_STYLE.checklist.card
           }
