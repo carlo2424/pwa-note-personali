@@ -61,7 +61,7 @@ function AreaChipButton({
     <button
       type="button"
       {...press}
-      className={`${chipBase} ${compact ? 'text-xs' : ''} ${
+      className={`${chipBase} ${compact ? 'text-[11px]' : ''} ${
         active
           ? 'bg-indigo-600 text-white shadow-sm'
           : inGroup
@@ -100,10 +100,10 @@ export function AreaChips({
   const [deleting, setDeleting] = useState(false)
 
   const chipBase =
-    'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition active:scale-[0.98]'
+    'inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition active:scale-[0.98]'
 
   const chipWrap =
-    '-mx-1 flex flex-wrap gap-2 px-1 pb-1'
+    '-mx-1 flex flex-wrap gap-1.5 px-1 pb-1'
 
   const { standalone, groups } = useMemo(
     () => buildAreaChipLayout(areas),
@@ -215,7 +215,7 @@ export function AreaChips({
     if (count <= 0) return null
     return (
       <span
-        className={`rounded-full px-1.5 py-px text-xs tabular-nums ${
+        className={`rounded-full px-1 py-px text-[10px] tabular-nums ${
           active
             ? 'bg-indigo-500/50 text-indigo-50'
             : 'bg-white/80 text-slate-500'
@@ -238,10 +238,10 @@ export function AreaChips({
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-indigo-50 hover:text-indigo-600"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-indigo-50 hover:text-indigo-600"
               aria-label="Nuova area"
             >
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
             </button>
           )}
         </div>
@@ -444,7 +444,7 @@ export function AreaChips({
               <span>{group.name}</span>
               {countBadge(group.memberCount, active)}
               <ChevronDown
-                className={`h-3.5 w-3.5 transition ${expanded ? 'rotate-180' : ''}`}
+                className={`h-3 w-3 transition ${expanded ? 'rotate-180' : ''}`}
               />
             </button>
           )
