@@ -59,8 +59,8 @@ const LABELED_FIELDS: { field: keyof ParsedFields; aliases: string[] }[] = [
   { field: 'category', aliases: ['categoria', 'cat', 'etichetta', 'label'] },
   { field: 'amountText', aliases: ['importo', 'spesa di', 'prezzo', 'pagato'] },
   { field: 'costText', aliases: ['costo', 'abbonamento di', 'canone'] },
-  { field: 'endDateText', aliases: ['scadenza', 'data fine', 'fine', 'entro il', 'entro', 'fino al', 'fino a', 'per il', 'per'] },
-  { field: 'startDateText', aliases: ['data inizio', 'inizio', 'partendo dal', 'partendo da', 'dal', 'da'] },
+  { field: 'endDateText', aliases: ['scadenza', 'data fine', 'entro il', 'entro', 'fino al', 'fino a', 'per il'] },
+  { field: 'startDateText', aliases: ['data inizio', 'inizio', 'partendo dal', 'partendo da'] },
   { field: 'renewalDateText', aliases: ['rinnovo', 'prossimo addebito', 'addebito', 'prossimo pagamento'] },
   { field: 'listItemsText', aliases: ['elementi', 'voci', 'punti'] },
 ]
@@ -326,6 +326,35 @@ function splitListItems(raw: string): string[] {
     .filter((p) => p.length > 0)
 }
 
+function stripCreateCommandPrefix(text: string): string {
+  const kindWords = KIND_RULES.flatMap((r) => r.words).join('|')
+  return text
+    .replace(
+      new RegExp(
+        `^(?:crea(?:re)?|aggiungi(?:ere)?|inserisci(?:ere)?|nuov[oa]|metti(?:ere)?|registra(?:re)?)\\s+(?:un[a]?|una|uno|un)?\\s*(?:${kindWords})\\s*[,;:]?\\s*`,
+        'i',
+      ),
+      '',
+    )
+    .trim()
+}
+
+function collapseRepeatedWords(text: string): string {
+  const words = text.split(/\s+/).filter(Boolean)
+  const out: string[] = []
+  for (const word of words) {
+    const prev = out[out.length - 1]
+    if (!prev || prev.toLowerCase() !== word.toLowerCase()) out.push(word)
+  }
+  return out.join(' ')
+}
+
+function makeNoteTitle(body: string): string {
+  const words = body.split(/\s+/).filter(Boolean)
+  if (words.length <= 6) return body
+  return words.slice(0, 6).join(' ')
+}
+
 function cleanRemainder(raw: string): string {
   let t = raw
   t = t.replace(/\b(\d+(?:[.,]\d{1,2})?)\s*(?:euro|€)\b/gi, ' ')
@@ -375,6 +404,13 @@ function inferTitleAndContent(
       title: cleaned,
       content: fields.content,
       checklistItems: fields.listItemsText ? splitListItems(fields.listItemsText) : undefined,
+    }
+  }
+
+  if (kind === 'note' && cleaned) {
+    return {
+      title: makeNoteTitle(cleaned),
+      content: cleaned,
     }
   }
 
@@ -441,7 +477,9 @@ function extractInlineDate(text: string): string | undefined {
 export function parseVoiceCreateCommand(
   rawTranscript: string,
 ): VoiceParseResult | VoiceParseFailure {
-  const text = normalizeTranscript(rawTranscript)
+  const text = collapseRepeatedWords(
+    stripCreateCommandPrefix(normalizeTranscript(rawTranscript)),
+  )
   if (text.length < 3) {
     return {
       ok: false,
@@ -475,8 +513,7 @@ export function parseVoiceCreateCommand(
       : undefined
 
   if (!title && content) {
-    title = content.length > 80 ? content.slice(0, 80) : content
-    if (kind === 'note') content = undefined
+    title = makeNoteTitle(content)
   }
 
   if (!title) {

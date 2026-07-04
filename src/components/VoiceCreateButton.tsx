@@ -19,6 +19,16 @@ function getSpeechRecognition(): SpeechRecognitionConstructor | undefined {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition
 }
 
+function appendSpeechSegment(base: string, segment: string): string {
+  const b = base.trim()
+  const s = segment.trim()
+  if (!s) return b
+  if (!b) return s
+  if (b.toLowerCase().endsWith(s.toLowerCase())) return b
+  if (s.toLowerCase().startsWith(b.toLowerCase())) return s
+  return `${b} ${s}`.replace(/\s+/g, ' ').trim()
+}
+
 export function VoiceCreateButton({
   onEditNote,
   onEditEvent,
@@ -35,6 +45,7 @@ export function VoiceCreateButton({
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const listeningRef = useRef(false)
+  const finalTranscriptRef = useRef('')
   const transcriptRef = useRef('')
 
   useEffect(() => {
@@ -61,6 +72,7 @@ export function VoiceCreateButton({
     if (!SpeechRecognitionCtor) return
 
     setTranscript('')
+    finalTranscriptRef.current = ''
     transcriptRef.current = ''
     setFeedback(null)
 
@@ -70,13 +82,23 @@ export function VoiceCreateButton({
     recognition.interimResults = true
 
     recognition.onresult = (event) => {
-      let chunk = ''
-      for (let i = 0; i < event.results.length; i++) {
-        chunk += event.results[i][0].transcript
+      let interim = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        const segment = result[0]?.transcript?.trim()
+        if (!segment) continue
+        if (result.isFinal) {
+          finalTranscriptRef.current = appendSpeechSegment(
+            finalTranscriptRef.current,
+            segment,
+          )
+        } else {
+          interim = appendSpeechSegment(interim, segment)
+        }
       }
-      const normalized = chunk.replace(/\s+/g, ' ').trim()
-      transcriptRef.current = normalized
-      setTranscript(normalized)
+      const display = appendSpeechSegment(finalTranscriptRef.current, interim)
+      transcriptRef.current = display
+      setTranscript(display)
     }
 
     recognition.onerror = (event) => {
@@ -112,7 +134,7 @@ export function VoiceCreateButton({
 
   async function finishAndCreate() {
     stopListening()
-    const text = transcriptRef.current.trim()
+    const text = finalTranscriptRef.current.trim() || transcriptRef.current.trim()
     if (!text) {
       setFeedback({
         message:
