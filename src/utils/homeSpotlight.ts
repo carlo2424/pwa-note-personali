@@ -1,6 +1,72 @@
 import type { Event, Note } from '../db'
 import { countdownUrgency, daysUntil } from './countdown'
 
+export type HomeDeadlineTone = 'today' | 'overdue' | 'soon' | 'default'
+
+export interface HomeDeadlineLine {
+  label: string
+  tone: HomeDeadlineTone
+  iso?: string
+}
+
+export function deadlineToneClassName(tone: HomeDeadlineTone): string {
+  if (tone === 'today' || tone === 'overdue') {
+    return 'font-semibold text-rose-600'
+  }
+  if (tone === 'soon') return 'font-medium text-amber-700'
+  return 'text-slate-500'
+}
+
+/** Scadenze da oggi fino a 7 giorni inclusi */
+export function isDeadlineThisWeek(iso: string): boolean {
+  const days = daysUntil(iso)
+  return days >= 0 && days <= 7
+}
+
+export function homeDeadlineWhenWord(iso: string): string {
+  const days = daysUntil(iso)
+  if (days < 0) return 'scaduto'
+  if (days === 0) return 'oggi'
+  if (days === 1) return 'domani'
+  if (days <= 7) return `tra ${days} giorni`
+  return ''
+}
+
+export function formatHomeDeadlineDate(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+export function buildHomeDeadlineLine(
+  title: string,
+  iso: string,
+): HomeDeadlineLine {
+  const days = daysUntil(iso)
+  const when = homeDeadlineWhenWord(iso)
+  const date = formatHomeDeadlineDate(iso)
+  const label = when ? `${title} - ${when} ${date}` : `${title} - ${date}`
+  let tone: HomeDeadlineTone = 'default'
+  if (days < 0) tone = 'overdue'
+  else if (days === 0) tone = 'today'
+  else if (days <= 7) tone = 'soon'
+  return { label, tone, iso }
+}
+
+export function sortHomeDeadlineLines(lines: HomeDeadlineLine[]): HomeDeadlineLine[] {
+  return [...lines].sort((a, b) => {
+    if (a.iso && b.iso) {
+      const byDate = a.iso.localeCompare(b.iso)
+      if (byDate !== 0) return byDate
+    }
+    const toneRank = (t: HomeDeadlineTone) =>
+      t === 'today' ? 0 : t === 'overdue' ? 1 : t === 'soon' ? 2 : 3
+    return toneRank(a.tone) - toneRank(b.tone)
+  })
+}
+
 export type DateUrgency = ReturnType<typeof countdownUrgency>
 
 /** Etichetta breve per scadenze imminenti (liste, impegni, note) */

@@ -1,6 +1,8 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { sentenceCase } from '../utils/format'
+import type { HomeDeadlineLine } from '../utils/homeSpotlight'
+import { HomeDeadlineLines } from './HomeDeadlineLines'
 
 interface ExpandableCardProps {
   icon: ReactNode
@@ -26,6 +28,8 @@ interface ExpandableCardProps {
   detailLine?: string
   /** Quarta riga opzionale — con homeLayout */
   extraLine?: string
+  /** Righe scadenza settimana (home) */
+  deadlineLines?: HomeDeadlineLine[]
   /** Es. Nota, Lista, Impegno, Spesa — mostrato sopra l'icona */
   typeLabel?: string
 }
@@ -51,6 +55,7 @@ export function ExpandableCard({
   homeLayout = false,
   detailLine,
   extraLine,
+  deadlineLines,
   typeLabel,
 }: ExpandableCardProps) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded)
@@ -152,6 +157,9 @@ export function ExpandableCard({
                   >
                     {extraLine}
                   </p>
+                ) : null}
+                {deadlineLines && deadlineLines.length > 0 ? (
+                  <HomeDeadlineLines lines={deadlineLines} compact={dense} />
                 ) : null}
               </div>
             ) : (

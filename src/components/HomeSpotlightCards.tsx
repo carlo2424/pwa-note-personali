@@ -1,26 +1,34 @@
 import { Wallet } from 'lucide-react'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
+import type { HomeDeadlineLine } from '../utils/homeSpotlight'
 import { formatAmount, sentenceCase } from '../utils/format'
+import { HomeDeadlineLines } from './HomeDeadlineLines'
 
 interface HomeSpotlightCardsProps {
   monthLabel: string
   monthPaid: number
   monthPlanned: number
+  deadlineLines?: HomeDeadlineLine[]
   onGoToExpenses: () => void
 }
 
-/** Riepilogo spese del mese — card compatta in Home (2 righe) */
+/** Riepilogo spese del mese — card compatta in Home */
 export function HomeSpotlightCards({
   monthLabel,
   monthPaid,
   monthPlanned,
+  deadlineLines = [],
   onGoToExpenses,
 }: HomeSpotlightCardsProps) {
+  const hasTodayDeadline = deadlineLines.some((line) => line.tone === 'today')
+
   return (
     <button
       type="button"
       onClick={onGoToExpenses}
-      className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left shadow-sm hover:border-rose-200 active:scale-[0.99] ${ITEM_TYPE_STYLE.expense.card}`}
+      className={`flex w-full items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left shadow-sm hover:border-rose-200 active:scale-[0.99] ${ITEM_TYPE_STYLE.expense.card}${
+        hasTodayDeadline ? ' ring-1 ring-rose-300' : ''
+      }`}
     >
       <div className="flex shrink-0 flex-col items-center gap-0.5">
         <span className="text-[8px] font-semibold uppercase leading-none tracking-wide text-slate-500">
@@ -48,6 +56,11 @@ export function HomeSpotlightCards({
             {sentenceCase(monthLabel)}
           </span>
         </p>
+        {deadlineLines.length > 0 && (
+          <div className="mt-1.5">
+            <HomeDeadlineLines lines={deadlineLines} compact maxLines={4} />
+          </div>
+        )}
       </div>
     </button>
   )

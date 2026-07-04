@@ -1,5 +1,6 @@
 import { Plus, Share2 } from 'lucide-react'
 import { type ReactNode } from 'react'
+import type { HomeDeadlineLine } from '../utils/homeSpotlight'
 import { formatAmount } from '../utils/format'
 import { ExpandableCard } from './ExpandableCard'
 
@@ -22,6 +23,7 @@ interface CollapsibleSectionProps {
   homeLayout?: boolean
   detailLine?: string
   extraLine?: string
+  deadlineLines?: HomeDeadlineLine[]
 }
 
 export function CollapsibleSection({
@@ -43,6 +45,7 @@ export function CollapsibleSection({
   homeLayout = false,
   detailLine,
   extraLine,
+  deadlineLines,
 }: CollapsibleSectionProps) {
   if (!alwaysShow && count === 0) return null
 
@@ -99,6 +102,7 @@ export function CollapsibleSection({
       homeLayout={homeLayout}
       detailLine={detailLine}
       extraLine={extraLine}
+      deadlineLines={deadlineLines}
       typeLabel={typeLabel}
       defaultExpanded={false}
       containerClassName={containerClassName}
