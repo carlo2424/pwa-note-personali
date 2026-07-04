@@ -15,18 +15,10 @@ interface VoiceCreateButtonProps {
   onEditExpense: (expense: Expense) => void
 }
 
+import { appendSpeechSegment } from '../utils/speechText'
+
 function getSpeechRecognition(): SpeechRecognitionConstructor | undefined {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition
-}
-
-function appendSpeechSegment(base: string, segment: string): string {
-  const b = base.trim()
-  const s = segment.trim()
-  if (!s) return b
-  if (!b) return s
-  if (b.toLowerCase().endsWith(s.toLowerCase())) return b
-  if (s.toLowerCase().startsWith(b.toLowerCase())) return s
-  return `${b} ${s}`.replace(/\s+/g, ' ').trim()
 }
 
 export function VoiceCreateButton({

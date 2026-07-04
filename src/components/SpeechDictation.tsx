@@ -1,8 +1,10 @@
 import { Mic, Square } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { appendSpeechSegment } from '../utils/speechText'
 
 interface SpeechDictationProps {
   onTranscript: (text: string) => void
+  onListeningChange?: (listening: boolean) => void
   disabled?: boolean
   variant?: 'default' | 'icon'
 }
@@ -14,6 +16,7 @@ function getSpeechRecognition(): SpeechRecognitionConstructor | undefined {
 /** Dettatura vocale → testo (Web Speech API) */
 export function SpeechDictation({
   onTranscript,
+  onListeningChange,
   disabled = false,
   variant = 'default',
 }: SpeechDictationProps) {
@@ -21,6 +24,8 @@ export function SpeechDictation({
   const supported = !!getSpeechRecognition()
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const listeningRef = useRef(false)
+  const finalTranscriptRef = useRef('')
+  const lastEmittedRef = useRef('')
 
   useEffect(() => {
     return () => {
@@ -33,11 +38,22 @@ export function SpeechDictation({
     listeningRef.current = false
     setListening(false)
     recognitionRef.current?.stop()
+    onListeningChange?.(false)
+  }
+
+  function emitMergedTranscript(merged: string) {
+    const text = merged.trim()
+    if (!text || text === lastEmittedRef.current) return
+    lastEmittedRef.current = text
+    onTranscript(text)
   }
 
   function start() {
     const SpeechRecognitionCtor = getSpeechRecognition()
     if (!SpeechRecognitionCtor) return
+
+    finalTranscriptRef.current = ''
+    lastEmittedRef.current = ''
 
     const recognition = new SpeechRecognitionCtor()
     recognition.lang = 'it-IT'
@@ -45,13 +61,17 @@ export function SpeechDictation({
     recognition.interimResults = false
 
     recognition.onresult = (event) => {
-      let chunk = ''
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          chunk += event.results[i][0].transcript
-        }
+        const result = event.results[i]
+        if (!result.isFinal) continue
+        const segment = result[0]?.transcript?.trim()
+        if (!segment) continue
+        finalTranscriptRef.current = appendSpeechSegment(
+          finalTranscriptRef.current,
+          segment,
+        )
       }
-      if (chunk.trim()) onTranscript(chunk.trim())
+      emitMergedTranscript(finalTranscriptRef.current)
     }
 
     recognition.onerror = (event) => {
@@ -76,6 +96,7 @@ export function SpeechDictation({
     recognitionRef.current = recognition
     listeningRef.current = true
     setListening(true)
+    onListeningChange?.(true)
 
     try {
       recognition.start()

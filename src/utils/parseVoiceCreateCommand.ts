@@ -446,9 +446,11 @@ function inferTitleAndContent(
   }
 
   if (kind === 'note' && cleaned) {
+    const title = makeNoteTitle(cleaned)
+    const sameText = title.toLowerCase() === cleaned.toLowerCase()
     return {
-      title: makeNoteTitle(cleaned),
-      content: cleaned,
+      title,
+      content: sameText ? undefined : cleaned,
     }
   }
 

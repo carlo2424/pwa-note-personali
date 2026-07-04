@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ListChecks, StickyNote } from 'lucide-react'
 import { db, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
@@ -14,6 +14,7 @@ import { AreaInput } from './AreaInput'
 import { CameraCapture } from './CameraCapture'
 import { EventIcon } from './EventIcon'
 import { IconColorPicker } from './IconColorPicker'
+import { mergeDictationIntoContent } from '../utils/speechText'
 import { SpeechDictation } from './SpeechDictation'
 
 const inputClass =
@@ -91,6 +92,7 @@ export function NoteForm({
   const [photoBlob, setPhotoBlob] = useState<Blob | undefined>(note?.photoBlob)
   const [areaName, setAreaName] = useState('')
   const [saving, setSaving] = useState(false)
+  const dictationPrefixRef = useRef('')
 
   const areas = useDexieLiveQuery(() => db.areas.toArray())
   const isChecklist = kind === 'checklist'
@@ -130,18 +132,25 @@ export function NoteForm({
     setEndDate(startDate ? clampEndDateToStart(startDate, date) : date)
   }
 
-  function appendContent(text: string) {
-    setContent((prev) =>
-      sentenceCase(
-        isChecklist
-          ? prev
-            ? `${prev.trimEnd()}\n${text}`
-            : text
-          : prev
-            ? `${prev.trimEnd()} ${text}`
-            : text,
-      ),
-    )
+  function handleDictationListening(listening: boolean) {
+    if (listening) {
+      setContent((prev) => {
+        dictationPrefixRef.current = prev.trim()
+        return prev
+      })
+    } else {
+      dictationPrefixRef.current = ''
+    }
+  }
+
+  function applyDictation(sessionText: string) {
+    const prefix = dictationPrefixRef.current
+    const merged = prefix
+      ? isChecklist
+        ? `${prefix}\n${sessionText.trim()}`
+        : mergeDictationIntoContent(prefix, sessionText, false)
+      : sessionText.trim()
+    setContent(sentenceCase(merged))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -276,7 +285,11 @@ export function NoteForm({
           <label className="text-sm font-medium text-slate-700">
             {isChecklist ? 'Voci' : 'Contenuto'}
           </label>
-          <SpeechDictation onTranscript={appendContent} disabled={saving} />
+          <SpeechDictation
+            onTranscript={applyDictation}
+            onListeningChange={handleDictationListening}
+            disabled={saving}
+          />
         </div>
         <textarea
           value={content}
