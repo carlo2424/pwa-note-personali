@@ -43,7 +43,7 @@ import {
   shareExpensesSection,
   shareImpegnoRowsSection,
 } from '../utils/share'
-import { deadlineLabel, compareDeadlineIso, eventDeadlineIso, noteKeyDate, sortNotesByUrgency, buildHomeDeadlineLine, buildHomeItemSummaryLine, isDeadlineThisWeek, noteSummaryLineTone, sortHomeDeadlineLines, type HomeDeadlineLine } from '../utils/homeSpotlight'
+import { deadlineLabel, compareDeadlineIso, eventDeadlineIso, noteKeyDate, sortNotesByUrgency, buildHomeDeadlineLine, buildHomeItemSummaryLine, buildImpegniHomeCardLines, isDeadlineThisWeek, noteSummaryLineTone, sortHomeDeadlineLines, type HomeDeadlineLine } from '../utils/homeSpotlight'
 import { sortExpensesByDeadline } from '../utils/homeFeed'
 import { isNoteChecklist } from '../utils/noteKind'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
@@ -447,8 +447,8 @@ export function HomeView({
     return parts.join(' · ')
   }, [displayImpegni, impegnoCount, monthPlannedTotal])
 
-  const homeImpegniDeadlineLines = useMemo(() => {
-    return buildWeekDeadlineLines(
+  const homeImpegniCardLines = useMemo(() => {
+    return buildImpegniHomeCardLines(
       displayImpegni.flatMap((row) => {
         const iso = impegnoRowDeadline(row)
         if (!iso) return []
@@ -834,7 +834,10 @@ export function HomeView({
           typeLabel="Impegno"
           homeLayout
           subtitle={homeImpegniSubtitle}
-          deadlineLines={homeImpegniDeadlineLines}
+          summaryLines={homeImpegniCardLines.todayLines}
+          deadlineLines={
+            homeImpegniCardLines.nextLine ? [homeImpegniCardLines.nextLine] : []
+          }
           icon={impegnoSectionIcon}
           containerClassName={
             impegnoSectionUrgent

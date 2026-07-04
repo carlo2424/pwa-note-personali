@@ -91,6 +91,38 @@ export function buildHomeItemSummaryLine(
   }
 }
 
+export interface ImpegniHomeCardLines {
+  todayLines: HomeDeadlineLine[]
+  nextLine: HomeDeadlineLine | null
+}
+
+/** Card Impegni chiusa: oggi (se presente) + prossima scadenza. */
+export function buildImpegniHomeCardLines(
+  items: { title: string; iso: string }[],
+): ImpegniHomeCardLines {
+  const allLines = items
+    .filter((item) => item.iso)
+    .map((item) => buildHomeDeadlineLine(item.title, item.iso))
+
+  if (allLines.length === 0) {
+    return { todayLines: [], nextLine: null }
+  }
+
+  const sorted = sortHomeDeadlineLines(allLines)
+  const todayLines = sorted.filter(
+    (line) => line.iso != null && daysUntil(line.iso) === 0,
+  )
+
+  if (todayLines.length === 0) {
+    return { todayLines: [], nextLine: sorted[0] ?? null }
+  }
+
+  const nextLine =
+    sorted.find((line) => line.iso != null && daysUntil(line.iso) > 0) ?? null
+
+  return { todayLines, nextLine }
+}
+
 export type DateUrgency = ReturnType<typeof countdownUrgency>
 
 /** Etichetta breve per scadenze imminenti (liste, impegni, note) */
