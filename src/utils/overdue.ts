@@ -10,9 +10,10 @@ export function tasksForNote(tasks: Task[], noteId?: number): Task[] {
 
 /** Nota-impegno scaduta e non completata (lista o periodo ancora aperto) */
 export function isOverdueNoteImpegno(
-  note: Pick<Note, 'id' | 'startDate' | 'endDate' | 'content'>,
+  note: Pick<Note, 'id' | 'startDate' | 'endDate' | 'content' | 'completedAt'>,
   linkedTasks: Pick<Task, 'done'>[],
 ): boolean {
+  if (note.completedAt) return false
   if (!isNoteImpegno(note) || !isPastDue(note.endDate)) return false
 
   const hasChecklist = isNoteChecklist(note) && linkedTasks.length > 0
@@ -26,8 +27,9 @@ export function isOverdueNoteImpegno(
 
 /** Impegno evento con fine o rinnovo passato */
 export function isOverdueEvent(
-  event: Pick<Event, 'startDate' | 'endDate' | 'renewalDate'>,
+  event: Pick<Event, 'startDate' | 'endDate' | 'renewalDate' | 'completedAt'>,
 ): boolean {
+  if (event.completedAt) return false
   if (event.endDate && isPastDue(event.endDate)) return true
   if (event.renewalDate && isPastDue(event.renewalDate)) return true
   return false

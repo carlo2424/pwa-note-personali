@@ -14,6 +14,8 @@ export interface Note {
   photoBlob?: Blob
   startDate?: string
   endDate?: string
+  /** Impegno-nota segnato come completato */
+  completedAt?: number
   areaId?: number
   createdAt: number
   updatedAt: number
@@ -50,6 +52,8 @@ export interface Event {
   /** Giornaliera, settimanale, mensile, annuale */
   recurrenceFrequency?: RecurrenceFrequency
   renewalDate?: string
+  /** Impegno una tantum segnato come completato */
+  completedAt?: number
   color: string
   icon: string
   cost?: number
@@ -285,6 +289,18 @@ class PersonalNotesDB extends Dexie {
 
     // v14: gruppi aree (es. Famiglia → Lorenzo, Maria…)
     this.version(14).stores({
+      notes: '++id, title, createdAt, updatedAt, startDate, endDate, areaId, kind',
+      expenses: '++id, amount, category, date, createdAt, cardId, eventId, areaId',
+      archive: '++id, type, originalId, archivedAt',
+      events: '++id, title, startDate, renewalDate, createdAt, updatedAt, cardId, areaId',
+      tasks: '++id, done, createdAt, eventId, noteId, listId, dueDate',
+      taskLists: '++id, createdAt, dueDate',
+      paymentCards: '++id, name, expiry',
+      areas: '++id, name, createdAt, groupName',
+    })
+
+    // v15: completamento impegni (Fatto)
+    this.version(15).stores({
       notes: '++id, title, createdAt, updatedAt, startDate, endDate, areaId, kind',
       expenses: '++id, amount, category, date, createdAt, cardId, eventId, areaId',
       archive: '++id, type, originalId, archivedAt',

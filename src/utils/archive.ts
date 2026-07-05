@@ -20,6 +20,7 @@ export function serializeEvent(event: Event, linkedTasks: Task[] = []): string {
     durationDays: event.durationDays,
     recurrenceFrequency: event.recurrenceFrequency,
     renewalDate: event.renewalDate,
+    completedAt: event.completedAt,
     color: event.color,
     icon: event.icon,
     cost: event.cost,

@@ -1,5 +1,12 @@
 export type CalendarMarkerType = 'event' | 'note' | 'task' | 'expense'
 
+export type CalendarDayItem = {
+  type: CalendarMarkerType
+  id?: number
+  title: string
+  subtitle?: string
+}
+
 export const CALENDAR_MARKER_STYLE: Record<
   CalendarMarkerType,
   { dot: string; label: string }
@@ -9,6 +16,8 @@ export const CALENDAR_MARKER_STYLE: Record<
   task: { dot: 'bg-emerald-500', label: 'Attività' },
   expense: { dot: 'bg-rose-500', label: 'Spese' },
 }
+
+const TYPE_ORDER: CalendarMarkerType[] = ['event', 'note', 'task', 'expense']
 
 export function localIsoFromDate(d: Date): string {
   const y = d.getFullYear()
@@ -26,46 +35,59 @@ function addDay(
   map.get(iso)!.add(type)
 }
 
-function addRange(
-  map: Map<string, Set<CalendarMarkerType>>,
-  startIso: string,
-  endIso: string | undefined,
-  type: CalendarMarkerType,
-) {
-  const start = new Date(startIso + 'T00:00:00')
-  const end = new Date((endIso ?? startIso) + 'T00:00:00')
-  if (end < start) return
+function eventMarkerIso(event: {
+  startDate: string
+  endDate?: string
+  renewalDate?: string
+}): string | undefined {
+  return event.renewalDate ?? event.endDate ?? event.startDate
+}
 
-  const cursor = new Date(start)
-  while (cursor <= end) {
-    addDay(map, localIsoFromDate(cursor), type)
-    cursor.setDate(cursor.getDate() + 1)
-  }
+function noteMarkerIso(note: { startDate?: string; endDate?: string }): string | undefined {
+  return note.endDate ?? note.startDate
 }
 
 type MarkerInput = {
   events?: {
+    id?: number
+    title: string
     startDate: string
     endDate?: string
     renewalDate?: string
   }[]
-  notes?: { startDate?: string; endDate?: string }[]
-  tasks?: { dueDate?: string; listId?: number; done: boolean }[]
-  taskLists?: { id?: number; dueDate?: string }[]
-  expenses?: { date: string }[]
+  notes?: {
+    id?: number
+    title: string
+    startDate?: string
+    endDate?: string
+  }[]
+  tasks?: {
+    id?: number
+    title: string
+    dueDate?: string
+    listId?: number
+    done: boolean
+  }[]
+  taskLists?: { id?: number; title?: string; dueDate?: string }[]
+  expenses?: {
+    id?: number
+    description: string
+    date: string
+    amount: number
+  }[]
 }
 
 export function buildCalendarMarkers(input: MarkerInput): Map<string, CalendarMarkerType[]> {
   const map = new Map<string, Set<CalendarMarkerType>>()
 
   for (const event of input.events ?? []) {
-    addRange(map, event.startDate, event.endDate, 'event')
-    if (event.renewalDate) addDay(map, event.renewalDate, 'event')
+    const iso = eventMarkerIso(event)
+    if (iso) addDay(map, iso, 'event')
   }
 
   for (const note of input.notes ?? []) {
-    if (note.startDate) addRange(map, note.startDate, note.endDate, 'note')
-    else if (note.endDate) addDay(map, note.endDate, 'note')
+    const iso = noteMarkerIso(note)
+    if (iso) addDay(map, iso, 'note')
   }
 
   const listDueById = new Map<number, string>()
@@ -88,6 +110,90 @@ export function buildCalendarMarkers(input: MarkerInput): Map<string, CalendarMa
     result.set(iso, [...types])
   }
   return result
+}
+
+export function formatCalendarDayTitle(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('it-IT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+function compareDayItems(a: CalendarDayItem, b: CalendarDayItem): number {
+  const typeDiff =
+    TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type)
+  if (typeDiff !== 0) return typeDiff
+  return a.title.localeCompare(b.title, 'it-IT')
+}
+
+/** Voci visibili nel calendario per un giorno (ISO locale). */
+export function getCalendarDayItems(
+  iso: string,
+  input: MarkerInput,
+): CalendarDayItem[] {
+  const items: CalendarDayItem[] = []
+
+  for (const event of input.events ?? []) {
+    const eventIso = eventMarkerIso(event)
+    if (eventIso !== iso) continue
+    items.push({
+      type: 'event',
+      id: event.id,
+      title: event.title,
+      subtitle: event.renewalDate ? 'Rinnovo' : undefined,
+    })
+  }
+
+  for (const note of input.notes ?? []) {
+    const noteIso = noteMarkerIso(note)
+    if (noteIso !== iso) continue
+    items.push({
+      type: 'note',
+      id: note.id,
+      title: note.title,
+    })
+  }
+
+  const listDueById = new Map<number, string>()
+  const listTitleById = new Map<number, string>()
+  for (const list of input.taskLists ?? []) {
+    if (list.id && list.dueDate) listDueById.set(list.id, list.dueDate)
+    if (list.id && list.title) listTitleById.set(list.id, list.title)
+  }
+
+  for (const task of input.tasks ?? []) {
+    if (task.done) continue
+    const due =
+      task.dueDate ??
+      (task.listId ? listDueById.get(task.listId) : undefined)
+    if (due !== iso) continue
+    items.push({
+      type: 'task',
+      id: task.id,
+      title: task.title,
+      subtitle: task.listId
+        ? listTitleById.get(task.listId)
+        : undefined,
+    })
+  }
+
+  for (const expense of input.expenses ?? []) {
+    if (!expense.date || expense.date.slice(0, 10) !== iso) continue
+    items.push({
+      type: 'expense',
+      id: expense.id,
+      title: expense.description,
+      subtitle:
+        expense.amount < 0
+          ? `+${Math.abs(expense.amount).toFixed(2).replace('.', ',')} €`
+          : `−${expense.amount.toFixed(2).replace('.', ',')} €`,
+    })
+  }
+
+  return items.sort(compareDayItems)
 }
 
 export function getMonthGrid(year: number, month: number) {

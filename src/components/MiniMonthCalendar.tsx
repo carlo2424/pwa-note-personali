@@ -1,12 +1,16 @@
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
+import { sentenceCase } from '../utils/format'
 import {
   buildCalendarMarkers,
   CALENDAR_MARKER_STYLE,
+  formatCalendarDayTitle,
+  getCalendarDayItems,
   getMonthGrid,
   localIsoFromDate,
+  type CalendarDayItem,
   type CalendarMarkerType,
 } from '../utils/calendarMarkers'
 
@@ -26,9 +30,30 @@ function DayDots({ types }: { types: CalendarMarkerType[] }) {
   )
 }
 
+function DayItemRow({ item }: { item: CalendarDayItem }) {
+  const style = CALENDAR_MARKER_STYLE[item.type]
+  return (
+    <li className="flex items-start gap-2 rounded-lg bg-slate-50 px-2 py-1.5">
+      <span
+        className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`}
+        aria-hidden
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[11px] font-medium text-slate-800">
+          {sentenceCase(item.title)}
+        </p>
+        <p className="truncate text-[10px] text-slate-500">
+          {item.subtitle ?? style.label}
+        </p>
+      </div>
+    </li>
+  )
+}
+
 /** Vista mensile read-only con pallini colorati per eventi, note, attività e spese */
 export function MiniMonthCalendar({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false)
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [view, setView] = useState(() => {
     const now = new Date()
     return { year: now.getFullYear(), month: now.getMonth() }
@@ -53,6 +78,22 @@ export function MiniMonthCalendar({ compact = false }: { compact?: boolean }) {
     [events, notes, tasks, taskLists, expenses],
   )
 
+  const calendarInput = useMemo(
+    () => ({
+      events: events ?? [],
+      notes: notes ?? [],
+      tasks: tasks ?? [],
+      taskLists: taskLists ?? [],
+      expenses: expenses ?? [],
+    }),
+    [events, notes, tasks, taskLists, expenses],
+  )
+
+  const selectedDayItems = useMemo(() => {
+    if (!selectedDay) return []
+    return getCalendarDayItems(selectedDay, calendarInput)
+  }, [selectedDay, calendarInput])
+
   const todayIso = localIsoFromDate(new Date())
   const cells = getMonthGrid(view.year, view.month)
   const monthLabel = new Date(view.year, view.month, 1).toLocaleDateString(
@@ -70,6 +111,7 @@ export function MiniMonthCalendar({ compact = false }: { compact?: boolean }) {
   }, [open])
 
   function prevMonth() {
+    setSelectedDay(null)
     setView((v) => {
       const d = new Date(v.year, v.month - 1, 1)
       return { year: d.getFullYear(), month: d.getMonth() }
@@ -77,11 +119,22 @@ export function MiniMonthCalendar({ compact = false }: { compact?: boolean }) {
   }
 
   function nextMonth() {
+    setSelectedDay(null)
     setView((v) => {
       const d = new Date(v.year, v.month + 1, 1)
       return { year: d.getFullYear(), month: d.getMonth() }
     })
   }
+
+  function goToToday() {
+    const now = new Date()
+    setSelectedDay(localIsoFromDate(now))
+    setView({ year: now.getFullYear(), month: now.getMonth() })
+  }
+
+  const now = new Date()
+  const isCurrentMonth =
+    view.year === now.getFullYear() && view.month === now.getMonth()
 
   return (
     <div ref={rootRef} className="relative">
@@ -112,9 +165,20 @@ export function MiniMonthCalendar({ compact = false }: { compact?: boolean }) {
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <p className="truncate text-sm font-semibold capitalize text-slate-800">
-              {monthLabel}
-            </p>
+            <div className="min-w-0 flex-1 text-center">
+              <p className="truncate text-sm font-semibold capitalize text-slate-800">
+                {monthLabel}
+              </p>
+              {!isCurrentMonth && (
+                <button
+                  type="button"
+                  onClick={goToToday}
+                  className="mt-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800"
+                >
+                  Oggi
+                </button>
+              )}
+            </div>
             <button
               type="button"
               onClick={nextMonth}
@@ -141,25 +205,65 @@ export function MiniMonthCalendar({ compact = false }: { compact?: boolean }) {
 
               const types = markers.get(cell.iso) ?? []
               const isToday = cell.iso === todayIso
+              const isSelected = cell.iso === selectedDay
 
               return (
-                <div
+                <button
                   key={cell.iso}
-                  className={`flex h-8 flex-col items-center justify-center rounded-lg ${
-                    isToday ? 'bg-indigo-50 ring-1 ring-indigo-200' : ''
-                  } ${types.length > 0 ? 'font-semibold text-slate-800' : 'text-slate-500'}`}
-                  title={
-                    types.length > 0
-                      ? types.map((t) => CALENDAR_MARKER_STYLE[t].label).join(', ')
-                      : undefined
+                  type="button"
+                  onClick={() =>
+                    setSelectedDay((prev) =>
+                      prev === cell.iso ? null : cell.iso,
+                    )
                   }
+                  className={`flex h-8 flex-col items-center justify-center rounded-lg transition ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white ring-1 ring-indigo-600'
+                      : isToday
+                        ? 'bg-indigo-50 ring-1 ring-indigo-200'
+                        : 'hover:bg-slate-50'
+                  } ${types.length > 0 && !isSelected ? 'font-semibold text-slate-800' : isSelected ? 'font-semibold' : 'text-slate-500'}`}
+                  aria-label={`${cell.day} ${types.length > 0 ? `${types.length} voci` : 'nessuna voce'}`}
+                  aria-pressed={isSelected}
                 >
                   <span className="text-[11px] leading-none">{cell.day}</span>
-                  <DayDots types={types} />
-                </div>
+                  <DayDots types={isSelected ? [] : types} />
+                </button>
               )
             })}
           </div>
+
+          {selectedDay && (
+            <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50/80 p-2">
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <p className="text-[11px] font-semibold capitalize leading-snug text-slate-800">
+                  {formatCalendarDayTitle(selectedDay)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDay(null)}
+                  className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-white hover:text-slate-600"
+                  aria-label="Chiudi dettaglio giorno"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {selectedDayItems.length === 0 ? (
+                <p className="text-[10px] text-slate-400">
+                  Nessuna voce per questo giorno.
+                </p>
+              ) : (
+                <ul className="max-h-36 space-y-1 overflow-y-auto">
+                  {selectedDayItems.map((item) => (
+                    <DayItemRow
+                      key={`${item.type}-${item.id ?? item.title}`}
+                      item={item}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-100 pt-2">
             {(Object.keys(CALENDAR_MARKER_STYLE) as CalendarMarkerType[]).map(

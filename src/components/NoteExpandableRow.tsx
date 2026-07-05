@@ -11,6 +11,10 @@ import { isNoteImpegno } from '../utils/impegno'
 import { isNoteChecklist } from '../utils/noteKind'
 import { resolveNoteIcon } from '../utils/noteIcon'
 import { archiveNote } from '../utils/noteArchive'
+import {
+  isNoteImpegnoMarkedDone,
+  toggleNoteImpegnoDone,
+} from '../utils/impegnoDone'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { shareNote } from '../utils/share'
 import {
@@ -19,6 +23,7 @@ import {
 } from '../utils/textSummary'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ExpandableCard } from './ExpandableCard'
+import { ImpegnoDoneToggle } from './ImpegnoDoneToggle'
 import { ItemIconCircle } from './ItemIconCircle'
 import { ItemActions } from './ItemActions'
 import { TaskRow } from './TaskRow'
@@ -72,7 +77,9 @@ export function NoteExpandableRow({
     !checklistNote && note.photoBlob
       ? URL.createObjectURL(note.photoBlob)
       : null
-  const overdue = isPastDue(note.endDate)
+  const overdue =
+    isPastDue(note.endDate) &&
+    !isNoteImpegnoMarkedDone(note, checklistTasks ?? [])
   const dateRange = formatDateRange(note.startDate, note.endDate)
 
   const doneCount = checklistTasks?.filter((t) => t.done).length ?? 0
@@ -219,8 +226,22 @@ export function NoteExpandableRow({
       : ITEM_TYPE_STYLE.note.card
   })()
 
+  const noteImpegno = isNoteImpegno(note)
+  const markedDone = isNoteImpegnoMarkedDone(note, checklistTasks ?? [])
+
   return (
     <>
+    <div className={`flex items-stretch gap-0.5 ${noteImpegno ? '' : 'contents'}`}>
+      {noteImpegno ? (
+        <ImpegnoDoneToggle
+          compact={compact}
+          done={markedDone}
+          onToggle={() =>
+            void toggleNoteImpegnoDone(note, checklistTasks ?? [])
+          }
+        />
+      ) : null}
+      <div className={noteImpegno ? 'min-w-0 flex-1' : 'contents'}>
     <ExpandableCard
       compact={compact}
       homeLayout={homeCard}
@@ -237,7 +258,9 @@ export function NoteExpandableRow({
       }
       title={primaryTitle}
       titleClassName={
-        overdue || dateUrg === 'expired'
+        markedDone && noteImpegno
+          ? 'text-slate-900'
+          : overdue || dateUrg === 'expired'
           ? 'text-rose-900'
           : soon
             ? 'text-amber-900'
@@ -254,6 +277,10 @@ export function NoteExpandableRow({
         ) : soon ? (
           <span className={`shrink-0 rounded-full bg-amber-500 font-bold text-white ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
             {soonLabel === 'Oggi' ? 'Oggi' : 'Presto'}
+          </span>
+        ) : markedDone && noteImpegno ? (
+          <span className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
+            Fatto
           </span>
         ) : hasChecklist && totalCount > 0 && doneCount === totalCount ? (
           <span className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
@@ -332,6 +359,8 @@ export function NoteExpandableRow({
         </div>
       )}
     </ExpandableCard>
+      </div>
+    </div>
 
     {showArchiveConfirm && (
       <ConfirmDialog
