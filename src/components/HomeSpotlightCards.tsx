@@ -7,6 +7,7 @@ import { HomeDeadlineLines } from './HomeDeadlineLines'
 interface HomeSpotlightCardsProps {
   monthLabel: string
   monthPaid: number
+  monthPaidCount: number
   monthPlanned: number
   deadlineLines?: HomeDeadlineLine[]
   onGoToExpenses: () => void
@@ -16,6 +17,7 @@ interface HomeSpotlightCardsProps {
 export function HomeSpotlightCards({
   monthLabel,
   monthPaid,
+  monthPaidCount,
   monthPlanned,
   deadlineLines = [],
   onGoToExpenses,
@@ -48,9 +50,13 @@ export function HomeSpotlightCards({
         </div>
         <p className="mt-0.5 text-base font-bold leading-tight text-rose-600">
           {formatAmount(monthPaid)}
-          <span className="ml-1.5 text-xs font-normal capitalize text-slate-400">
-            {sentenceCase(monthLabel)}
-          </span>
+        </p>
+        <p className="text-[10px] leading-snug text-slate-500">
+          Sostenuto fino a oggi
+          {monthPaidCount > 0
+            ? ` · ${monthPaidCount} ${monthPaidCount === 1 ? 'spesa' : 'spese'}`
+            : ''}
+          <span className="capitalize text-slate-400"> · {sentenceCase(monthLabel)}</span>
         </p>
         {deadlineLines.length > 0 && (
           <div className="mt-1.5">

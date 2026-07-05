@@ -95,10 +95,14 @@ export function ExpenseDetailBody({
         </div>
         {card && (
           <div className={`flex justify-between ${row}`}>
-            <span className="text-slate-500">Carta</span>
+            <span className="text-slate-500">
+              {method === 'bonifico' ? 'Banca' : 'Carta'}
+            </span>
             <span className="font-medium text-slate-800">
               {card.name}
-              {card.digitsEnd ? ` ····${card.digitsEnd}` : ''}
+              {method === 'carta' && card.digitsEnd
+                ? ` ····${card.digitsEnd}`
+                : ''}
             </span>
           </div>
         )}

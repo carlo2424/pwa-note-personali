@@ -2,6 +2,7 @@ import { db, type Event, type Note, type Task } from '../db'
 import { isPastDue } from './countdown'
 import { isNoteImpegno } from './impegno'
 import { isNoteChecklist } from './noteKind'
+import { isAutomatedPaymentMethod } from './paymentMethod'
 
 export function tasksForNote(tasks: Task[], noteId?: number): Task[] {
   if (!noteId) return []
@@ -27,8 +28,12 @@ export function isOverdueNoteImpegno(
 
 /** Impegno evento con fine o rinnovo passato */
 export function isOverdueEvent(
-  event: Pick<Event, 'startDate' | 'endDate' | 'renewalDate' | 'completedAt'>,
+  event: Pick<
+    Event,
+    'startDate' | 'endDate' | 'renewalDate' | 'completedAt' | 'paymentMethod'
+  >,
 ): boolean {
+  if (isAutomatedPaymentMethod(event.paymentMethod)) return false
   if (event.completedAt) return false
   if (event.endDate && isPastDue(event.endDate)) return true
   if (event.renewalDate && isPastDue(event.renewalDate)) return true

@@ -5,6 +5,7 @@ import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { useDictationField } from '../hooks/useDictationField'
 import { sentenceCase } from '../utils/format'
 import { resolveAreaId, areaNameById } from '../utils/areas'
+import { filterPaymentAccounts } from '../utils/paymentAccounts'
 import { AreaInput } from './AreaInput'
 import { SpeechDictation } from './SpeechDictation'
 
@@ -225,10 +226,33 @@ export function ExpenseForm({ expense, defaultAreaName, onSave, onClose }: Expen
             className={inputClass}
           >
             <option value="">— Seleziona carta —</option>
-            {cards?.map((c) => (
+            {filterPaymentAccounts(cards ?? [], 'carta').map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
+        </div>
+      )}
+
+      {paymentMethod === 'bonifico' && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Banca
+          </label>
+          <select
+            value={cardId}
+            onChange={(e) => setCardId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">— Seleziona banca —</option>
+            {filterPaymentAccounts(cards ?? [], 'bonifico').map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          {filterPaymentAccounts(cards ?? [], 'bonifico').length === 0 && (
+            <p className="mt-1 text-xs text-slate-400">
+              Aggiungi banche nella sezione Spese → Bonifico
+            </p>
+          )}
         </div>
       )}
 

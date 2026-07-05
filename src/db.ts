@@ -84,9 +84,13 @@ export interface Task {
   completedAt?: number
 }
 
+export type PaymentAccountKind = 'carta' | 'bonifico'
+
 export interface PaymentCard {
   id?: number
   name: string
+  /** Carta di credito o conto bonifico */
+  kind?: PaymentAccountKind
   digitsStart: string
   digitsEnd: string
   expiry: string
@@ -309,6 +313,24 @@ class PersonalNotesDB extends Dexie {
       taskLists: '++id, createdAt, dueDate',
       paymentCards: '++id, name, expiry',
       areas: '++id, name, createdAt, groupName',
+    })
+
+    // v16: carte vs banche bonifico
+    this.version(16).stores({
+      notes: '++id, title, createdAt, updatedAt, startDate, endDate, areaId, kind',
+      expenses: '++id, amount, category, date, createdAt, cardId, eventId, areaId',
+      archive: '++id, type, originalId, archivedAt',
+      events: '++id, title, startDate, renewalDate, createdAt, updatedAt, cardId, areaId',
+      tasks: '++id, done, createdAt, eventId, noteId, listId, dueDate',
+      taskLists: '++id, createdAt, dueDate',
+      paymentCards: '++id, name, kind, expiry',
+      areas: '++id, name, createdAt, groupName',
+    }).upgrade(async (tx) => {
+      const accounts = await tx.table('paymentCards').toArray()
+      for (const account of accounts) {
+        if (!account.id || account.kind) continue
+        await tx.table('paymentCards').update(account.id, { kind: 'carta' })
+      }
     })
   }
 }

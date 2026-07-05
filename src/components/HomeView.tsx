@@ -32,6 +32,7 @@ import {
 import {
   computeMonthPaidTotal,
   computeMonthPlannedTotal,
+  countMonthPaidExpenses,
   sumOccurredPositiveExpenses,
 } from '../utils/monthExpenseTotals'
 import {
@@ -371,7 +372,15 @@ export function HomeView({
   const noteCount = displayNotes.length
   const expenseCount = displayExpenses.length
 
-  const monthExpensesTotal = computeMonthPaidTotal(expenses ?? [])
+  const monthExpensesTotal = useMemo(
+    () => computeMonthPaidTotal(expenses ?? []),
+    [expenses],
+  )
+
+  const monthPaidExpenseCount = useMemo(
+    () => countMonthPaidExpenses(expenses ?? []),
+    [expenses],
+  )
 
   const monthPlannedTotal = useMemo(
     () => computeMonthPlannedTotal(events ?? []),
@@ -536,7 +545,9 @@ export function HomeView({
   const homeExpenseDeadlineLines = useMemo(() => {
     return buildWeekDeadlineLines(
       (expenses ?? [])
-        .filter((e) => e.amount > 0)
+        .filter(
+          (e) => e.amount > 0 && expenseInCurrentMonth(e),
+        )
         .map((e) => ({
           title: sentenceCase(e.description),
           iso: e.date,
@@ -819,6 +830,7 @@ export function HomeView({
           <HomeSpotlightCards
             monthLabel={monthLabel}
             monthPaid={monthExpensesTotal}
+            monthPaidCount={monthPaidExpenseCount}
             monthPlanned={monthPlannedTotal}
             deadlineLines={homeExpenseDeadlineLines}
             onGoToExpenses={onGoToExpenses}

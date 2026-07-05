@@ -18,6 +18,7 @@ import { SpeechDictation } from './SpeechDictation'
 import { syncExpensesForEvent } from '../utils/eventExpenses'
 import { syncTasksForEvent, type TodoInput } from '../utils/eventTasks'
 import { resolveAreaId, areaNameById } from '../utils/areas'
+import { filterPaymentAccounts } from '../utils/paymentAccounts'
 import { RECURRENCE_OPTIONS, deriveImpegnoPeriodFields, computeDurationFromRange, computeEndDateFromDuration, clampEndDateToStart } from '../utils/recurring'
 import { AreaInput } from './AreaInput'
 import { IconColorPicker } from './IconColorPicker'
@@ -642,13 +643,33 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
               className={inputClass}
             >
               <option value="">— Seleziona carta —</option>
-              {cards?.map((c) => (
+              {filterPaymentAccounts(cards ?? [], 'carta').map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            {cards?.length === 0 && (
+            {filterPaymentAccounts(cards ?? [], 'carta').length === 0 && (
               <p className="mt-1 text-xs text-slate-400">
                 Aggiungi carte nella sezione Spese
+              </p>
+            )}
+          </div>
+        )}
+        {paymentMethod === 'bonifico' && (
+          <div>
+            <label className="mb-1 block text-xs text-slate-600">Banca</label>
+            <select
+              value={cardId}
+              onChange={(e) => setCardId(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">— Seleziona banca —</option>
+              {filterPaymentAccounts(cards ?? [], 'bonifico').map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {filterPaymentAccounts(cards ?? [], 'bonifico').length === 0 && (
+              <p className="mt-1 text-xs text-slate-400">
+                Aggiungi banche in Spese → Bonifico
               </p>
             )}
           </div>

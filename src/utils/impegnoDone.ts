@@ -1,5 +1,9 @@
 import { db, type Event, type Note, type RecurrenceFrequency } from '../db'
+import { isPastDue } from './countdown'
 import { addRecurrence, parseIsoDate, toIsoDateLocal } from './impegnoDates'
+import { isAutomatedPaymentMethod, eventRequiresManualDone } from './paymentMethod'
+
+export { eventRequiresManualDone }
 
 export function isEventMarkedDone(
   event: Pick<Event, 'completedAt'>,
@@ -100,5 +104,50 @@ export async function toggleNoteImpegnoDone(
     await unmarkNoteImpegnoDone(note)
   } else {
     await markNoteImpegnoDone(note)
+  }
+}
+
+/** Avanza il rinnovo degli impegni ricorrenti carta/bonifico già addebitati. */
+export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
+  if (!event.id || !isAutomatedPaymentMethod(event.paymentMethod)) return
+
+  const now = Date.now()
+
+  if (
+    event.recurrenceFrequency &&
+    event.renewalDate &&
+    isPastDue(event.renewalDate)
+  ) {
+    const renewalDate = advanceRenewalAfterDone(
+      event.renewalDate,
+      event.recurrenceFrequency,
+    )
+    if (renewalDate !== event.renewalDate) {
+      await db.events.update(event.id, {
+        renewalDate,
+        completedAt: undefined,
+        updatedAt: now,
+      })
+    }
+    return
+  }
+
+  if (
+    !event.recurrenceFrequency &&
+    !event.completedAt &&
+    isPastDue(event.renewalDate ?? event.endDate)
+  ) {
+    await db.events.update(event.id, {
+      completedAt: now,
+      updatedAt: now,
+    })
+  }
+}
+
+export async function syncAllAutomatedEventRenewals(): Promise<void> {
+  const events = await db.events.toArray()
+  for (const event of events) {
+    if (!event.startDate || !event.endDate) continue
+    await syncAutomatedEventRenewal(event)
   }
 }

@@ -45,14 +45,31 @@ export function upcomingFromExpenses(
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+function expenseAmount(expense: Pick<Expense, 'amount'>): number {
+  const amount = Number(expense.amount)
+  return Number.isFinite(amount) ? amount : 0
+}
+
 /** Spese già avvenute nel mese corrente (data ≤ oggi, importi positivi). */
 export function computeMonthPaidTotal(expenses: Expense[]): number {
   const today = todayIso()
-  return expenses
-    .filter(
-      (e) => e.amount > 0 && expenseInCurrentMonth(e) && e.date <= today,
-    )
-    .reduce((s, e) => s + e.amount, 0)
+  return expenses.reduce((sum, expense) => {
+    const amount = expenseAmount(expense)
+    if (amount <= 0) return sum
+    if (!expenseInCurrentMonth(expense) || expense.date > today) return sum
+    return sum + amount
+  }, 0)
+}
+
+/** Numero di spese positive del mese già sostenute (data ≤ oggi). */
+export function countMonthPaidExpenses(expenses: Expense[]): number {
+  const today = todayIso()
+  return expenses.filter(
+    (e) =>
+      expenseAmount(e) > 0 &&
+      expenseInCurrentMonth(e) &&
+      e.date <= today,
+  ).length
 }
 
 /** Spese previste nel mese ma con data futura (non ancora avvenute). */

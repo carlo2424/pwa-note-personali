@@ -12,10 +12,12 @@ import { formatAmount } from '../utils/format'
 import {
   computeMonthPaidTotal,
 } from '../utils/monthExpenseTotals'
+import { expenseInCurrentMonth } from '../utils/monthFilter'
 import {
   sumByPaymentMethod,
 } from '../utils/paymentTotals'
 import { MonthExpenseOverviewList } from './MonthExpenseOverviewList'
+import { BankManager } from './BankManager'
 import { CardManager } from './CardManager'
 
 const METHOD_ICON: Record<
@@ -40,6 +42,7 @@ export function PaymentOverview({
   onFilterMethod,
 }: PaymentOverviewProps) {
   const [showCardForm, setShowCardForm] = useState(false)
+  const [showBankForm, setShowBankForm] = useState(false)
 
   const expenses = useDexieLiveQuery(() => db.expenses.toArray())
   const events = useDexieLiveQuery(() => db.events.toArray())
@@ -55,14 +58,18 @@ export function PaymentOverview({
   )
 
   const monthExpensesForList = useMemo(() => {
-    const list = expenses ?? []
-    if (!filterMethod) return list
-    return list.filter(
-      (e) => (e.paymentMethod ?? 'altro') === filterMethod,
-    )
+    let list = (expenses ?? []).filter(expenseInCurrentMonth)
+    if (filterMethod) {
+      list = list.filter(
+        (e) => (e.paymentMethod ?? 'altro') === filterMethod,
+      )
+    }
+    return list
   }, [expenses, filterMethod])
 
-  const showCards = filterMethod === null || filterMethod === 'carta'
+  const showCardManager =
+    filterMethod === null || filterMethod === 'carta'
+  const showBankManager = filterMethod === 'bonifico'
 
   if (expenses === undefined || events === undefined) {
     return null
@@ -113,7 +120,7 @@ export function PaymentOverview({
         })}
       </div>
 
-      {showCards && (
+      {showCardManager && (
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Carte salvate
@@ -122,6 +129,19 @@ export function PaymentOverview({
             monthOnly
             showForm={showCardForm}
             onShowFormChange={setShowCardForm}
+          />
+        </div>
+      )}
+
+      {showBankManager && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Banche salvate
+          </p>
+          <BankManager
+            monthOnly
+            showForm={showBankForm}
+            onShowFormChange={setShowBankForm}
           />
         </div>
       )}

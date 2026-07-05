@@ -4,6 +4,7 @@ import { db, type PaymentCard } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { isCardExpired } from '../utils/countdown'
 import { formatAmount } from '../utils/format'
+import { filterPaymentAccounts } from '../utils/paymentAccounts'
 import { cardBreakdowns } from '../utils/paymentTotals'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { ExpandableCard } from './ExpandableCard'
@@ -44,7 +45,13 @@ export function CardManager({
   const events = useDexieLiveQuery(() => db.events.toArray())
 
   const cardRows = useMemo(
-    () => cardBreakdowns(cards ?? [], expenses ?? [], events ?? [], monthOnly),
+    () =>
+      cardBreakdowns(
+        filterPaymentAccounts(cards ?? [], 'carta'),
+        expenses ?? [],
+        events ?? [],
+        monthOnly,
+      ),
     [cards, expenses, events, monthOnly],
   )
 
@@ -77,9 +84,9 @@ export function CardManager({
       expiry: expiry.trim(),
     }
     if (editingId) {
-      await db.paymentCards.update(editingId, fields)
+      await db.paymentCards.update(editingId, { ...fields, kind: 'carta' })
     } else {
-      await db.paymentCards.add({ ...fields, createdAt: Date.now() })
+      await db.paymentCards.add({ ...fields, kind: 'carta', createdAt: Date.now() })
     }
     resetForm()
   }
@@ -96,7 +103,7 @@ export function CardManager({
 
   return (
     <div className="space-y-2">
-      {cards.length === 0 && !showForm ? (
+      {filterPaymentAccounts(cards ?? [], 'carta').length === 0 && !showForm ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-center">
           <CreditCard className="mx-auto mb-1.5 h-6 w-6 text-slate-300" />
           <p className="text-xs text-slate-500">Nessuna carta salvata</p>

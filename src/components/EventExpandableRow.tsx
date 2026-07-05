@@ -2,7 +2,7 @@ import type { Event } from '../db'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { countdownLabel, countdownUrgency } from '../utils/countdown'
 import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
-import { isEventMarkedDone, toggleEventDone } from '../utils/impegnoDone'
+import { isEventMarkedDone, toggleEventDone, eventRequiresManualDone } from '../utils/impegnoDone'
 import { recurrenceShort } from '../utils/recurring'
 import { summarizeText } from '../utils/textSummary'
 import { EventDetailBody } from './EventDetailBody'
@@ -57,6 +57,7 @@ export function EventExpandableRow({
   const homeCard = compact && showTypeLabel
   const isRecurring = !!(event.recurrenceFrequency && event.renewalDate)
   const markedDone = isEventMarkedDone(event)
+  const showDoneToggle = eventRequiresManualDone(event)
 
   let title = event.title
   let subtitle: string | undefined
@@ -95,14 +96,16 @@ export function EventExpandableRow({
   }
 
   return (
-    <div className="flex items-stretch gap-0.5">
-      <ImpegnoDoneToggle
-        compact={compact}
-        done={markedDone}
-        advanceOnly={isRecurring}
-        onToggle={() => void toggleEventDone(event)}
-      />
-      <div className="min-w-0 flex-1">
+    <div className={`flex items-stretch gap-0.5 ${showDoneToggle ? '' : 'contents'}`}>
+      {showDoneToggle ? (
+        <ImpegnoDoneToggle
+          compact={compact}
+          done={markedDone}
+          advanceOnly={isRecurring}
+          onToggle={() => void toggleEventDone(event)}
+        />
+      ) : null}
+      <div className={showDoneToggle ? 'min-w-0 flex-1' : 'contents'}>
     <ExpandableCard
       compact={compact}
       homeLayout={homeCard}

@@ -30,6 +30,7 @@ import { shouldShowBackupReminder } from './utils/backupReminder'
 import { NavBadge } from './components/NavBadge'
 import { useNavSectionCounts } from './hooks/useNavSectionCounts'
 import { useOverdueCounts } from './hooks/useOverdueCounts'
+import { useAutomatedEventSync } from './hooks/useAutomatedEventSync'
 import { type Event, type Expense, type Note } from './db'
 import type { NoteKind } from './utils/noteKind'
 import { resolveNoteKind } from './utils/noteKind'
@@ -102,6 +103,7 @@ function App() {
   const CurrentIcon = current.icon
   const overdueCounts = useOverdueCounts()
   const navCounts = useNavSectionCounts()
+  useAutomatedEventSync()
 
   function navBadgeCount(section: Section): number {
     return navCounts[section]
