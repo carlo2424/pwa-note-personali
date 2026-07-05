@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { PAYMENT_METHODS } from '../constants/events'
 import { db, type Expense, type PaymentMethod } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
@@ -39,20 +39,23 @@ export function ExpenseForm({ expense, defaultAreaName, onSave, onClose }: Expen
   const [cardId, setCardId] = useState(
     expense?.cardId ? String(expense.cardId) : '',
   )
-  const [areaName, setAreaName] = useState('')
-  const [saving, setSaving] = useState(false)
-  const descriptionDictation = useDictationField(setDescription)
-
   const cards = useDexieLiveQuery(() => db.paymentCards.toArray())
   const areas = useDexieLiveQuery(() => db.areas.toArray())
 
-  useEffect(() => {
+  const areaSyncKey = `${expense?.id ?? 'new'}:${expense?.areaId ?? ''}:${defaultAreaName ?? ''}:${(areas ?? []).map((a) => a.id).join(',')}`
+  const [areaName, setAreaName] = useState('')
+  const [prevAreaSyncKey, setPrevAreaSyncKey] = useState(areaSyncKey)
+  if (areaSyncKey !== prevAreaSyncKey) {
+    setPrevAreaSyncKey(areaSyncKey)
     if (expense?.id) {
       setAreaName(areaNameById(areas ?? [], expense.areaId) ?? '')
-    } else if (defaultAreaName) {
-      setAreaName(defaultAreaName)
+    } else {
+      setAreaName(defaultAreaName ?? '')
     }
-  }, [expense?.id, expense?.areaId, areas, defaultAreaName])
+  }
+
+  const [saving, setSaving] = useState(false)
+  const descriptionDictation = useDictationField(setDescription)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

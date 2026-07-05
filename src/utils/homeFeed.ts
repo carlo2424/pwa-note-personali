@@ -36,11 +36,7 @@ function compareFeedItems(a: HomeFeedItem, b: HomeFeedItem): number {
   )
 }
 
-export function buildHomeFeedItems(
-  notes: Note[],
-  _events: Event[],
-  _expenses: Expense[],
-): HomeFeedItem[] {
+export function buildHomeFeedItems(notes: Note[]): HomeFeedItem[] {
   const items: HomeFeedItem[] = []
 
   for (const note of filterPlainNotes(notes)) {
@@ -50,11 +46,7 @@ export function buildHomeFeedItems(
   return items.filter(itemInHomeMonth).sort(compareFeedItems)
 }
 
-export function isHomeFeedQuiet(
-  notes: Note[],
-  _events: Event[],
-  _expenses: Expense[],
-): boolean {
+export function isHomeFeedQuiet(notes: Note[]): boolean {
   const items: HomeFeedItem[] = []
   for (const note of filterPlainNotes(notes)) {
     if (noteInHomeMonth(note)) items.push({ kind: 'note', item: note, activityAt: note.updatedAt })

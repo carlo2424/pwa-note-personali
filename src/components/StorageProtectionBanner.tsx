@@ -5,8 +5,10 @@ import {
   ensurePersistentStorage,
   getStorageStatus,
 } from '../utils/storagePersistence'
-
-const DISMISS_KEY = 'pwa-storage-banner-dismissed'
+import {
+  clearStorageProtectionBannerDismiss,
+  dismissStorageProtectionBanner,
+} from '../utils/storageProtectionBanner'
 
 interface StorageProtectionBannerProps {
   onOpenSettings: () => void
@@ -24,7 +26,7 @@ export function StorageProtectionBanner({
     try {
       const granted = await ensurePersistentStorage()
       if (granted) {
-        sessionStorage.removeItem(DISMISS_KEY)
+        clearStorageProtectionBannerDismiss()
         onDismiss()
       } else {
         const info = buildStorageProtectionInfo(await getStorageStatus())
@@ -36,7 +38,7 @@ export function StorageProtectionBanner({
   }
 
   function handleDismiss() {
-    sessionStorage.setItem(DISMISS_KEY, String(Date.now()))
+    dismissStorageProtectionBanner()
     onDismiss()
   }
 
@@ -95,8 +97,4 @@ export function StorageProtectionBanner({
       </div>
     </div>
   )
-}
-
-export function isStorageProtectionBannerDismissed(): boolean {
-  return sessionStorage.getItem(DISMISS_KEY) != null
 }

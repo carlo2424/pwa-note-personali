@@ -26,10 +26,8 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { VoiceCreateButton } from './components/VoiceCreateButton'
 import { BackupReminderBanner } from './components/BackupReminderBanner'
 import { DataLossBanner } from './components/DataLossBanner'
-import {
-  isStorageProtectionBannerDismissed,
-  StorageProtectionBanner,
-} from './components/StorageProtectionBanner'
+import { StorageProtectionBanner } from './components/StorageProtectionBanner'
+import { isStorageProtectionBannerDismissed } from './utils/storageProtectionBanner'
 import { hasBackupableData } from './utils/backup'
 import { shouldShowBackupReminder } from './utils/backupReminder'
 import {
@@ -58,6 +56,11 @@ const ALL_SECTIONS: Section[] = [
 
 function isSection(value: string): value is Section {
   return ALL_SECTIONS.includes(value as Section)
+}
+
+function readSectionFromHash(): Section {
+  const hash = window.location.hash.replace('#', '')
+  return isSection(hash) ? hash : 'home'
 }
 
 const sections: Record<
@@ -97,7 +100,7 @@ const sections: Record<
 }
 
 function App() {
-  const [activeSection, setActiveSection] = useState<Section>('home')
+  const [activeSection, setActiveSection] = useState<Section>(readSectionFromHash)
   const [showEventForm, setShowEventForm] = useState(false)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [showNoteForm, setShowNoteForm] = useState(false)
@@ -309,9 +312,7 @@ function App() {
   }
 
   useEffect(() => {
-    const hash = window.location.hash.replace('#', '')
-    const initial = isSection(hash) ? hash : 'home'
-    setActiveSection(initial)
+    const initial = readSectionFromHash()
     window.history.replaceState(
       { section: initial },
       '',

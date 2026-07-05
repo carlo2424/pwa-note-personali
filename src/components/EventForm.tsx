@@ -69,59 +69,81 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
   )
   const [photoBlob, setPhotoBlob] = useState<Blob | undefined>(event?.photoBlob)
   const [voiceBlob, setVoiceBlob] = useState<Blob | undefined>(event?.voiceBlob)
-  const [todos, setTodos] = useState<TodoInput[]>([])
-  const [areaName, setAreaName] = useState('')
   const [saving, setSaving] = useState(false)
   const writtenNoteDictation = useDictationField(setWrittenNote)
-
   const areas = useDexieLiveQuery(() => db.areas.toArray())
 
-  useEffect(() => {
+  const areaSyncKey = `${event?.id ?? 'new'}:${event?.areaId ?? ''}:${defaultAreaName ?? ''}:${(areas ?? []).map((a) => a.id).join(',')}`
+  const [areaName, setAreaName] = useState('')
+  const [prevAreaSyncKey, setPrevAreaSyncKey] = useState(areaSyncKey)
+  if (areaSyncKey !== prevAreaSyncKey) {
+    setPrevAreaSyncKey(areaSyncKey)
     if (event?.id) {
       setAreaName(areaNameById(areas ?? [], event.areaId) ?? '')
-    } else if (defaultAreaName) {
-      setAreaName(defaultAreaName)
+    } else {
+      setAreaName(defaultAreaName ?? '')
     }
-  }, [event?.id, event?.areaId, areas, defaultAreaName])
+  }
+
+  const todoEventId = event?.id
+  const [loadedTodoEventId, setLoadedTodoEventId] = useState<number | undefined>(
+    todoEventId,
+  )
+  const [todos, setTodos] = useState<TodoInput[]>([])
+  if (todoEventId !== loadedTodoEventId) {
+    setLoadedTodoEventId(todoEventId)
+    setTodos([])
+  }
 
   useEffect(() => {
-    if (!event?.id) {
-      setTodos([])
-      return
-    }
+    if (!todoEventId) return
+    let cancelled = false
     db.tasks
       .where('eventId')
-      .equals(event.id)
+      .equals(todoEventId)
       .toArray()
-      .then((tasks) =>
+      .then((tasks) => {
+        if (cancelled) return
         setTodos(
           tasks.map((t) => ({
             id: t.id,
             title: t.title,
             done: t.done,
           })),
-        ),
-      )
-  }, [event?.id])
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [todoEventId])
 
-  useEffect(() => {
+  const autoPeriodKey = [
+    event?.id ?? 'new',
+    event?.startDate ?? today,
+    event?.recurrenceFrequency ?? '',
+    event?.renewalDate ?? '',
+    event?.endDate ?? '',
+    event?.durationDays ?? '',
+    durationDays,
+  ].join('|')
+  const [prevAutoPeriodKey, setPrevAutoPeriodKey] = useState('')
+  if (autoPeriodKey !== prevAutoPeriodKey) {
+    setPrevAutoPeriodKey(autoPeriodKey)
     const start = event?.startDate ?? today
     const freq = event?.recurrenceFrequency
-    if (!freq || !start) return
-
-    if (!event?.renewalDate) {
+    if (freq && start && !event?.renewalDate) {
       const patch = deriveImpegnoPeriodFields(start, freq, durationDays, {
-        renewal: false,
-        end: !!event?.endDate,
-        duration: !!event?.durationDays,
+        renewal: renewalManual,
+        end: endManual,
+        duration: durationManual,
       })
       if (patch.renewalDate) setRenewalDate(patch.renewalDate)
       if (patch.endDate && !event?.endDate) setEndDate(patch.endDate)
       if (patch.durationDays && !event?.durationDays) {
-        setDurationDays(patch.durationDays)
+        setDurationDays(String(patch.durationDays))
       }
     }
-  }, [event?.id, event?.startDate, event?.recurrenceFrequency, event?.renewalDate, event?.endDate, event?.durationDays, today, durationDays])
+  }
 
   function periodManual() {
     return {

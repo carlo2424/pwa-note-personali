@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { ListChecks, StickyNote } from 'lucide-react'
 import { db, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
@@ -90,27 +90,30 @@ export function NoteForm({
     note?.icon ?? defaultNoteIcon(note ? resolveNoteKind(note) : defaultKind),
   )
   const [photoBlob, setPhotoBlob] = useState<Blob | undefined>(note?.photoBlob)
-  const [areaName, setAreaName] = useState('')
-  const [saving, setSaving] = useState(false)
   const dictationPrefixRef = useRef('')
-
   const areas = useDexieLiveQuery(() => db.areas.toArray())
   const isChecklist = kind === 'checklist'
 
-  useEffect(() => {
+  const noteSyncKey = note?.id
+    ? `edit:${note.id}:${note.areaId}:${note.kind}:${note.icon}:${note.color}:${note.content ?? ''}:${(areas ?? []).map((a) => a.id).join(',')}`
+    : `new:${defaultKind}:${defaultAreaName ?? ''}:${(areas ?? []).map((a) => a.id).join(',')}`
+  const [prevNoteSyncKey, setPrevNoteSyncKey] = useState(noteSyncKey)
+  const [areaName, setAreaName] = useState('')
+  if (noteSyncKey !== prevNoteSyncKey) {
+    setPrevNoteSyncKey(noteSyncKey)
     if (note?.id) {
-      setKind(resolveNoteKind(note))
-      setIcon(note.icon ?? defaultNoteIcon(resolveNoteKind(note)))
+      const resolvedKind = resolveNoteKind(note)
+      setKind(resolvedKind)
+      setIcon(note.icon ?? defaultNoteIcon(resolvedKind))
       setColor(note.color ?? 'indigo')
       setAreaName(areaNameById(areas ?? [], note.areaId) ?? '')
-    } else if (defaultAreaName) {
-      setAreaName(defaultAreaName)
+    } else {
+      setKind(defaultKind)
+      setAreaName(defaultAreaName ?? '')
     }
-  }, [note?.id, note?.areaId, note?.kind, note?.content, areas, defaultAreaName])
+  }
 
-  useEffect(() => {
-    if (!note?.id) setKind(defaultKind)
-  }, [defaultKind, note?.id])
+  const [saving, setSaving] = useState(false)
 
   function handleStartDateChange(date: string) {
     setStartDate(date)

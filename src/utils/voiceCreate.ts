@@ -43,7 +43,7 @@ export async function createFromVoiceCommand(
   if (cmd.kind === 'note' || cmd.kind === 'checklist') {
     const kind = cmd.kind === 'note' ? 'text' : 'checklist'
     let noteTitle = title
-    let content =
+    const content =
       kind === 'checklist'
         ? buildChecklistContent(
             cmd.checklistItems?.join('\n') ?? cmd.content ?? cmd.title,

@@ -49,7 +49,8 @@ import { sortExpensesByDeadline } from '../utils/homeFeed'
 import { isNoteChecklist } from '../utils/noteKind'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { AreaChips } from './AreaChips'
-import { CollapsibleSection, sectionIcon } from './CollapsibleSection'
+import { CollapsibleSection } from './CollapsibleSection'
+import { sectionIcon } from './sectionIcon'
 import { EventExpandableRow } from './EventExpandableRow'
 import { ExpenseExpandableRow } from './ExpenseExpandableRow'
 import { HomeSpotlightCards } from './HomeSpotlightCards'
@@ -206,7 +207,7 @@ export function HomeView({
   const areas = useDexieLiveQuery(() => db.areas.orderBy('name').toArray())
   const tasks = useDexieLiveQuery(() => db.tasks.toArray())
 
-  const areaList = areas ?? []
+  const areaList = useMemo(() => areas ?? [], [areas])
   const areaFilterActive = isAreaFilterActive(areaSelection)
 
   const overdueRows = useMemo((): ImpegnoRow[] => {
