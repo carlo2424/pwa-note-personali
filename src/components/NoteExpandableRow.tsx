@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Note } from '../db'
 import { db } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
-import { archiveConfirmCopy } from '../utils/confirmMessages'
+import { archiveConfirmCopy, markImpegnoDoneConfirmCopy } from '../utils/confirmMessages'
 import { isPastDue } from '../utils/countdown'
 import { deadlineLabel, noteDateUrgency } from '../utils/homeSpotlight'
 import { toggleTask, parseTaskLines } from '../utils/eventTasks'
@@ -13,6 +13,7 @@ import { resolveNoteIcon } from '../utils/noteIcon'
 import { archiveNote } from '../utils/noteArchive'
 import {
   isNoteImpegnoMarkedDone,
+  markNoteImpegnoDone,
   toggleNoteImpegnoDone,
 } from '../utils/impegnoDone'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
@@ -51,6 +52,7 @@ export function NoteExpandableRow({
   showTypeLabel = false,
 }: NoteExpandableRowProps) {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
+  const [showDoneConfirm, setShowDoneConfirm] = useState(false)
   const archiveKind = isNoteImpegno(note) ? 'impegno' : 'nota'
   const archiveCopy = archiveConfirmCopy(archiveKind, note.title)
   const checklistNote = isNoteChecklist(note)
@@ -228,6 +230,19 @@ export function NoteExpandableRow({
 
   const noteImpegno = isNoteImpegno(note)
   const markedDone = isNoteImpegnoMarkedDone(note, checklistTasks ?? [])
+  const doneConfirmCopy = markImpegnoDoneConfirmCopy(note.title)
+
+  function handleDoneToggle() {
+    if (markedDone) {
+      void toggleNoteImpegnoDone(note, checklistTasks ?? [])
+      return
+    }
+    setShowDoneConfirm(true)
+  }
+
+  function handleConfirmDone() {
+    void markNoteImpegnoDone(note)
+  }
 
   return (
     <>
@@ -242,9 +257,7 @@ export function NoteExpandableRow({
           <ImpegnoDoneToggle
             compact={compact}
             done={markedDone}
-            onToggle={() =>
-              void toggleNoteImpegnoDone(note, checklistTasks ?? [])
-            }
+            onToggle={handleDoneToggle}
           />
         ) : undefined
       }
@@ -359,6 +372,16 @@ export function NoteExpandableRow({
         </div>
       )}
     </ExpandableCard>
+
+    {showDoneConfirm && (
+      <ConfirmDialog
+        title={doneConfirmCopy.title}
+        message={doneConfirmCopy.message}
+        confirmLabel={doneConfirmCopy.confirmLabel}
+        onConfirm={handleConfirmDone}
+        onClose={() => setShowDoneConfirm(false)}
+      />
+    )}
 
     {showArchiveConfirm && (
       <ConfirmDialog

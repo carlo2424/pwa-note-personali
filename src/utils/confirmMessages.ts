@@ -17,6 +17,25 @@ export function archiveConfirmCopy(kind: ItemKind, title: string) {
   }
 }
 
+export function markImpegnoDoneConfirmCopy(
+  title: string,
+  options?: { recurring?: boolean },
+) {
+  const name = sentenceCase(title)
+  if (options?.recurring) {
+    return {
+      title: 'Convalidare il periodo?',
+      message: `"${name}": confermando segni il periodo come completato, aggiorni la prossima scadenza e la voce esce da «In ritardo». Se hai cliccato per errore, annulla ora.`,
+      confirmLabel: 'Convalida',
+    }
+  }
+  return {
+    title: 'Segnare come fatto?',
+    message: `"${name}" verrà segnato come completato e non comparirà più tra gli impegni in ritardo. Puoi deselezionare la spunta in seguito se era un errore.`,
+    confirmLabel: 'Segna fatto',
+  }
+}
+
 export function deletePermanentlyConfirmCopy(title: string) {
   const name = sentenceCase(title)
   return {

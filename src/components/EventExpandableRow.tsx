@@ -1,10 +1,19 @@
+import { useState } from 'react'
 import type { Event } from '../db'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { countdownLabel, countdownUrgency } from '../utils/countdown'
 import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
-import { isEventMarkedDone, toggleEventDone, eventRequiresManualDone, isRecurringPeriodReadyForDone } from '../utils/impegnoDone'
+import { markImpegnoDoneConfirmCopy } from '../utils/confirmMessages'
+import {
+  eventRequiresManualDone,
+  isEventMarkedDone,
+  isRecurringPeriodReadyForDone,
+  markEventDone,
+  toggleEventDone,
+} from '../utils/impegnoDone'
 import { recurrenceShort } from '../utils/recurring'
 import { summarizeText } from '../utils/textSummary'
+import { ConfirmDialog } from './ConfirmDialog'
 import { EventDetailBody } from './EventDetailBody'
 import { ImpegnoDoneToggle } from './ImpegnoDoneToggle'
 import { ItemIconCircle } from './ItemIconCircle'
@@ -45,6 +54,7 @@ export function EventExpandableRow({
   compact = false,
   showTypeLabel = false,
 }: EventExpandableRowProps) {
+  const [showDoneConfirm, setShowDoneConfirm] = useState(false)
   const freqShort = recurrenceShort(event.recurrenceFrequency)
   const meta = `${freqShort ? `${freqShort} · ` : ''}${formatIsoDate(event.startDate)}${event.endDate ? ` → ${formatIsoDate(event.endDate)}` : ''}${event.labels.length > 0 ? ` · ${event.labels[0]}` : ''}${todoCount > 0 ? ` · ${todoCount} da fare` : ''}`
   const descriptionExcerpt = summarizeText(event.writtenNote)
@@ -59,11 +69,27 @@ export function EventExpandableRow({
   const showDoneToggle = eventRequiresManualDone(event)
   const checkDisabled =
     !!event.recurrenceFrequency && !isRecurringPeriodReadyForDone(event)
-  const invalidEarlyDone =
+  const invalidStoredDone =
     showDoneToggle &&
     event.completedAt != null &&
     !!event.recurrenceFrequency &&
-    checkDisabled
+    !isRecurringPeriodReadyForDone(event)
+  const doneConfirmCopy = markImpegnoDoneConfirmCopy(event.title, {
+    recurring: !!event.recurrenceFrequency,
+  })
+
+  function handleDoneToggle() {
+    if (markedDone || invalidStoredDone) {
+      void toggleEventDone(event)
+      return
+    }
+    if (checkDisabled) return
+    setShowDoneConfirm(true)
+  }
+
+  function handleConfirmDone() {
+    void markEventDone(event)
+  }
 
   let title = event.title
   let subtitle: string | undefined
@@ -102,6 +128,7 @@ export function EventExpandableRow({
   }
 
   return (
+    <>
     <ExpandableCard
       compact={compact}
       homeLayout={homeCard}
@@ -113,9 +140,9 @@ export function EventExpandableRow({
           <ImpegnoDoneToggle
             compact={compact}
             done={markedDone}
+            storedDone={invalidStoredDone}
             checkDisabled={checkDisabled}
-            clearInvalid={invalidEarlyDone}
-            onToggle={() => void toggleEventDone(event)}
+            onToggle={handleDoneToggle}
           />
         ) : undefined
       }
@@ -168,5 +195,16 @@ export function EventExpandableRow({
         compact={compact}
       />
     </ExpandableCard>
+
+    {showDoneConfirm && (
+      <ConfirmDialog
+        title={doneConfirmCopy.title}
+        message={doneConfirmCopy.message}
+        confirmLabel={doneConfirmCopy.confirmLabel}
+        onConfirm={handleConfirmDone}
+        onClose={() => setShowDoneConfirm(false)}
+      />
+    )}
+    </>
   )
 }

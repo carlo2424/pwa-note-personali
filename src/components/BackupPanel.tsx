@@ -1,10 +1,16 @@
-import { useRef, useState } from 'react'
-import { Download, HardDriveDownload, Loader2, Upload } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Download, HardDriveDownload, Loader2, Link2, Upload } from 'lucide-react'
 import {
   BACKUP_MIME,
-  downloadBackup,
+  getLinkedBackupFileName,
+  hasRollingLocalBackup,
   importBackupFile,
+  linkBackupExportFile,
+  restoreRollingLocalBackup,
+  saveBackup,
   summarizeBackup,
+  supportsBackupFilePicker,
+  unlinkBackupExportFile,
 } from '../utils/backup'
 import {
   formatLastBackupLabel,
@@ -18,25 +24,101 @@ interface BackupPanelProps {
   onBackupDone?: () => void
 }
 
+function formatSaveStatus(result: Awaited<ReturnType<typeof saveBackup>>): string {
+  const parts: string[] = []
+  if (result.localCopyReplaced) {
+    parts.push('copia interna sostituita')
+  }
+  if (result.linkedFileReplaced && result.linkedFileName) {
+    parts.push(`file «${result.linkedFileName}» aggiornato`)
+  } else if (result.downloaded) {
+    parts.push('file scaricato con nome fisso (sostituisci quello vecchio se ne restano due)')
+  }
+  if (parts.length === 0) {
+    return 'Backup esportato.'
+  }
+  return `Backup aggiornato: ${parts.join(' · ')}.`
+}
+
 export function BackupPanel({ onBackupDone }: BackupPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [loading, setLoading] = useState<'export' | 'import' | null>(null)
+  const [loading, setLoading] = useState<'export' | 'import' | 'local' | null>(
+    null,
+  )
   const [lastBackup, setLastBackup] = useState(getLastBackupAt())
   const [reminderEnabled, setReminderEnabled] = useState(isBackupReminderEnabled())
+  const [replacePrevious, setReplacePrevious] = useState(true)
+  const [linkedFileName, setLinkedFileName] = useState<string | null>(null)
+  const [hasLocalCopy, setHasLocalCopy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      setLinkedFileName(await getLinkedBackupFileName())
+      setHasLocalCopy(await hasRollingLocalBackup())
+    })()
+  }, [])
+
+  async function refreshBackupMeta() {
+    setLinkedFileName(await getLinkedBackupFileName())
+    setHasLocalCopy(await hasRollingLocalBackup())
+  }
 
   async function handleExport() {
     setLoading('export')
     setStatus(null)
     try {
-      await downloadBackup()
+      const result = await saveBackup({ replacePrevious })
       markBackupCompleted()
       setLastBackup(getLastBackupAt())
-      setStatus('Backup esportato sul dispositivo.')
+      await refreshBackupMeta()
+      setStatus(formatSaveStatus(result))
       onBackupDone?.()
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : 'Esportazione non riuscita.'
+      alert(msg)
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  async function handleLinkFile() {
+    try {
+      await linkBackupExportFile()
+      await refreshBackupMeta()
+      setStatus('File collegato: i prossimi backup lo sostituiranno automaticamente.')
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      const msg =
+        err instanceof Error ? err.message : 'Impossibile collegare il file.'
+      alert(msg)
+    }
+  }
+
+  async function handleUnlinkFile() {
+    await unlinkBackupExportFile()
+    await refreshBackupMeta()
+    setStatus('File collegato scollegato.')
+  }
+
+  async function handleRestoreLocal() {
+    const ok = window.confirm(
+      'Ripristinare l’ultima copia locale sostituirà tutti i dati attuali.\n\nContinuare?',
+    )
+    if (!ok) return
+
+    setLoading('local')
+    setStatus(null)
+    try {
+      const payload = await restoreRollingLocalBackup()
+      markBackupCompleted()
+      setLastBackup(getLastBackupAt())
+      setStatus(`Copia locale ripristinata: ${summarizeBackup(payload)}.`)
+      onBackupDone?.()
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Ripristino locale non riuscito.'
       alert(msg)
     } finally {
       setLoading(null)
@@ -89,8 +171,8 @@ export function BackupPanel({ onBackupDone }: BackupPanelProps) {
             Backup dati
           </h4>
           <p className="mt-0.5 text-xs text-slate-500">
-            Esporta tutto in un file JSON sul dispositivo. Conservalo in un posto
-            sicuro (cloud, email, PC).
+            Esporta tutto in JSON. Con «un solo file» la copia precedente
+            nell’app viene sostituita, senza accumulare versioni simili.
           </p>
         </div>
       </div>
@@ -101,6 +183,47 @@ export function BackupPanel({ onBackupDone }: BackupPanelProps) {
           {formatLastBackupLabel(lastBackup)}
         </span>
       </p>
+
+      <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+        <input
+          type="checkbox"
+          checked={replacePrevious}
+          onChange={(e) => setReplacePrevious(e.target.checked)}
+          className="mt-0.5 h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+        />
+        <span className="text-sm text-slate-700">
+          <span className="font-medium">Un solo file</span>
+          <span className="mt-0.5 block text-xs text-slate-500">
+            Sostituisce la copia interna e, se collegato, lo stesso file sul
+            telefono. Il download usa sempre lo stesso nome.
+          </span>
+        </span>
+      </label>
+
+      {linkedFileName ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+          <span>
+            File collegato:{' '}
+            <span className="font-semibold">{linkedFileName}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleUnlinkFile()}
+            className="rounded-md border border-sky-200 bg-white px-2 py-0.5 font-medium text-sky-800"
+          >
+            Scollega
+          </button>
+        </div>
+      ) : supportsBackupFilePicker() ? (
+        <button
+          type="button"
+          onClick={() => void handleLinkFile()}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-sky-300 bg-white py-2.5 text-xs font-semibold text-sky-700 hover:bg-sky-50"
+        >
+          <Link2 className="h-3.5 w-3.5" />
+          Collega file da sostituire ogni backup
+        </button>
+      ) : null}
 
       <div className="flex flex-col gap-2">
         <button
@@ -121,6 +244,24 @@ export function BackupPanel({ onBackupDone }: BackupPanelProps) {
             </>
           )}
         </button>
+
+        {hasLocalCopy && (
+          <button
+            type="button"
+            disabled={loading !== null}
+            onClick={() => void handleRestoreLocal()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-300 bg-white py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50 disabled:opacity-50"
+          >
+            {loading === 'local' ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Ripristino…
+              </>
+            ) : (
+              'Ripristina ultima copia locale'
+            )}
+          </button>
+        )}
 
         <button
           type="button"

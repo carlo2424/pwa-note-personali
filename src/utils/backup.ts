@@ -1,5 +1,11 @@
 import { db } from '../db'
 import { updateDataFingerprint } from './dataFingerprint'
+import {
+  getLinkedBackupFileName,
+  readRollingLocalBackupText,
+  writeLinkedBackupFile,
+  writeRollingLocalBackup,
+} from './backupStorage'
 import type {
   ArchiveItem,
   Area,
@@ -13,6 +19,15 @@ import type {
 
 export const BACKUP_FILE_VERSION = 1
 export const BACKUP_MIME = 'application/json'
+export const BACKUP_FIXED_FILENAME = 'note-personali-backup.json'
+
+export type BackupSaveResult = {
+  payload: BackupPayload
+  localCopyReplaced: boolean
+  linkedFileReplaced: boolean
+  downloaded: boolean
+  linkedFileName: string | null
+}
 
 type SerializedBlob = { _blob: true; type: string; base64: string }
 
@@ -184,17 +199,77 @@ export function backupFileName(date = new Date()): string {
   return `note-personali-backup-${iso}.json`
 }
 
-export async function downloadBackup(): Promise<void> {
-  const payload = await exportBackup()
-  const json = JSON.stringify(payload)
+function triggerDownload(json: string, fileName: string): void {
   const blob = new Blob([json], { type: BACKUP_MIME })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = backupFileName()
+  link.download = fileName
   link.click()
   URL.revokeObjectURL(url)
 }
+
+export async function saveBackup(options?: {
+  /** Sostituisce copia locale e file collegato; scarica sempre un solo nome fisso */
+  replacePrevious?: boolean
+  /** Scarica anche un file sul dispositivo (Download / Condividi) */
+  download?: boolean
+}): Promise<BackupSaveResult> {
+  const replacePrevious = options?.replacePrevious !== false
+  const download = options?.download !== false
+  const payload = await exportBackup()
+  const json = JSON.stringify(payload)
+  const linkedFileName = await getLinkedBackupFileName()
+
+  let localCopyReplaced = false
+  let linkedFileReplaced = false
+  let downloaded = false
+
+  if (replacePrevious) {
+    localCopyReplaced = await writeRollingLocalBackup(json)
+    const linked = await writeLinkedBackupFile(json)
+    linkedFileReplaced = linked === 'written'
+  }
+
+  if (download) {
+    triggerDownload(
+      json,
+      replacePrevious ? BACKUP_FIXED_FILENAME : backupFileName(),
+    )
+    downloaded = true
+  }
+
+  return {
+    payload,
+    localCopyReplaced,
+    linkedFileReplaced,
+    downloaded,
+    linkedFileName,
+  }
+}
+
+export async function downloadBackup(options?: {
+  replacePrevious?: boolean
+}): Promise<BackupSaveResult> {
+  return saveBackup(options)
+}
+
+export async function restoreRollingLocalBackup(): Promise<BackupPayload> {
+  const text = await readRollingLocalBackupText()
+  if (!text) {
+    throw new Error('Nessuna copia locale di backup trovata.')
+  }
+  const payload = parseBackupJson(text)
+  await restoreBackup(payload)
+  return payload
+}
+
+export { hasRollingLocalBackup, getLinkedBackupFileName } from './backupStorage'
+export {
+  linkBackupExportFile,
+  unlinkBackupExportFile,
+  supportsBackupFilePicker,
+} from './backupStorage'
 
 function parseBackupJson(text: string): BackupPayload {
   const parsed = JSON.parse(text) as BackupPayload

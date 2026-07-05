@@ -8,8 +8,8 @@ interface ImpegnoDoneToggleProps {
   advanceOnly?: boolean
   /** Periodo non ancora scaduto: non si può spuntare */
   checkDisabled?: boolean
-  /** Rimuove una spunta errata su periodo futuro */
-  clearInvalid?: boolean
+  /** completedAt salvato ma periodo non valido: mostra spunta e permetti deselezione */
+  storedDone?: boolean
 }
 
 export function ImpegnoDoneToggle({
@@ -18,10 +18,11 @@ export function ImpegnoDoneToggle({
   onToggle,
   advanceOnly = false,
   checkDisabled = false,
-  clearInvalid = false,
+  storedDone = false,
 }: ImpegnoDoneToggleProps) {
-  const canUncheck = done && !advanceOnly
-  const canCheck = !done && !checkDisabled
+  const visualDone = done || storedDone
+  const canUncheck = visualDone && !advanceOnly
+  const canCheck = !visualDone && !checkDisabled
 
   return (
     <button
@@ -34,31 +35,35 @@ export function ImpegnoDoneToggle({
       }}
       onClick={(e) => {
         e.stopPropagation()
-        if (canUncheck || canCheck || clearInvalid) onToggle()
+        if (canUncheck || canCheck) onToggle()
       }}
       aria-label={
-        done
+        visualDone
           ? advanceOnly
             ? 'Periodo completato'
-            : 'Segna come da fare'
-          : 'Segna come fatto'
+            : 'Deseleziona — segna come da fare'
+          : checkDisabled
+            ? 'Periodo non ancora scaduto'
+            : 'Segna come fatto'
       }
       className={`relative flex shrink-0 touch-manipulation flex-col items-center gap-0.5 self-center ${
         compact ? 'px-0.5' : 'px-1'
       } ${done && advanceOnly ? 'opacity-80' : ''} ${
-        checkDisabled && !done ? 'opacity-50' : ''
-      }`}
+        checkDisabled && !visualDone ? 'opacity-50' : ''
+      } ${storedDone && !done ? 'opacity-90' : ''}`}
     >
       <span
         className={`flex items-center justify-center rounded-md border-2 ${
           compact ? 'h-4 w-4' : 'h-5 w-5'
         } ${
-          done
-            ? 'border-emerald-500 bg-emerald-500 text-white'
+          visualDone
+            ? storedDone && !done
+              ? 'border-amber-500 bg-amber-500 text-white'
+              : 'border-emerald-500 bg-emerald-500 text-white'
             : 'border-slate-300 bg-white hover:border-emerald-400'
         }`}
       >
-        {done && (
+        {visualDone && (
           <Check
             className={compact ? 'h-2.5 w-2.5' : 'h-3.5 w-3.5'}
             strokeWidth={3}
