@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { ShieldAlert, X } from 'lucide-react'
-import { ensurePersistentStorage } from '../utils/storagePersistence'
+import {
+  buildStorageProtectionInfo,
+  ensurePersistentStorage,
+  getStorageStatus,
+} from '../utils/storagePersistence'
 
 const DISMISS_KEY = 'pwa-storage-banner-dismissed'
 
@@ -23,9 +27,8 @@ export function StorageProtectionBanner({
         sessionStorage.removeItem(DISMISS_KEY)
         onDismiss()
       } else {
-        alert(
-          'Protezione non concessa. In Brave: Impostazioni del sito → Permessi, oppure installa l’app nella schermata Home.',
-        )
+        const info = buildStorageProtectionInfo(await getStorageStatus())
+        alert(info.help)
       }
     } finally {
       setActivating(false)
@@ -52,9 +55,9 @@ export function StorageProtectionBanner({
             Dati a rischio di cancellazione
           </p>
           <p className="mt-0.5 text-[11px] leading-snug text-amber-800">
-            La protezione è attiva di default all’apertura, ma Brave non l’ha
-            ancora confermata. Tocca lo schermo o premi il pulsante; fai anche
-            backup periodici.
+            Su Brave spesso resta «Non concessa» anche con l’app in Home: non
+            aspettare. Esporta un backup JSON da Impostazioni — è la protezione
+            che funziona sempre.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button

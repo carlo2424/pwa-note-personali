@@ -6,6 +6,10 @@ interface ImpegnoDoneToggleProps {
   onToggle: () => void
   /** Ricorrenti: solo segna fatto (avanza data), non si annulla */
   advanceOnly?: boolean
+  /** Periodo non ancora scaduto: non si può spuntare */
+  checkDisabled?: boolean
+  /** Rimuove una spunta errata su periodo futuro */
+  clearInvalid?: boolean
 }
 
 export function ImpegnoDoneToggle({
@@ -13,8 +17,11 @@ export function ImpegnoDoneToggle({
   compact = false,
   onToggle,
   advanceOnly = false,
+  checkDisabled = false,
+  clearInvalid = false,
 }: ImpegnoDoneToggleProps) {
   const canUncheck = done && !advanceOnly
+  const canCheck = !done && !checkDisabled
 
   return (
     <button
@@ -27,7 +34,7 @@ export function ImpegnoDoneToggle({
       }}
       onClick={(e) => {
         e.stopPropagation()
-        if (canUncheck || !done) onToggle()
+        if (canUncheck || canCheck || clearInvalid) onToggle()
       }}
       aria-label={
         done
@@ -38,7 +45,9 @@ export function ImpegnoDoneToggle({
       }
       className={`relative flex shrink-0 touch-manipulation flex-col items-center gap-0.5 self-center ${
         compact ? 'px-0.5' : 'px-1'
-      } ${done && advanceOnly ? 'opacity-80' : ''}`}
+      } ${done && advanceOnly ? 'opacity-80' : ''} ${
+        checkDisabled && !done ? 'opacity-50' : ''
+      }`}
     >
       <span
         className={`flex items-center justify-center rounded-md border-2 ${

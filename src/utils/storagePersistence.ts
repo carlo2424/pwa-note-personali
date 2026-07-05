@@ -7,8 +7,65 @@ export interface StorageStatus {
   quotaBytes?: number
 }
 
+export interface StorageProtectionInfo {
+  supported: boolean
+  persisted: boolean
+  /** Etichetta breve per l'UI */
+  label: 'Protetto' | 'Non concessa' | 'Non supportata'
+  /** Spiegazione e consigli pratici */
+  help: string
+  isBrave: boolean
+}
+
 function storageManager(): StorageManager | undefined {
   return typeof navigator !== 'undefined' ? navigator.storage : undefined
+}
+
+export function isBraveBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /brave/i.test(navigator.userAgent)
+}
+
+export function buildStorageProtectionInfo(
+  status: Pick<StorageStatus, 'supported' | 'persisted'>,
+): StorageProtectionInfo {
+  const isBrave = isBraveBrowser()
+
+  if (!status.supported) {
+    return {
+      ...status,
+      isBrave,
+      label: 'Non supportata',
+      help: 'Questo browser non espone la protezione automatica. Esporta backup regolari da Impostazioni.',
+    }
+  }
+
+  if (status.persisted) {
+    return {
+      ...status,
+      isBrave,
+      label: 'Protetto',
+      help: 'I dati sono protetti dalla cancellazione automatica del browser. Continua a fare backup periodici.',
+    }
+  }
+
+  if (isBrave) {
+    return {
+      ...status,
+      isBrave,
+      label: 'Non concessa',
+      help:
+        'Brave decide da solo e spesso rifiuta la protezione, anche con l’app installata in Home. Non restare in attesa: i dati sono comunque sul telefono, ma Brave può cancellarli se liberi spazio o pulisci i dati del sito. Esporta un backup JSON ogni settimana — è la copia più affidabile.',
+    }
+  }
+
+  return {
+    ...status,
+    isBrave,
+    label: 'Non concessa',
+    help:
+      'Il browser non ha accettato la richiesta (non compare un messaggio di conferma). Usa spesso l’app installata in Home ed esporta backup regolari.',
+  }
 }
 
 /** True se lo storage è già marcato come persistente */

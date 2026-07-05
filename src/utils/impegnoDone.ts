@@ -6,10 +6,38 @@ import { isOverdueEvent } from './overdue'
 
 export { eventRequiresManualDone }
 
-export function isEventMarkedDone(
-  event: Pick<Event, 'completedAt'>,
+/** Il periodo corrente è convalidabile (scaduto o rinnovo passato), non futuro. */
+export function isRecurringPeriodReadyForDone(
+  event: Pick<
+    Event,
+    | 'startDate'
+    | 'renewalDate'
+    | 'recurrenceFrequency'
+    | 'paymentMethod'
+    | 'completedAt'
+  >,
 ): boolean {
-  return event.completedAt != null
+  if (isAutomatedPaymentMethod(event.paymentMethod)) return false
+  if (!event.recurrenceFrequency) return true
+  if (isOverdueEvent(event)) return true
+  if (event.renewalDate && isPastDue(event.renewalDate)) return true
+  return false
+}
+
+export function isEventMarkedDone(
+  event: Pick<
+    Event,
+    'completedAt' | 'renewalDate' | 'recurrenceFrequency' | 'paymentMethod' | 'startDate'
+  >,
+): boolean {
+  if (event.completedAt == null) return false
+  if (
+    event.recurrenceFrequency &&
+    !isRecurringPeriodReadyForDone(event)
+  ) {
+    return false
+  }
+  return true
 }
 
 export function isNoteImpegnoMarkedDone(
@@ -37,6 +65,14 @@ export function advanceRenewalAfterDone(
 export async function markEventDone(event: Event): Promise<void> {
   if (!event.id) return
   const now = Date.now()
+
+  if (
+    event.recurrenceFrequency &&
+    !isAutomatedPaymentMethod(event.paymentMethod) &&
+    !isRecurringPeriodReadyForDone(event)
+  ) {
+    return
+  }
 
   if (
     event.recurrenceFrequency &&
@@ -72,10 +108,22 @@ export async function unmarkEventDone(event: Event): Promise<void> {
 }
 
 export async function toggleEventDone(event: Event): Promise<void> {
-  if (isEventMarkedDone(event)) {
-    await unmarkEventDone(event)
+  if (!event.id) return
+  const fresh = (await db.events.get(event.id)) ?? event
+
+  if (
+    fresh.completedAt &&
+    fresh.recurrenceFrequency &&
+    !isRecurringPeriodReadyForDone(fresh)
+  ) {
+    await unmarkEventDone(fresh)
+    return
+  }
+
+  if (isEventMarkedDone(fresh)) {
+    await unmarkEventDone(fresh)
   } else {
-    await markEventDone(event)
+    await markEventDone(fresh)
   }
 }
 

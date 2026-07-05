@@ -2,7 +2,7 @@ import type { Event } from '../db'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { countdownLabel, countdownUrgency } from '../utils/countdown'
 import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
-import { isEventMarkedDone, toggleEventDone, eventRequiresManualDone } from '../utils/impegnoDone'
+import { isEventMarkedDone, toggleEventDone, eventRequiresManualDone, isRecurringPeriodReadyForDone } from '../utils/impegnoDone'
 import { recurrenceShort } from '../utils/recurring'
 import { summarizeText } from '../utils/textSummary'
 import { EventDetailBody } from './EventDetailBody'
@@ -57,6 +57,13 @@ export function EventExpandableRow({
   const homeCard = compact && showTypeLabel
   const markedDone = isEventMarkedDone(event)
   const showDoneToggle = eventRequiresManualDone(event)
+  const checkDisabled =
+    !!event.recurrenceFrequency && !isRecurringPeriodReadyForDone(event)
+  const invalidEarlyDone =
+    showDoneToggle &&
+    event.completedAt != null &&
+    !!event.recurrenceFrequency &&
+    checkDisabled
 
   let title = event.title
   let subtitle: string | undefined
@@ -106,6 +113,8 @@ export function EventExpandableRow({
           <ImpegnoDoneToggle
             compact={compact}
             done={markedDone}
+            checkDisabled={checkDisabled}
+            clearInvalid={invalidEarlyDone}
             onToggle={() => void toggleEventDone(event)}
           />
         ) : undefined

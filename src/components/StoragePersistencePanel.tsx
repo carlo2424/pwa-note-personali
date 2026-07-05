@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react'
 import {
+  buildStorageProtectionInfo,
   ensurePersistentStorage,
   formatBytes,
   getStorageStatus,
@@ -10,6 +11,7 @@ import {
 export function StoragePersistencePanel() {
   const [status, setStatus] = useState<StorageStatus | null>(null)
   const [requesting, setRequesting] = useState(false)
+  const [lastAttemptDenied, setLastAttemptDenied] = useState(false)
 
   async function refresh() {
     setStatus(await getStorageStatus())
@@ -17,23 +19,33 @@ export function StoragePersistencePanel() {
 
   useEffect(() => {
     void (async () => {
-      await ensurePersistentStorage()
+      const granted = await ensurePersistentStorage()
       await refresh()
+      if (!granted) setLastAttemptDenied(true)
     })()
   }, [])
+
+  const info = useMemo(
+    () =>
+      status
+        ? buildStorageProtectionInfo(status)
+        : null,
+    [status],
+  )
 
   async function handleRequest() {
     setRequesting(true)
     try {
-      await ensurePersistentStorage()
+      const granted = await ensurePersistentStorage()
       await refresh()
+      setLastAttemptDenied(!granted)
     } finally {
       setRequesting(false)
     }
   }
 
-  const persisted = status?.persisted ?? false
-  const supported = status?.supported ?? false
+  const persisted = info?.persisted ?? false
+  const supported = info?.supported ?? false
 
   const accent = persisted
     ? 'bg-emerald-100 text-emerald-600'
@@ -55,23 +67,19 @@ export function StoragePersistencePanel() {
           <h4 className="text-sm font-semibold text-slate-800">
             Protezione dati sul dispositivo
           </h4>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {!supported
-              ? 'Questo browser non espone la protezione dello storage.'
-              : persisted
-                ? 'Protezione attiva: i dati sono protetti dalla cancellazione automatica del browser.'
-                : 'Protezione richiesta all’avvio, ma il browser non l’ha ancora concessa. Tocca lo schermo o riprova sotto.'}
-          </p>
+          {info ? (
+            <p className="mt-0.5 text-xs text-slate-500">{info.help}</p>
+          ) : null}
         </div>
       </div>
 
-      {status && supported && (
+      {status && info && (
         <p className="mb-3 text-xs text-slate-500">
           Stato:{' '}
           <span
             className={`font-semibold ${persisted ? 'text-emerald-600' : 'text-amber-700'}`}
           >
-            {persisted ? 'Protetto' : 'In attesa'}
+            {info.label}
           </span>
           {status.usageBytes != null && (
             <>
@@ -85,6 +93,14 @@ export function StoragePersistencePanel() {
         </p>
       )}
 
+      {supported && !persisted && lastAttemptDenied && (
+        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-snug text-amber-900">
+          {info?.isBrave
+            ? 'Su Brave la risposta è immediata: se resti su «Non concessa», il browser non la attiverà. Non aspettare minuti — passa al backup.'
+            : 'Il browser ha rifiutato l’ultimo tentativo. Non restare in attesa: esporta un backup.'}
+        </p>
+      )}
+
       {supported && !persisted && (
         <button
           type="button"
@@ -95,20 +111,12 @@ export function StoragePersistencePanel() {
           {requesting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Attivazione…
+              Verifica…
             </>
           ) : (
-            'Riprova attivazione'
+            'Riprova (opzionale)'
           )}
         </button>
-      )}
-
-      {supported && !persisted && (
-        <p className="mt-2 text-xs text-slate-400">
-          Suggerimento: installa l&apos;app nella schermata Home e usala qualche
-          volta. Il browser concede la protezione più facilmente alle app
-          installate. Fai comunque backup periodici.
-        </p>
       )}
     </section>
   )
