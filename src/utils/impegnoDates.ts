@@ -1,4 +1,5 @@
 import type { RecurrenceFrequency } from '../db'
+import { todayIso } from './countdown'
 
 export function parseIsoDate(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number)
@@ -51,6 +52,27 @@ export function computeNextRenewalDate(
   }
 
   return toIsoDateLocal(current)
+}
+
+/** Ultima occorrenza ricorrente con scadenza <= oggi (inclusa la data di inizio). */
+export function lastRecurrenceDueOnOrBeforeToday(
+  startDate: string,
+  frequency: RecurrenceFrequency,
+): string | undefined {
+  const today = todayIso()
+  if (!startDate || startDate > today) return undefined
+
+  let current = parseIsoDate(startDate)
+  let lastDue = startDate
+
+  for (;;) {
+    const iso = toIsoDateLocal(current)
+    if (iso > today) break
+    lastDue = iso
+    current = addRecurrence(current, frequency)
+  }
+
+  return lastDue
 }
 
 /** Data fine inclusiva da durata in giorni (es. 1 giorno = stesso giorno di inizio). */

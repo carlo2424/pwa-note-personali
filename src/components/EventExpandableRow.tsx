@@ -55,7 +55,6 @@ export function EventExpandableRow({
     !descriptionExcerpt.toLowerCase().startsWith(`${titleNorm}…`)
 
   const homeCard = compact && showTypeLabel
-  const isRecurring = !!(event.recurrenceFrequency && event.renewalDate)
   const markedDone = isEventMarkedDone(event)
   const showDoneToggle = eventRequiresManualDone(event)
 
@@ -107,7 +106,6 @@ export function EventExpandableRow({
           <ImpegnoDoneToggle
             compact={compact}
             done={markedDone}
-            advanceOnly={isRecurring}
             onToggle={() => void toggleEventDone(event)}
           />
         ) : undefined

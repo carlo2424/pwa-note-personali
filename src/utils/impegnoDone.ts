@@ -36,20 +36,6 @@ export function advanceRenewalAfterDone(
 export async function markEventDone(event: Event): Promise<void> {
   if (!event.id) return
   const now = Date.now()
-
-  if (event.recurrenceFrequency && event.renewalDate) {
-    const renewalDate = advanceRenewalAfterDone(
-      event.renewalDate,
-      event.recurrenceFrequency,
-    )
-    await db.events.update(event.id, {
-      renewalDate,
-      completedAt: undefined,
-      updatedAt: now,
-    })
-    return
-  }
-
   await db.events.update(event.id, {
     completedAt: now,
     updatedAt: now,
@@ -57,7 +43,7 @@ export async function markEventDone(event: Event): Promise<void> {
 }
 
 export async function unmarkEventDone(event: Event): Promise<void> {
-  if (!event.id || event.recurrenceFrequency) return
+  if (!event.id) return
   await db.events.update(event.id, {
     completedAt: undefined,
     updatedAt: Date.now(),
@@ -107,9 +93,9 @@ export async function toggleNoteImpegnoDone(
   }
 }
 
-/** Avanza il rinnovo degli impegni ricorrenti carta/bonifico già addebitati. */
+/** Avanza il rinnovo quando la scadenza è passata; per carta/bonifico segna anche i singoli impegni. */
 export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
-  if (!event.id || !isAutomatedPaymentMethod(event.paymentMethod)) return
+  if (!event.id) return
 
   const now = Date.now()
 
@@ -118,22 +104,45 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
     event.renewalDate &&
     isPastDue(event.renewalDate)
   ) {
-    const renewalDate = advanceRenewalAfterDone(
-      event.renewalDate,
-      event.recurrenceFrequency,
-    )
-    if (renewalDate !== event.renewalDate) {
-      await db.events.update(event.id, {
-        renewalDate,
-        completedAt: undefined,
-        updatedAt: now,
-      })
+    if (isAutomatedPaymentMethod(event.paymentMethod)) {
+      const renewalDate = advanceRenewalAfterDone(
+        event.renewalDate,
+        event.recurrenceFrequency,
+      )
+      if (renewalDate !== event.renewalDate) {
+        await db.events.update(event.id, {
+          renewalDate,
+          completedAt: undefined,
+          updatedAt: now,
+        })
+      }
+      return
+    }
+
+    if (event.completedAt) {
+      const renewalDate = advanceRenewalAfterDone(
+        event.renewalDate,
+        event.recurrenceFrequency,
+      )
+      if (renewalDate !== event.renewalDate) {
+        await db.events.update(event.id, {
+          renewalDate,
+          completedAt: undefined,
+          updatedAt: now,
+        })
+      }
     }
     return
   }
 
   if (
-    !event.recurrenceFrequency &&
+    !isAutomatedPaymentMethod(event.paymentMethod) ||
+    event.recurrenceFrequency
+  ) {
+    return
+  }
+
+  if (
     !event.completedAt &&
     isPastDue(event.renewalDate ?? event.endDate)
   ) {
