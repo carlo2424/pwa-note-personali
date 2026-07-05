@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react'
 import {
+  ensurePersistentStorage,
   formatBytes,
   getStorageStatus,
-  requestPersistentStorage,
   type StorageStatus,
 } from '../utils/storagePersistence'
 
@@ -16,13 +16,16 @@ export function StoragePersistencePanel() {
   }
 
   useEffect(() => {
-    void refresh()
+    void (async () => {
+      await ensurePersistentStorage()
+      await refresh()
+    })()
   }, [])
 
   async function handleRequest() {
     setRequesting(true)
     try {
-      await requestPersistentStorage()
+      await ensurePersistentStorage()
       await refresh()
     } finally {
       setRequesting(false)
@@ -56,8 +59,8 @@ export function StoragePersistencePanel() {
             {!supported
               ? 'Questo browser non espone la protezione dello storage.'
               : persisted
-                ? 'I dati sono protetti dalla cancellazione automatica del browser.'
-                : 'I dati non sono protetti: il browser potrebbe cancellarli per liberare spazio o dopo giorni di inattività.'}
+                ? 'Protezione attiva: i dati sono protetti dalla cancellazione automatica del browser.'
+                : 'Protezione richiesta all’avvio, ma il browser non l’ha ancora concessa. Tocca lo schermo o riprova sotto.'}
           </p>
         </div>
       </div>
@@ -68,7 +71,7 @@ export function StoragePersistencePanel() {
           <span
             className={`font-semibold ${persisted ? 'text-emerald-600' : 'text-amber-700'}`}
           >
-            {persisted ? 'Protetto' : 'Non protetto'}
+            {persisted ? 'Protetto' : 'In attesa'}
           </span>
           {status.usageBytes != null && (
             <>
@@ -95,7 +98,7 @@ export function StoragePersistencePanel() {
               Attivazione…
             </>
           ) : (
-            'Attiva protezione'
+            'Riprova attivazione'
           )}
         </button>
       )}

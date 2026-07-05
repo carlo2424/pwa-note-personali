@@ -25,8 +25,19 @@ import { NoteList } from './components/NoteList'
 import { SettingsPanel } from './components/SettingsPanel'
 import { VoiceCreateButton } from './components/VoiceCreateButton'
 import { BackupReminderBanner } from './components/BackupReminderBanner'
+import { DataLossBanner } from './components/DataLossBanner'
+import {
+  isStorageProtectionBannerDismissed,
+  StorageProtectionBanner,
+} from './components/StorageProtectionBanner'
 import { hasBackupableData } from './utils/backup'
 import { shouldShowBackupReminder } from './utils/backupReminder'
+import {
+  detectPossibleDataLoss,
+  updateDataFingerprint,
+  type DataFingerprint,
+} from './utils/dataFingerprint'
+import { ensurePersistentStorage, isStoragePersisted } from './utils/storagePersistence'
 import { NavBadge } from './components/NavBadge'
 import { useNavSectionCounts } from './hooks/useNavSectionCounts'
 import { useOverdueCounts } from './hooks/useOverdueCounts'
@@ -92,6 +103,9 @@ function App() {
   const [showNoteForm, setShowNoteForm] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showBackupReminder, setShowBackupReminder] = useState(false)
+  const [showStorageProtection, setShowStorageProtection] = useState(false)
+  const [dataLossPrevious, setDataLossPrevious] =
+    useState<DataFingerprint | null>(null)
   const [showAddChooser, setShowAddChooser] = useState(false)
   const [editingEvent, setEditingEvent] = useState<Event | undefined>()
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>()
@@ -216,6 +230,45 @@ function App() {
 
   useEffect(() => {
     let cancelled = false
+
+    async function checkStartupSafety() {
+      const loss = await detectPossibleDataLoss()
+      if (!cancelled && loss.lost && loss.previous) {
+        setDataLossPrevious(loss.previous)
+      }
+
+      await updateDataFingerprint()
+
+      if (cancelled) return
+
+      await ensurePersistentStorage()
+      const persisted = await isStoragePersisted()
+      if (
+        !persisted &&
+        !isStorageProtectionBannerDismissed() &&
+        !loss.lost
+      ) {
+        setShowStorageProtection(true)
+      }
+    }
+
+    void checkStartupSafety()
+
+    function onVisible() {
+      if (document.visibilityState !== 'visible') return
+      void ensurePersistentStorage()
+      void updateDataFingerprint()
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
     async function checkBackupReminder() {
       if (!shouldShowBackupReminder()) {
         if (!cancelled) setShowBackupReminder(false)
@@ -291,6 +344,23 @@ function App() {
     >
       <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-slate-50">
         <OfflineStatus />
+        {dataLossPrevious && (
+          <DataLossBanner
+            previous={dataLossPrevious}
+            onOpenSettings={openSettingsFromBackup}
+            onRestored={() => {
+              setDataLossPrevious(null)
+              void updateDataFingerprint()
+            }}
+            onDismiss={() => setDataLossPrevious(null)}
+          />
+        )}
+        {showStorageProtection && !dataLossPrevious && (
+          <StorageProtectionBanner
+            onOpenSettings={openSettingsFromBackup}
+            onDismiss={() => setShowStorageProtection(false)}
+          />
+        )}
         {showBackupReminder && (
           <BackupReminderBanner
             onOpenSettings={openSettingsFromBackup}

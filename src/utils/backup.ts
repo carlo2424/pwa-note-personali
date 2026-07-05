@@ -1,4 +1,5 @@
 import { db } from '../db'
+import { updateDataFingerprint } from './dataFingerprint'
 import type {
   ArchiveItem,
   Area,
@@ -261,6 +262,7 @@ export async function restoreBackup(payload: BackupPayload): Promise<void> {
       }
     },
   )
+  await updateDataFingerprint()
 }
 
 export async function importBackupFile(file: File): Promise<BackupPayload> {

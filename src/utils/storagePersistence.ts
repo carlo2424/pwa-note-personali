@@ -37,6 +37,31 @@ export async function requestPersistentStorage(): Promise<boolean> {
   }
 }
 
+/** Attiva la protezione all'avvio (default). */
+export async function ensurePersistentStorage(): Promise<boolean> {
+  return requestPersistentStorage()
+}
+
+let interactionHookInstalled = false
+
+/** Ritenta al primo tocco se il browser non ha concesso la protezione in avvio. */
+export function schedulePersistentStorageOnInteraction(): void {
+  if (interactionHookInstalled || typeof window === 'undefined') return
+  interactionHookInstalled = true
+
+  const tryPersist = () => {
+    void ensurePersistentStorage().then((granted) => {
+      if (granted) {
+        window.removeEventListener('pointerdown', tryPersist, true)
+        window.removeEventListener('keydown', tryPersist, true)
+      }
+    })
+  }
+
+  window.addEventListener('pointerdown', tryPersist, true)
+  window.addEventListener('keydown', tryPersist, true)
+}
+
 export async function getStorageStatus(): Promise<StorageStatus> {
   const storage = storageManager()
   const supported = !!storage?.persist

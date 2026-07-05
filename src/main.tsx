@@ -12,7 +12,11 @@ import {
 import { migrateTextToSentenceCase } from './utils/textCaseMigrate'
 import { syncChecklistForNote } from './utils/noteTasks'
 import { resolveNoteKind } from './utils/noteKind'
-import { requestPersistentStorage } from './utils/storagePersistence'
+import {
+  ensurePersistentStorage,
+  schedulePersistentStorageOnInteraction,
+} from './utils/storagePersistence'
+import { updateDataFingerprint } from './utils/dataFingerprint'
 import {
   applyAppUpdateReload,
   prepareAppUpdate,
@@ -96,16 +100,13 @@ function Bootstrap() {
 
     async function boot() {
       try {
+        await ensurePersistentStorage()
+        schedulePersistentStorageOnInteraction()
         await db.open()
         if (cancelled) return
+        await updateDataFingerprint()
+        if (cancelled) return
         setReady(true)
-        void requestPersistentStorage().then((granted) => {
-          if (!granted) {
-            console.warn(
-              '[Storage] Persistenza non concessa: il browser potrebbe cancellare i dati automaticamente.',
-            )
-          }
-        })
         void runPostOpenTasks().catch((err) => {
           console.error('[DB] Errore attività post-avvio:', err)
         })
