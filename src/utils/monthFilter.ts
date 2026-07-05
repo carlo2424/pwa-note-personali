@@ -117,8 +117,6 @@ export function groupExpensesByMonth<T extends Pick<Expense, 'date'>>(
     .map(([key, items]) => ({
       key,
       label: monthLabelFromKey(key),
-      items: [...items].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-      ),
+      items: [...items].sort((a, b) => a.date.localeCompare(b.date)),
     }))
 }
