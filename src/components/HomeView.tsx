@@ -16,7 +16,7 @@ import {
   matchesAreaSelection,
   selectionLabel,
 } from '../utils/areaSelection'
-import { countdownUrgency } from '../utils/countdown'
+import { countdownUrgency, todayIso } from '../utils/countdown'
 import { formatAmount, sentenceCase } from '../utils/format'
 import {
   filterEventImpegni,
@@ -133,6 +133,24 @@ function buildWeekDeadlineLines(
       .filter((item) => isDeadlineThisWeek(item.iso))
       .map((item) => buildHomeDeadlineLine(item.title, item.iso)),
   )
+}
+
+function buildFutureMonthExpenseLines(
+  expenses: Expense[],
+): { lines: HomeDeadlineLine[]; hiddenCount: number } {
+  const today = todayIso()
+  const upcoming = expenses
+    .filter(
+      (e) => e.amount > 0 && expenseInCurrentMonth(e) && e.date > today,
+    )
+    .sort((a, b) => a.date.localeCompare(b.date))
+
+  return {
+    lines: upcoming
+      .slice(0, 3)
+      .map((e) => buildHomeDeadlineLine(sentenceCase(e.description), e.date)),
+    hiddenCount: Math.max(0, upcoming.length - 3),
+  }
 }
 
 function notesAreUrgent(notes: Note[]): boolean {
@@ -542,18 +560,10 @@ export function HomeView({
     return parts.join(' · ')
   }, [checklistCount, homeChecklistItemCount, tasks, homeChecklists])
 
-  const homeExpenseDeadlineLines = useMemo(() => {
-    return buildWeekDeadlineLines(
-      (expenses ?? [])
-        .filter(
-          (e) => e.amount > 0 && expenseInCurrentMonth(e),
-        )
-        .map((e) => ({
-          title: sentenceCase(e.description),
-          iso: e.date,
-        })),
-    )
-  }, [expenses])
+  const homeExpenseUpcoming = useMemo(
+    () => buildFutureMonthExpenseLines(expenses ?? []),
+    [expenses],
+  )
 
   const noteSectionUrgent = useMemo(
     () => notesAreUrgent(homeTextNotes),
@@ -832,7 +842,8 @@ export function HomeView({
             monthPaid={monthExpensesTotal}
             monthPaidCount={monthPaidExpenseCount}
             monthPlanned={monthPlannedTotal}
-            deadlineLines={homeExpenseDeadlineLines}
+            upcomingLines={homeExpenseUpcoming.lines}
+            upcomingOverflowCount={homeExpenseUpcoming.hiddenCount}
             onGoToExpenses={onGoToExpenses}
           />
         </div>

@@ -231,23 +231,23 @@ export function NoteExpandableRow({
 
   return (
     <>
-    <div className={`flex items-stretch gap-0.5 ${noteImpegno ? '' : 'contents'}`}>
-      {noteImpegno ? (
-        <ImpegnoDoneToggle
-          compact={compact}
-          done={markedDone}
-          onToggle={() =>
-            void toggleNoteImpegnoDone(note, checklistTasks ?? [])
-          }
-        />
-      ) : null}
-      <div className={noteImpegno ? 'min-w-0 flex-1' : 'contents'}>
     <ExpandableCard
       compact={compact}
       homeLayout={homeCard}
       detailLine={detailLine}
       subtitleMultiline={compact && !homeCard}
       typeLabel={typeLabel}
+      headerLeading={
+        noteImpegno ? (
+          <ImpegnoDoneToggle
+            compact={compact}
+            done={markedDone}
+            onToggle={() =>
+              void toggleNoteImpegnoDone(note, checklistTasks ?? [])
+            }
+          />
+        ) : undefined
+      }
       containerClassName={noteCardStyle}
       icon={
         <ItemIconCircle
@@ -359,8 +359,6 @@ export function NoteExpandableRow({
         </div>
       )}
     </ExpandableCard>
-      </div>
-    </div>
 
     {showArchiveConfirm && (
       <ConfirmDialog

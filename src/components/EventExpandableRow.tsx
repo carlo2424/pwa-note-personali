@@ -96,22 +96,22 @@ export function EventExpandableRow({
   }
 
   return (
-    <div className={`flex items-stretch gap-0.5 ${showDoneToggle ? '' : 'contents'}`}>
-      {showDoneToggle ? (
-        <ImpegnoDoneToggle
-          compact={compact}
-          done={markedDone}
-          advanceOnly={isRecurring}
-          onToggle={() => void toggleEventDone(event)}
-        />
-      ) : null}
-      <div className={showDoneToggle ? 'min-w-0 flex-1' : 'contents'}>
     <ExpandableCard
       compact={compact}
       homeLayout={homeCard}
       detailLine={detailLine}
       subtitleMultiline={compact && !homeCard}
       typeLabel={showTypeLabel ? 'Impegno' : undefined}
+      headerLeading={
+        showDoneToggle ? (
+          <ImpegnoDoneToggle
+            compact={compact}
+            done={markedDone}
+            advanceOnly={isRecurring}
+            onToggle={() => void toggleEventDone(event)}
+          />
+        ) : undefined
+      }
       containerClassName={containerClassName}
       defaultExpanded={defaultExpanded}
       expanded={expanded}
@@ -161,7 +161,5 @@ export function EventExpandableRow({
         compact={compact}
       />
     </ExpandableCard>
-      </div>
-    </div>
   )
 }

@@ -229,7 +229,7 @@ export function AreaChips({
   return (
     <div className="mb-2">
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <p className="text-xs font-semibold tracking-wide text-slate-500">
           Aree
         </p>
         <div className="flex shrink-0 items-center gap-1">

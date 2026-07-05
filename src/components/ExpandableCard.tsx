@@ -39,6 +39,8 @@ interface ExpandableCardProps {
   summaryOverflowLabel?: (hidden: number) => string
   /** Es. Nota, Lista, Impegno, Spesa — mostrato sopra l'icona */
   typeLabel?: string
+  /** Controllo a sinistra dell'header (es. Fatto) — fuori dal pulsante espandi */
+  headerLeading?: ReactNode
 }
 
 /** Riga compatta stile evento — tap per espandere il contenuto */
@@ -69,6 +71,7 @@ export function ExpandableCard({
   summaryLines,
   summaryOverflowLabel,
   typeLabel,
+  headerLeading,
 }: ExpandableCardProps) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded)
   const expanded = controlledExpanded ?? internalExpanded
@@ -123,6 +126,9 @@ export function ExpandableCard({
                 : 'gap-2 px-3 py-2.5'
         }`}
       >
+        {headerLeading ? (
+          <div className="flex shrink-0 items-center self-center">{headerLeading}</div>
+        ) : null}
         <button
           type="button"
           onClick={toggleExpanded}

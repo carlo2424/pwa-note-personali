@@ -19,6 +19,12 @@ export function ImpegnoDoneToggle({
   return (
     <button
       type="button"
+      onPointerDown={(e) => {
+        e.stopPropagation()
+      }}
+      onMouseDown={(e) => {
+        e.stopPropagation()
+      }}
       onClick={(e) => {
         e.stopPropagation()
         if (canUncheck || !done) onToggle()
@@ -30,7 +36,7 @@ export function ImpegnoDoneToggle({
             : 'Segna come da fare'
           : 'Segna come fatto'
       }
-      className={`flex shrink-0 flex-col items-center gap-0.5 self-center ${
+      className={`relative z-10 flex shrink-0 touch-manipulation flex-col items-center gap-0.5 self-center ${
         compact ? 'px-0.5' : 'px-1'
       } ${done && advanceOnly ? 'opacity-80' : ''}`}
     >

@@ -9,7 +9,8 @@ interface HomeSpotlightCardsProps {
   monthPaid: number
   monthPaidCount: number
   monthPlanned: number
-  deadlineLines?: HomeDeadlineLine[]
+  upcomingLines?: HomeDeadlineLine[]
+  upcomingOverflowCount?: number
   onGoToExpenses: () => void
 }
 
@@ -19,7 +20,8 @@ export function HomeSpotlightCards({
   monthPaid,
   monthPaidCount,
   monthPlanned,
-  deadlineLines = [],
+  upcomingLines = [],
+  upcomingOverflowCount = 0,
   onGoToExpenses,
 }: HomeSpotlightCardsProps) {
   return (
@@ -58,9 +60,17 @@ export function HomeSpotlightCards({
             : ''}
           <span className="capitalize text-slate-400"> · {sentenceCase(monthLabel)}</span>
         </p>
-        {deadlineLines.length > 0 && (
+        {upcomingLines.length > 0 && (
           <div className="mt-1.5">
-            <HomeDeadlineLines lines={deadlineLines} compact maxLines={4} />
+            <HomeDeadlineLines
+              lines={upcomingLines}
+              compact
+              maxLines={3}
+              overflowCount={upcomingOverflowCount}
+              overflowLabel={(hidden) =>
+                `+${hidden} ${hidden === 1 ? 'altra spesa prevista' : 'altre spese previste'}`
+              }
+            />
           </div>
         )}
       </div>
