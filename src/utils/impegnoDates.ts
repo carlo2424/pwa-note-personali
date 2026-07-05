@@ -1,5 +1,5 @@
 import type { RecurrenceFrequency } from '../db'
-import { todayIso } from './countdown'
+import { isPastDue, todayIso } from './countdown'
 
 export function parseIsoDate(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number)
@@ -73,6 +73,39 @@ export function lastRecurrenceDueOnOrBeforeToday(
   }
 
   return lastDue
+}
+
+/** Corregge rinnovi saltati in avanti rispetto a inizio + frequenza (bug checkbox precedente). */
+export function repairCorruptedRenewalPatch(event: {
+  startDate?: string
+  renewalDate?: string
+  recurrenceFrequency?: RecurrenceFrequency
+  completedAt?: number
+}): { renewalDate: string; completedAt?: undefined } | null {
+  if (!event.recurrenceFrequency || !event.startDate || !event.renewalDate) {
+    return null
+  }
+
+  const canonical = computeNextRenewalDate(
+    event.startDate,
+    event.recurrenceFrequency,
+  )
+  if (!canonical || event.renewalDate <= canonical) return null
+
+  const lastDue = lastRecurrenceDueOnOrBeforeToday(
+    event.startDate,
+    event.recurrenceFrequency,
+  )
+
+  const patch: { renewalDate: string; completedAt?: undefined } = {
+    renewalDate: canonical,
+  }
+
+  if (event.completedAt && lastDue && isPastDue(lastDue)) {
+    patch.completedAt = undefined
+  }
+
+  return patch
 }
 
 /** Data fine inclusiva da durata in giorni (es. 1 giorno = stesso giorno di inizio). */

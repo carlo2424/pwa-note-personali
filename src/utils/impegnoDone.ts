@@ -1,6 +1,6 @@
 import { db, type Event, type Note, type RecurrenceFrequency } from '../db'
 import { isPastDue } from './countdown'
-import { addRecurrence, parseIsoDate, toIsoDateLocal } from './impegnoDates'
+import { addRecurrence, parseIsoDate, toIsoDateLocal, repairCorruptedRenewalPatch } from './impegnoDates'
 import { isAutomatedPaymentMethod, eventRequiresManualDone } from './paymentMethod'
 
 export { eventRequiresManualDone }
@@ -93,6 +93,18 @@ export async function toggleNoteImpegnoDone(
   }
 }
 
+export async function repairCorruptedRenewalDates(): Promise<void> {
+  const events = await db.events.toArray()
+  const now = Date.now()
+
+  for (const event of events) {
+    if (!event.id) continue
+    const patch = repairCorruptedRenewalPatch(event)
+    if (!patch) continue
+    await db.events.update(event.id, { ...patch, updatedAt: now })
+  }
+}
+
 /** Avanza il rinnovo quando la scadenza è passata; per carta/bonifico segna anche i singoli impegni. */
 export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
   if (!event.id) return
@@ -154,6 +166,7 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
 }
 
 export async function syncAllAutomatedEventRenewals(): Promise<void> {
+  await repairCorruptedRenewalDates()
   const events = await db.events.toArray()
   for (const event of events) {
     if (!event.startDate || !event.endDate) continue

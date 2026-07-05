@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
 import { clearPwaCache } from './utils/appRecovery'
+import { repairCorruptedRenewalPatch } from './utils/impegnoDates'
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
@@ -330,6 +331,28 @@ class PersonalNotesDB extends Dexie {
       for (const account of accounts) {
         if (!account.id || account.kind) continue
         await tx.table('paymentCards').update(account.id, { kind: 'carta' })
+      }
+    })
+
+    // v17: corregge date rinnovo saltate in avanti (bug checkbox precedente)
+    this.version(17).stores({
+      notes: '++id, title, createdAt, updatedAt, startDate, endDate, areaId, kind',
+      expenses: '++id, amount, category, date, createdAt, cardId, eventId, areaId',
+      archive: '++id, type, originalId, archivedAt',
+      events: '++id, title, startDate, renewalDate, createdAt, updatedAt, cardId, areaId',
+      tasks: '++id, done, createdAt, eventId, noteId, listId, dueDate',
+      taskLists: '++id, createdAt, dueDate',
+      paymentCards: '++id, name, kind, expiry',
+      areas: '++id, name, createdAt, groupName',
+    }).upgrade(async (tx) => {
+      const events = await tx.table('events').toArray()
+      const now = Date.now()
+
+      for (const event of events) {
+        if (!event.id) continue
+        const patch = repairCorruptedRenewalPatch(event)
+        if (!patch) continue
+        await tx.table('events').update(event.id, { ...patch, updatedAt: now })
       }
     })
   }
