@@ -1,7 +1,8 @@
 import { db, type Event, type Note, type RecurrenceFrequency } from '../db'
 import { isPastDue } from './countdown'
-import { addRecurrence, parseIsoDate, toIsoDateLocal, repairCorruptedRenewalPatch } from './impegnoDates'
+import { addRecurrence, parseIsoDate, toIsoDateLocal, repairCorruptedRenewalPatch, computeNextRenewalDate } from './impegnoDates'
 import { isAutomatedPaymentMethod, eventRequiresManualDone } from './paymentMethod'
+import { isOverdueEvent } from './overdue'
 
 export { eventRequiresManualDone }
 
@@ -36,6 +37,26 @@ export function advanceRenewalAfterDone(
 export async function markEventDone(event: Event): Promise<void> {
   if (!event.id) return
   const now = Date.now()
+
+  if (
+    event.recurrenceFrequency &&
+    event.startDate &&
+    !isAutomatedPaymentMethod(event.paymentMethod) &&
+    (isOverdueEvent(event) ||
+      (event.renewalDate != null && isPastDue(event.renewalDate)))
+  ) {
+    const renewalDate = computeNextRenewalDate(
+      event.startDate,
+      event.recurrenceFrequency,
+    )
+    await db.events.update(event.id, {
+      renewalDate,
+      completedAt: undefined,
+      updatedAt: now,
+    })
+    return
+  }
+
   await db.events.update(event.id, {
     completedAt: now,
     updatedAt: now,
@@ -144,6 +165,20 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
         })
       }
     }
+    return
+  }
+
+  if (
+    event.recurrenceFrequency &&
+    event.renewalDate &&
+    !isPastDue(event.renewalDate) &&
+    event.completedAt &&
+    !isAutomatedPaymentMethod(event.paymentMethod)
+  ) {
+    await db.events.update(event.id, {
+      completedAt: undefined,
+      updatedAt: now,
+    })
     return
   }
 

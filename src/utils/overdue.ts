@@ -34,14 +34,14 @@ function isRecurringManualOverdue(
 
   if (event.renewalDate && isPastDue(event.renewalDate)) return true
 
+  // Prossimo rinnovo già nel futuro: periodo corrente in attesa, non in ritardo
+  if (event.renewalDate && !isPastDue(event.renewalDate)) return false
+
   const lastDue = lastRecurrenceDueOnOrBeforeToday(
     event.startDate,
     event.recurrenceFrequency,
   )
   if (!lastDue || !isPastDue(lastDue)) return false
-
-  // Rinnovo spostato in avanti (sync o modifica) ma periodo precedente non convalidato
-  if (event.renewalDate && event.renewalDate > lastDue) return true
 
   return !event.renewalDate
 }

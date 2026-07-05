@@ -36,7 +36,7 @@ export function ImpegnoDoneToggle({
             : 'Segna come da fare'
           : 'Segna come fatto'
       }
-      className={`relative z-10 flex shrink-0 touch-manipulation flex-col items-center gap-0.5 self-center ${
+      className={`relative flex shrink-0 touch-manipulation flex-col items-center gap-0.5 self-center ${
         compact ? 'px-0.5' : 'px-1'
       } ${done && advanceOnly ? 'opacity-80' : ''}`}
     >

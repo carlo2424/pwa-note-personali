@@ -105,7 +105,7 @@ export function EventList({ onEdit, onEditNote }: EventListProps) {
           Nessun risultato per &ldquo;{search}&rdquo;
         </p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2 pb-4">
           {filtered.map((row) => {
             if (row.kind === 'event') {
               const event = row.item
