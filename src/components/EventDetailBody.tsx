@@ -12,6 +12,7 @@ import { recurrenceLabel, recurrenceShort } from '../utils/recurring'
 import { shareEvent } from '../utils/share'
 import { OVERDUE_ACCENT, taskAccentById } from '../constants/tasks'
 import { ConfirmDialog } from './ConfirmDialog'
+import { PhotoPreview } from './PhotoPreview'
 import { ShareButton } from './ShareButton'
 import { TaskListCard } from './TaskListCard'
 
@@ -84,10 +85,9 @@ export function EventDetailBody({
       )}
 
       {photoUrl && (
-        <img
+        <PhotoPreview
           src={photoUrl}
-          alt=""
-          className={`w-full object-cover ${compact ? 'max-h-24 rounded-lg' : 'max-h-40 rounded-xl'}`}
+          variant={compact ? 'card-compact' : 'card'}
         />
       )}
 

@@ -1,5 +1,6 @@
-import { Camera, X } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { Camera } from 'lucide-react'
+import { useEffect, useMemo, useRef } from 'react'
+import { PhotoPreview } from './PhotoPreview'
 
 interface CameraCaptureProps {
   photo?: Blob
@@ -9,20 +10,25 @@ interface CameraCaptureProps {
 /** Acquisizione foto dalla fotocamera del telefono */
 export function CameraCapture({ photo, onCapture }: CameraCaptureProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [preview, setPreview] = useState<string | undefined>(
-    photo ? URL.createObjectURL(photo) : undefined,
+  const preview = useMemo(
+    () => (photo ? URL.createObjectURL(photo) : undefined),
+    [photo],
   )
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview)
+    }
+  }, [preview])
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     onCapture(file)
-    setPreview(URL.createObjectURL(file))
   }
 
   function remove() {
     onCapture(undefined)
-    setPreview(undefined)
     if (inputRef.current) inputRef.current.value = ''
   }
 
@@ -32,21 +38,13 @@ export function CameraCapture({ photo, onCapture }: CameraCaptureProps) {
         Foto (fotocamera)
       </label>
       {preview ? (
-        <div className="relative">
-          <img
-            src={preview}
-            alt="Anteprima"
-            className="h-32 w-full rounded-xl object-cover"
-          />
-          <button
-            type="button"
-            onClick={remove}
-            className="absolute right-2 top-2 rounded-full bg-black/50 p-1 text-white"
-            aria-label="Rimuovi foto"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <PhotoPreview
+          src={preview}
+          alt="Anteprima"
+          variant="form"
+          removable
+          onRemove={remove}
+        />
       ) : (
         <button
           type="button"

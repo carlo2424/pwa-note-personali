@@ -22,6 +22,7 @@ import {
   summarizeChecklistTasks,
   summarizeText,
 } from '../utils/textSummary'
+import { PhotoPreview } from './PhotoPreview'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ExpandableCard } from './ExpandableCard'
 import { ImpegnoDoneToggle } from './ImpegnoDoneToggle'
@@ -314,10 +315,9 @@ export function NoteExpandableRow({
       }
     >
       {photoUrl && (
-        <img
+        <PhotoPreview
           src={photoUrl}
-          alt=""
-          className={`w-full object-cover ${compact ? 'max-h-24 rounded-lg' : 'max-h-40 rounded-xl'}`}
+          variant={compact ? 'card-compact' : 'card'}
         />
       )}
       {hasChecklist && checklistTasks && checklistTasks.length > 0 ? (
