@@ -5,6 +5,7 @@ import {
   ensurePersistentStorage,
   formatBytes,
   getStorageStatus,
+  requestPersistentStorageBoosted,
   type StorageStatus,
 } from '../utils/storagePersistence'
 
@@ -36,7 +37,7 @@ export function StoragePersistencePanel() {
   async function handleRequest() {
     setRequesting(true)
     try {
-      const granted = await ensurePersistentStorage()
+      const granted = await requestPersistentStorageBoosted()
       await refresh()
       setLastAttemptDenied(!granted)
     } finally {
@@ -102,21 +103,28 @@ export function StoragePersistencePanel() {
       )}
 
       {supported && !persisted && (
-        <button
-          type="button"
-          disabled={requesting}
-          onClick={() => void handleRequest()}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-        >
-          {requesting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Verifica…
-            </>
-          ) : (
-            'Riprova (opzionale)'
-          )}
-        </button>
+        <>
+          <p className="mb-2 text-[11px] leading-snug text-slate-500">
+            Suggerimento: consenti le <span className="font-medium">notifiche</span>{' '}
+            e aggiungi l’app alla schermata Home. Con questi segnali il browser
+            concede molto più spesso la protezione.
+          </p>
+          <button
+            type="button"
+            disabled={requesting}
+            onClick={() => void handleRequest()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {requesting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Verifica…
+              </>
+            ) : (
+              'Attiva protezione'
+            )}
+          </button>
+        </>
       )}
     </section>
   )

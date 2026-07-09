@@ -15,6 +15,7 @@ import {
   schedulePersistentStorageOnInteraction,
 } from '../utils/storagePersistence'
 import { updateDataFingerprint } from '../utils/dataFingerprint'
+import { saveAutoSnapshot, tryAutoRestore } from '../utils/backup'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
@@ -53,6 +54,9 @@ async function runPostOpenTasks(): Promise<void> {
   setInterval(() => {
     checkRenewalNotifications()
   }, 60 * 60 * 1000)
+
+  // Aggiorna lo snapshot automatico dopo aver aperto il DB.
+  await saveAutoSnapshot()
 }
 
 export function Bootstrap() {
@@ -73,6 +77,16 @@ export function Bootstrap() {
         schedulePersistentStorageOnInteraction()
         await db.open()
         if (cancelled) return
+
+        // Recupero automatico: se il DB è vuoto ma esiste uno snapshot,
+        // ripristina prima di mostrare l'app (protezione perdita dati Brave).
+        try {
+          await tryAutoRestore()
+        } catch (err) {
+          console.error('[DB] Ripristino automatico non riuscito:', err)
+        }
+        if (cancelled) return
+
         await updateDataFingerprint()
         if (cancelled) return
         setReady(true)

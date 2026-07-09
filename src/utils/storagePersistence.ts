@@ -1,3 +1,8 @@
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+} from './renewalNotifications'
+
 export interface StorageStatus {
   /** Il browser espone l'API Storage persistente */
   supported: boolean
@@ -97,6 +102,26 @@ export async function requestPersistentStorage(): Promise<boolean> {
 /** Attiva la protezione all'avvio (default). */
 export async function ensurePersistentStorage(): Promise<boolean> {
   return requestPersistentStorage()
+}
+
+/**
+ * Richiesta "rafforzata", da chiamare su un gesto utente (es. tap su un
+ * pulsante). Se il browser nega la protezione, prova a ottenere il permesso
+ * Notifiche — segnale forte che spinge Chromium/Brave a concedere `persist()` —
+ * e poi ritenta. Restituisce true se la protezione è ora attiva.
+ */
+export async function requestPersistentStorageBoosted(): Promise<boolean> {
+  if (await requestPersistentStorage()) return true
+
+  try {
+    if (getNotificationPermission() === 'default') {
+      await requestNotificationPermission()
+      return requestPersistentStorage()
+    }
+  } catch {
+    // permesso notifiche non disponibile: nulla da fare
+  }
+  return false
 }
 
 let interactionHookInstalled = false

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, HardDriveDownload, Loader2, Link2, Upload } from 'lucide-react'
 import {
+  type AutoSnapshotMeta,
   BACKUP_MIME,
   getLinkedBackupFileName,
   hasRollingLocalBackup,
   importBackupFile,
   linkBackupExportFile,
+  readAutoSnapshotMeta,
   restoreRollingLocalBackup,
   saveBackup,
   summarizeBackup,
@@ -50,12 +52,14 @@ export function BackupPanel({ onBackupDone }: BackupPanelProps) {
   const [replacePrevious, setReplacePrevious] = useState(true)
   const [linkedFileName, setLinkedFileName] = useState<string | null>(null)
   const [hasLocalCopy, setHasLocalCopy] = useState(false)
+  const [autoSnapshot, setAutoSnapshot] = useState<AutoSnapshotMeta | null>(null)
   const [status, setStatus] = useState<string | null>(null)
 
   useEffect(() => {
     void (async () => {
       setLinkedFileName(await getLinkedBackupFileName())
       setHasLocalCopy(await hasRollingLocalBackup())
+      setAutoSnapshot(await readAutoSnapshotMeta())
     })()
   }, [])
 
@@ -183,6 +187,13 @@ export function BackupPanel({ onBackupDone }: BackupPanelProps) {
           {formatLastBackupLabel(lastBackup)}
         </span>
       </p>
+
+      <div className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+        <span className="font-semibold">Protezione automatica attiva.</span>{' '}
+        {autoSnapshot
+          ? `Copia interna aggiornata: ${autoSnapshot.notes} note · ${autoSnapshot.events} impegni · ${autoSnapshot.expenses} spese. Se il browser cancella i dati, vengono ripristinati da soli alla riapertura.`
+          : 'I dati vengono copiati automaticamente e ripristinati alla riapertura se il browser li cancella.'}
+      </div>
 
       <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
         <input

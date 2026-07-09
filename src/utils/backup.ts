@@ -109,38 +109,55 @@ function deserializeOptionalBlob(
   return undefined
 }
 
-async function serializeNote(note: Note): Promise<SerializedNote> {
+async function serializeNote(
+  note: Note,
+  includeBlobs = true,
+): Promise<SerializedNote> {
   return {
     ...note,
-    photoBlob: (await serializeOptionalBlob(note.photoBlob)) as
-      | SerializedBlob
-      | undefined,
+    photoBlob: includeBlobs
+      ? ((await serializeOptionalBlob(note.photoBlob)) as
+          | SerializedBlob
+          | undefined)
+      : undefined,
   }
 }
 
-async function serializeEvent(event: Event): Promise<SerializedEvent> {
+async function serializeEvent(
+  event: Event,
+  includeBlobs = true,
+): Promise<SerializedEvent> {
   return {
     ...event,
-    voiceBlob: (await serializeOptionalBlob(event.voiceBlob)) as
-      | SerializedBlob
-      | undefined,
-    photoBlob: (await serializeOptionalBlob(event.photoBlob)) as
-      | SerializedBlob
-      | undefined,
+    voiceBlob: includeBlobs
+      ? ((await serializeOptionalBlob(event.voiceBlob)) as
+          | SerializedBlob
+          | undefined)
+      : undefined,
+    photoBlob: includeBlobs
+      ? ((await serializeOptionalBlob(event.photoBlob)) as
+          | SerializedBlob
+          | undefined)
+      : undefined,
   }
 }
 
 async function serializeArchiveItem(
   item: ArchiveItem,
+  includeBlobs = true,
 ): Promise<SerializedArchiveItem> {
   return {
     ...item,
-    photoBlob: (await serializeOptionalBlob(item.photoBlob)) as
-      | SerializedBlob
-      | undefined,
-    voiceBlob: (await serializeOptionalBlob(item.voiceBlob)) as
-      | SerializedBlob
-      | undefined,
+    photoBlob: includeBlobs
+      ? ((await serializeOptionalBlob(item.photoBlob)) as
+          | SerializedBlob
+          | undefined)
+      : undefined,
+    voiceBlob: includeBlobs
+      ? ((await serializeOptionalBlob(item.voiceBlob)) as
+          | SerializedBlob
+          | undefined)
+      : undefined,
   }
 }
 
@@ -164,7 +181,11 @@ function deserializeArchiveItem(item: SerializedArchiveItem): ArchiveItem {
   }
 }
 
-export async function exportBackup(): Promise<BackupPayload> {
+export async function exportBackup(options?: {
+  /** Includi foto/audio (default true). Con false lo snapshot resta leggero. */
+  includeBlobs?: boolean
+}): Promise<BackupPayload> {
+  const includeBlobs = options?.includeBlobs !== false
   const [notes, expenses, archive, events, tasks, taskLists, paymentCards, areas] =
     await Promise.all([
       db.notes.toArray(),
@@ -182,10 +203,14 @@ export async function exportBackup(): Promise<BackupPayload> {
     exportedAt: new Date().toISOString(),
     app: 'note-personali',
     data: {
-      notes: await Promise.all(notes.map(serializeNote)),
+      notes: await Promise.all(notes.map((n) => serializeNote(n, includeBlobs))),
       expenses,
-      archive: await Promise.all(archive.map(serializeArchiveItem)),
-      events: await Promise.all(events.map(serializeEvent)),
+      archive: await Promise.all(
+        archive.map((a) => serializeArchiveItem(a, includeBlobs)),
+      ),
+      events: await Promise.all(
+        events.map((e) => serializeEvent(e, includeBlobs)),
+      ),
       tasks,
       taskLists,
       paymentCards,
@@ -372,4 +397,141 @@ export async function hasBackupableData(): Promise<boolean> {
     db.archive.count(),
   ])
   return counts.some((c) => c > 0)
+}
+
+/* ---------------------------------------------------------------------------
+ * Snapshot automatico ridondante (protezione perdita dati)
+ *
+ * A ogni modifica salviamo una copia:
+ *  - in localStorage (leggera, senza foto/audio) — area separata da IndexedDB
+ *  - in OPFS (completa) — quando supportato
+ * All'avvio, se il database risulta vuoto ma esiste uno snapshot, ripristiniamo
+ * automaticamente prima di mostrare l'app.
+ * ------------------------------------------------------------------------- */
+
+const AUTO_SNAPSHOT_KEY = 'pwa-auto-backup-v1'
+/** Limite prudente per localStorage (~5 MB totali per origine). */
+const AUTO_SNAPSHOT_MAX_BYTES = 4_500_000
+
+export interface AutoSnapshotMeta {
+  savedAt: number
+  notes: number
+  events: number
+  expenses: number
+}
+
+function byteLength(text: string): number {
+  try {
+    return new Blob([text]).size
+  } catch {
+    return text.length
+  }
+}
+
+function backupPayloadTotal(payload: BackupPayload): number {
+  const d = payload.data
+  return (
+    d.notes.length +
+    d.events.length +
+    d.expenses.length +
+    d.tasks.length +
+    d.taskLists.length +
+    d.paymentCards.length +
+    d.areas.length +
+    d.archive.length
+  )
+}
+
+function tryParseBackupJson(text: string | null): BackupPayload | null {
+  if (!text) return null
+  try {
+    return parseBackupJson(text)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Salva uno snapshot automatico (best-effort) in localStorage e OPFS.
+ * Non lancia mai: la protezione non deve interrompere l'uso dell'app.
+ */
+export async function saveAutoSnapshot(): Promise<void> {
+  try {
+    if (!(await hasBackupableData())) return
+
+    // Copia completa (con foto/audio) su OPFS quando disponibile.
+    try {
+      const full = await exportBackup({ includeBlobs: true })
+      await writeRollingLocalBackup(JSON.stringify(full))
+    } catch {
+      // OPFS non disponibile o negato: ignora
+    }
+
+    // Copia leggera (senza blob) in localStorage: area più resistente.
+    try {
+      const slim = await exportBackup({ includeBlobs: false })
+      const json = JSON.stringify(slim)
+      if (byteLength(json) <= AUTO_SNAPSHOT_MAX_BYTES) {
+        localStorage.setItem(AUTO_SNAPSHOT_KEY, json)
+      }
+    } catch {
+      // quota localStorage superata: resta la copia OPFS
+    }
+  } catch {
+    // best-effort
+  }
+}
+
+let autoSnapshotTimer: ReturnType<typeof setTimeout> | undefined
+
+/**
+ * Pianifica un salvataggio snapshot dopo un breve ritardo, unendo modifiche
+ * ravvicinate (da chiamare dopo ogni creazione/modifica/eliminazione).
+ */
+export function scheduleAutoSnapshot(delayMs = 1500): void {
+  if (typeof window === 'undefined') {
+    void saveAutoSnapshot()
+    return
+  }
+  if (autoSnapshotTimer) clearTimeout(autoSnapshotTimer)
+  autoSnapshotTimer = setTimeout(() => {
+    autoSnapshotTimer = undefined
+    void saveAutoSnapshot()
+  }, delayMs)
+}
+
+/** Metadati dello snapshot automatico disponibile (localStorage o OPFS). */
+export async function readAutoSnapshotMeta(): Promise<AutoSnapshotMeta | null> {
+  const local = tryParseBackupJson(localStorage.getItem(AUTO_SNAPSHOT_KEY))
+  const opfs = local
+    ? null
+    : tryParseBackupJson(await readRollingLocalBackupText())
+  const payload = local ?? opfs
+  if (!payload || backupPayloadTotal(payload) === 0) return null
+  return {
+    savedAt: Date.parse(payload.exportedAt) || 0,
+    notes: payload.data.notes.length,
+    events: payload.data.events.length,
+    expenses: payload.data.expenses.length,
+  }
+}
+
+/**
+ * Se il database è vuoto ma esiste uno snapshot con dati, ripristina
+ * automaticamente. Restituisce il payload ripristinato oppure null.
+ */
+export async function tryAutoRestore(): Promise<BackupPayload | null> {
+  if (await hasBackupableData()) return null
+
+  // Preferisci OPFS (copia completa con foto), poi localStorage (leggera).
+  const opfs = tryParseBackupJson(await readRollingLocalBackupText())
+  const local = tryParseBackupJson(localStorage.getItem(AUTO_SNAPSHOT_KEY))
+
+  for (const candidate of [opfs, local]) {
+    if (candidate && backupPayloadTotal(candidate) > 0) {
+      await restoreBackup(candidate)
+      return candidate
+    }
+  }
+  return null
 }

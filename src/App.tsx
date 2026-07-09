@@ -28,7 +28,11 @@ import { BackupReminderBanner } from './components/BackupReminderBanner'
 import { DataLossBanner } from './components/DataLossBanner'
 import { StorageProtectionBanner } from './components/StorageProtectionBanner'
 import { isStorageProtectionBannerDismissed } from './utils/storageProtectionBanner'
-import { hasBackupableData } from './utils/backup'
+import {
+  hasBackupableData,
+  saveAutoSnapshot,
+  scheduleAutoSnapshot,
+} from './utils/backup'
 import { shouldShowBackupReminder } from './utils/backupReminder'
 import {
   detectPossibleDataLoss,
@@ -219,6 +223,21 @@ function App() {
     clearDefaultArea()
   }
 
+  function handleNoteSaved() {
+    scheduleAutoSnapshot()
+    closeNoteForm()
+  }
+
+  function handleEventSaved() {
+    scheduleAutoSnapshot()
+    closeEventForm()
+  }
+
+  function handleExpenseSaved() {
+    scheduleAutoSnapshot()
+    closeExpenseForm()
+  }
+
   function handleAddClick() {
     if (activeSection === 'expenses') openNewExpense()
     else if (activeSection === 'notes') openNewNote()
@@ -257,16 +276,35 @@ function App() {
 
     void checkStartupSafety()
 
-    function onVisible() {
-      if (document.visibilityState !== 'visible') return
-      void ensurePersistentStorage()
-      void updateDataFingerprint()
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        void ensurePersistentStorage()
+        void updateDataFingerprint()
+      } else {
+        // App in background: momento chiave per aggiornare lo snapshot.
+        void saveAutoSnapshot()
+      }
     }
 
-    document.addEventListener('visibilitychange', onVisible)
+    function onPageHide() {
+      void saveAutoSnapshot()
+    }
+
+    // Rete di sicurezza: snapshot periodico mentre l'app è aperta.
+    const snapshotInterval = window.setInterval(
+      () => {
+        if (document.visibilityState === 'visible') void saveAutoSnapshot()
+      },
+      5 * 60 * 1000,
+    )
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pagehide', onPageHide)
     return () => {
       cancelled = true
-      document.removeEventListener('visibilitychange', onVisible)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('pagehide', onPageHide)
+      window.clearInterval(snapshotInterval)
     }
   }, [])
 
@@ -525,7 +563,7 @@ function App() {
           <EventForm
             event={editingEvent}
             defaultAreaName={editingEvent ? undefined : defaultAreaName}
-            onSave={closeEventForm}
+            onSave={handleEventSaved}
             onClose={closeEventForm}
           />
         </Modal>
@@ -554,7 +592,7 @@ function App() {
             note={editingNote}
             defaultKind={newNoteKind}
             defaultAreaName={editingNote ? undefined : defaultAreaName}
-            onSave={closeNoteForm}
+            onSave={handleNoteSaved}
             onClose={closeNoteForm}
           />
         </Modal>
@@ -568,7 +606,7 @@ function App() {
           <ExpenseForm
             expense={editingExpense}
             defaultAreaName={editingExpense ? undefined : defaultAreaName}
-            onSave={closeExpenseForm}
+            onSave={handleExpenseSaved}
             onClose={closeExpenseForm}
           />
         </Modal>
