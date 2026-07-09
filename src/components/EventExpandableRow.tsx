@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Event } from '../db'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { countdownLabel, countdownUrgency } from '../utils/countdown'
-import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
+import { formatAmount, formatIsoDate, formatModifiedLong, sentenceCase } from '../utils/format'
 import { markImpegnoDoneConfirmCopy } from '../utils/confirmMessages'
 import {
   eventRequiresManualDone,
@@ -94,6 +94,7 @@ export function EventExpandableRow({
   let title = event.title
   let subtitle: string | undefined
   let detailLine: string | undefined
+  let extraLine: string | undefined
 
   if (homeCard) {
     title = event.title
@@ -119,6 +120,7 @@ export function EventExpandableRow({
     )
     if (showDescriptionExcerpt) line3Parts.push(descriptionExcerpt)
     detailLine = line3Parts.join(' · ')
+    extraLine = formatModifiedLong(event.updatedAt)
   } else {
     const subtitleParts: string[] = []
     if (areaName) subtitleParts.push(areaName)
@@ -133,6 +135,7 @@ export function EventExpandableRow({
       compact={compact}
       homeLayout={homeCard}
       detailLine={detailLine}
+      extraLine={extraLine}
       subtitleMultiline={compact && !homeCard}
       typeLabel={showTypeLabel ? 'Impegno' : undefined}
       headerLeading={

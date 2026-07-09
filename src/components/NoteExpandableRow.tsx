@@ -6,7 +6,7 @@ import { archiveConfirmCopy, markImpegnoDoneConfirmCopy } from '../utils/confirm
 import { isPastDue } from '../utils/countdown'
 import { deadlineLabel, noteDateUrgency } from '../utils/homeSpotlight'
 import { toggleTask, parseTaskLines } from '../utils/eventTasks'
-import { formatDate, formatDateRange, formatIsoDate, formatModifiedAt, sentenceCase } from '../utils/format'
+import { formatDate, formatDateRange, formatIsoDate, formatModifiedAt, formatModifiedLong, sentenceCase } from '../utils/format'
 import { isNoteImpegno } from '../utils/impegno'
 import { isNoteChecklist } from '../utils/noteKind'
 import { resolveNoteIcon } from '../utils/noteIcon'
@@ -127,6 +127,7 @@ export function NoteExpandableRow({
   let primaryTitle: string
   let resolvedSubtitle: string | undefined
   let detailLine: string | undefined
+  let extraLine: string | undefined
 
   if (homeCard) {
     primaryTitle = note.title
@@ -157,6 +158,7 @@ export function NoteExpandableRow({
     }
     if (showContentExcerpt) line3Parts.push(contentExcerpt)
     detailLine = line3Parts.length > 0 ? line3Parts.join(' · ') : undefined
+    extraLine = formatModifiedLong(note.updatedAt)
   } else if (showAreaAsTitle) {
     const areaLabel = areaMember ? `${areaName} · ${areaMember}` : areaName!
     const homeParts: string[] = []
@@ -251,6 +253,7 @@ export function NoteExpandableRow({
       compact={compact}
       homeLayout={homeCard}
       detailLine={detailLine}
+      extraLine={extraLine}
       subtitleMultiline={compact && !homeCard}
       typeLabel={typeLabel}
       headerLeading={
@@ -359,9 +362,11 @@ export function NoteExpandableRow({
           {dateRange}
         </p>
       )}
+      {!homeCard && (
       <p className={`text-slate-400 ${compact ? 'text-[10px]' : 'text-xs'}`}>
         Aggiornata {formatDate(note.updatedAt)}
       </p>
+      )}
       {homeCard && (
         <div className={`border-t border-slate-100 ${compact ? 'pt-1.5' : 'pt-2'}`}>
           <ItemActions

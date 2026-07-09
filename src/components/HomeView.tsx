@@ -497,7 +497,7 @@ export function HomeView({
   const homeNoteSummaryLines = useMemo(() => {
     return [...homeTextNotes]
       .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map((note) =>
+      .flatMap((note) =>
         buildHomeItemSummaryLine(
           noteItemTitle(note),
           note.updatedAt,

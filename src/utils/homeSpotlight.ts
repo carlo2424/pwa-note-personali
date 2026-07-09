@@ -1,5 +1,5 @@
 import type { Event, Note } from '../db'
-import { formatModifiedAt } from './format'
+import { formatModifiedLong } from './format'
 import { countdownUrgency, daysUntil } from './countdown'
 
 export type HomeDeadlineTone = 'today' | 'overdue' | 'soon' | 'default'
@@ -8,6 +8,8 @@ export interface HomeDeadlineLine {
   label: string
   tone: HomeDeadlineTone
   iso?: string
+  /** Solo per righe «Ultima modifica» in Home */
+  alignRight?: boolean
 }
 
 export function deadlineToneClassName(tone: HomeDeadlineTone): string {
@@ -132,11 +134,15 @@ export function buildHomeItemSummaryLine(
   title: string,
   updatedAt: number,
   tone: HomeDeadlineTone = 'default',
-): HomeDeadlineLine {
-  return {
-    label: `${title} · ${formatModifiedAt(updatedAt)}`,
-    tone,
-  }
+): HomeDeadlineLine[] {
+  return [
+    { label: title, tone },
+    {
+      label: formatModifiedLong(updatedAt),
+      tone: 'default',
+      alignRight: true,
+    },
+  ]
 }
 
 export type DateUrgency = ReturnType<typeof countdownUrgency>

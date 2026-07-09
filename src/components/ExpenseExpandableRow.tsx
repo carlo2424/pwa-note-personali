@@ -68,20 +68,20 @@ export function ExpenseExpandableRow({
     ? areaName
     : expense.description
 
-  let subtitle: string
+  let subtitle: string | undefined
 
   if (homeCard) {
-    const titleParts = [sentenceCase(expense.description)]
-    if (areaName) titleParts.push(areaName)
-    titleParts.push(expenseDate)
+    title = sentenceCase(expense.description)
+    const subParts: string[] = []
+    if (areaName) subParts.push(areaName)
+    subParts.push(expenseDate)
     if (
       descriptionExcerpt &&
       descriptionExcerpt.toLowerCase() !== sentenceCase(expense.description).toLowerCase()
     ) {
-      titleParts.push(descriptionExcerpt)
+      subParts.push(descriptionExcerpt)
     }
-    title = titleParts.join(' · ')
-    subtitle = formatModifiedLong(expense.createdAt)
+    subtitle = subParts.length > 0 ? subParts.join(' · ') : undefined
   } else if (promoteAreaTitle && areaName) {
     const parts = [expenseDate]
     if (categoryLabel && categoryLabel.toLowerCase() !== descriptionExcerpt.toLowerCase()) {
@@ -123,7 +123,9 @@ export function ExpenseExpandableRow({
   return (
     <ExpandableCard
       compact={compact}
-      subtitleMultiline={compact}
+      homeLayout={homeCard}
+      extraLine={homeCard ? formatModifiedLong(expense.createdAt) : undefined}
+      subtitleMultiline={compact && !homeCard}
       typeLabel={
         showTypeLabel ? (fromImpegno ? 'Impegno' : 'Spesa') : undefined
       }

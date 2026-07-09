@@ -169,7 +169,7 @@ export function ExpandableCard({
                 ) : null}
                 {extraLine ? (
                   <p
-                    className={`line-clamp-2 whitespace-normal leading-snug text-slate-500 ${
+                    className={`line-clamp-2 whitespace-normal text-right leading-snug text-slate-400 ${
                       dense ? 'text-[10px]' : 'text-xs'
                     }`}
                   >

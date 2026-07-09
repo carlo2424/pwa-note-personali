@@ -66,5 +66,5 @@ export function formatModifiedLong(timestamp: number): string {
     month: 'long',
     year: 'numeric',
   })
-  return `Modificato ${when}`
+  return `Ultima modifica ${when}`
 }

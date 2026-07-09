@@ -32,8 +32,8 @@ export function HomeDeadlineLines({
         <p
           key={`${line.label}-${index}`}
           className={`whitespace-normal leading-snug ${deadlineToneClassName(line.tone)} ${
-            compact ? 'text-[10px]' : 'text-xs'
-          }`}
+            line.alignRight ? 'text-right text-slate-400' : ''
+          } ${compact ? 'text-[10px]' : 'text-xs'}`}
         >
           {line.label}
         </p>
