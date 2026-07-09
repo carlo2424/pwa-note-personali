@@ -372,6 +372,30 @@ export async function importBackupFile(file: File): Promise<BackupPayload> {
   return payload
 }
 
+/** Valida un JSON di backup senza applicarlo. */
+export function parseBackupPayload(text: string): BackupPayload {
+  return parseBackupJson(text)
+}
+
+/** Ripristina i dati a partire da un JSON di backup (es. cloud). */
+export async function restoreBackupFromText(
+  text: string,
+): Promise<BackupPayload> {
+  const payload = parseBackupJson(text)
+  await restoreBackup(payload)
+  return payload
+}
+
+/** Numero totale di elementi contenuti in un payload di backup. */
+export function countBackupPayload(payload: BackupPayload): number {
+  return backupPayloadTotal(payload)
+}
+
+/** Costruisce il JSON di backup completo (con foto/audio). */
+export async function buildBackupJson(): Promise<string> {
+  return JSON.stringify(await exportBackup({ includeBlobs: true }))
+}
+
 export function summarizeBackup(payload: BackupPayload): string {
   const { data } = payload
   const parts = [

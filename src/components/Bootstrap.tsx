@@ -15,7 +15,8 @@ import {
   schedulePersistentStorageOnInteraction,
 } from '../utils/storagePersistence'
 import { updateDataFingerprint } from '../utils/dataFingerprint'
-import { saveAutoSnapshot, tryAutoRestore } from '../utils/backup'
+import { hasBackupableData, saveAutoSnapshot, tryAutoRestore } from '../utils/backup'
+import { isCloudBackupEnabled, restoreFromCloud } from '../utils/cloudBackup'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
@@ -84,6 +85,16 @@ export function Bootstrap() {
           await tryAutoRestore()
         } catch (err) {
           console.error('[DB] Ripristino automatico non riuscito:', err)
+        }
+        if (cancelled) return
+
+        // Se anche le copie locali sono vuote, prova il backup cloud.
+        try {
+          if (isCloudBackupEnabled() && !(await hasBackupableData())) {
+            await restoreFromCloud()
+          }
+        } catch (err) {
+          console.error('[Cloud] Ripristino dal cloud non riuscito:', err)
         }
         if (cancelled) return
 

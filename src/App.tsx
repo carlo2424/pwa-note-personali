@@ -33,6 +33,7 @@ import {
   saveAutoSnapshot,
   scheduleAutoSnapshot,
 } from './utils/backup'
+import { pushToCloud, scheduleCloudPush } from './utils/cloudBackup'
 import { shouldShowBackupReminder } from './utils/backupReminder'
 import {
   detectPossibleDataLoss,
@@ -225,16 +226,19 @@ function App() {
 
   function handleNoteSaved() {
     scheduleAutoSnapshot()
+    scheduleCloudPush()
     closeNoteForm()
   }
 
   function handleEventSaved() {
     scheduleAutoSnapshot()
+    scheduleCloudPush()
     closeEventForm()
   }
 
   function handleExpenseSaved() {
     scheduleAutoSnapshot()
+    scheduleCloudPush()
     closeExpenseForm()
   }
 
@@ -281,19 +285,25 @@ function App() {
         void ensurePersistentStorage()
         void updateDataFingerprint()
       } else {
-        // App in background: momento chiave per aggiornare lo snapshot.
+        // App in background: momento chiave per aggiornare le copie.
         void saveAutoSnapshot()
+        void pushToCloud().catch(() => {})
       }
     }
 
     function onPageHide() {
       void saveAutoSnapshot()
+      // keepalive: consente al salvataggio cloud di completarsi in chiusura.
+      void pushToCloud({ keepalive: true }).catch(() => {})
     }
 
     // Rete di sicurezza: snapshot periodico mentre l'app è aperta.
     const snapshotInterval = window.setInterval(
       () => {
-        if (document.visibilityState === 'visible') void saveAutoSnapshot()
+        if (document.visibilityState === 'visible') {
+          void saveAutoSnapshot()
+          void pushToCloud().catch(() => {})
+        }
       },
       5 * 60 * 1000,
     )

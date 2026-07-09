@@ -8,6 +8,7 @@ import {
   setRenewalNotifEnabled,
 } from '../utils/renewalNotifications'
 import { BackupPanel } from './BackupPanel'
+import { CloudBackupPanel } from './CloudBackupPanel'
 import { StoragePersistencePanel } from './StoragePersistencePanel'
 import { FileImportPanel } from './FileImportPanel'
 import { AreaGroupsSettings } from './AreaGroupsSettings'
@@ -61,6 +62,7 @@ export function SettingsPanel({ onBackupDone }: SettingsPanelProps) {
   return (
     <div className="space-y-4">
       <StoragePersistencePanel />
+      <CloudBackupPanel />
       <BackupPanel onBackupDone={onBackupDone} />
       <FileImportPanel />
       <AreaGroupsSettings />
