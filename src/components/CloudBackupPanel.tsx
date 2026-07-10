@@ -39,10 +39,21 @@ export function CloudBackupPanel() {
     setBusy('connect')
     setMessage(null)
     try {
-      await connectCloudBackup(token)
+      const result = await connectCloudBackup(token)
       setToken('')
       refresh()
-      setMessage('Backup cloud collegato e primo salvataggio eseguito.')
+      if (result.action === 'restored' && result.payload) {
+        clearDataFingerprint()
+        setMessage(
+          `Collegato e dati ripristinati dal cloud: ${summarizeBackup(result.payload)}.`,
+        )
+      } else if (result.action === 'pushed') {
+        setMessage('Backup cloud collegato e primo salvataggio eseguito.')
+      } else {
+        setMessage(
+          'Backup cloud collegato. Nessun dato ancora presente da salvare.',
+        )
+      }
     } catch (err) {
       setMessage(
         err instanceof Error ? err.message : 'Collegamento non riuscito.',

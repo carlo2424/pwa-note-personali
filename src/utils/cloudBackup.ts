@@ -1,6 +1,7 @@
 import {
-  buildBackupJson,
   countBackupPayload,
+  exportBackup,
+  hasBackupableData,
   parseBackupPayload,
   restoreBackupFromText,
   type BackupPayload,
@@ -114,15 +115,28 @@ async function findExistingBackupGist(token: string): Promise<string | null> {
   return match?.id ?? null
 }
 
+export interface CloudConnectResult {
+  /** 'restored' se i dati sono stati recuperati dal cloud, 'pushed' se salvati. */
+  action: 'restored' | 'pushed' | 'linked'
+  payload: BackupPayload | null
+}
+
 /**
- * Collega il backup cloud: valida il token, riusa un gist esistente se c'è,
- * altrimenti ne crea uno nuovo con lo stato attuale dei dati.
+ * Collega il backup cloud: valida il token e riusa il gist esistente se c'è.
+ *
+ * Sicurezza dati: se i dati locali sono assenti (es. dopo una cancellazione del
+ * browser) ma il gist contiene un backup, i dati vengono **ripristinati** dal
+ * cloud, senza mai sovrascrivere il backup buono con dati vuoti.
  */
-export async function connectCloudBackup(rawToken: string): Promise<void> {
+export async function connectCloudBackup(
+  rawToken: string,
+): Promise<CloudConnectResult> {
   const token = rawToken.trim()
   if (!token) throw new Error('Inserisci un token GitHub valido.')
 
   const existing = await findExistingBackupGist(token)
+  const previousToken = localStorage.getItem(TOKEN_KEY)
+  const previousGistId = localStorage.getItem(GIST_ID_KEY)
   localStorage.setItem(TOKEN_KEY, token)
   if (existing) {
     localStorage.setItem(GIST_ID_KEY, existing)
@@ -131,11 +145,25 @@ export async function connectCloudBackup(rawToken: string): Promise<void> {
   }
 
   try {
-    await pushToCloud()
+    const localHasData = await hasBackupableData()
+
+    if (!localHasData && existing) {
+      // Dati locali assenti: recupera dal cloud, NON sovrascrivere.
+      const restored = await restoreFromCloud()
+      if (restored) return { action: 'restored', payload: restored }
+      // Gist collegato ma vuoto: nulla da ripristinare, nulla da salvare.
+      return { action: 'linked', payload: null }
+    }
+
+    // Ci sono dati locali: salvali nel cloud.
+    const pushed = await pushToCloud({ force: true })
+    return { action: pushed ? 'pushed' : 'linked', payload: null }
   } catch (err) {
-    // Rollback se il primo salvataggio fallisce, per non lasciare stato monco.
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(GIST_ID_KEY)
+    // Rollback allo stato precedente, per non lasciare configurazione monca.
+    if (previousToken) localStorage.setItem(TOKEN_KEY, previousToken)
+    else localStorage.removeItem(TOKEN_KEY)
+    if (previousGistId) localStorage.setItem(GIST_ID_KEY, previousGistId)
+    else localStorage.removeItem(GIST_ID_KEY)
     throw err
   }
 }
@@ -188,14 +216,24 @@ async function updateGist(
 /**
  * Salva il backup corrente nel gist. Non lancia se il cloud non è collegato.
  * `keepalive` consente il completamento anche quando l'app va in background.
+ *
+ * Sicurezza dati: per impostazione predefinita NON sovrascrive con dati vuoti
+ * (0 elementi), così un avvio "a vuoto" non può distruggere il backup. Usa
+ * `force` solo quando il salvataggio di dati vuoti è voluto.
  */
 export async function pushToCloud(options?: {
   keepalive?: boolean
+  force?: boolean
 }): Promise<boolean> {
   const token = getCloudToken()
   if (!token) return false
 
-  const content = await buildBackupJson()
+  const payload = await exportBackup({ includeBlobs: true })
+  if (countBackupPayload(payload) === 0 && !options?.force) {
+    // Nessun dato: non sovrascrivere un eventuale backup cloud valido.
+    return false
+  }
+  const content = JSON.stringify(payload)
   const gistId = getCloudGistId()
   const keepalive = options?.keepalive ?? false
 
