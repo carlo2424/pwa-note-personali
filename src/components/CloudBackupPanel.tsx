@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Cloud, CloudOff, Loader2, RefreshCw, Download } from 'lucide-react'
+import { Cloud, CloudOff, History, Loader2, RefreshCw, Download } from 'lucide-react'
 import {
   connectCloudBackup,
   disconnectCloudBackup,
   getCloudStatus,
   pushToCloud,
   restoreFromCloud,
+  restoreMostCompleteFromCloud,
 } from '../utils/cloudBackup'
 import { summarizeBackup } from '../utils/backup'
 import { clearDataFingerprint } from '../utils/dataFingerprint'
@@ -27,7 +28,9 @@ function formatSync(at: number | null): string {
 export function CloudBackupPanel() {
   const [status, setStatus] = useState(getCloudStatus())
   const [token, setToken] = useState('')
-  const [busy, setBusy] = useState<'connect' | 'push' | 'restore' | null>(null)
+  const [busy, setBusy] = useState<
+    'connect' | 'push' | 'restore' | 'history' | null
+  >(null)
   const [message, setMessage] = useState<string | null>(null)
 
   function refresh() {
@@ -95,6 +98,31 @@ export function CloudBackupPanel() {
       setMessage(`Ripristinato dal cloud: ${summarizeBackup(payload)}.`)
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Ripristino non riuscito.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleRestoreHistory() {
+    const ok = window.confirm(
+      'Cerco nello storico del cloud la versione più completa (con più note) e la ripristino, sostituendo i dati attuali.\n\nContinuare?',
+    )
+    if (!ok) return
+    setBusy('history')
+    setMessage(null)
+    try {
+      const result = await restoreMostCompleteFromCloud()
+      if (!result) {
+        setMessage('Nessuna versione con dati trovata nello storico del cloud.')
+        return
+      }
+      clearDataFingerprint()
+      refresh()
+      setMessage(
+        `Ripristinata versione più completa (${result.revisionsScanned} versioni esaminate): ${summarizeBackup(result.payload)}.`,
+      )
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Recupero non riuscito.')
     } finally {
       setBusy(null)
     }
@@ -174,6 +202,19 @@ export function CloudBackupPanel() {
                 <Download className="h-4 w-4" />
               )}
               Ripristina dal cloud
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void handleRestoreHistory()}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white py-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+            >
+              {busy === 'history' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <History className="h-4 w-4" />
+              )}
+              Recupera versione più completa
             </button>
             <button
               type="button"

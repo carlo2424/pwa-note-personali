@@ -36,11 +36,25 @@ interface GistFile {
   raw_url?: string
 }
 
+interface GistHistoryEntry {
+  version: string
+  committed_at?: string
+}
+
 interface GistResponse {
   id: string
   description: string | null
   files: Record<string, GistFile>
   updated_at?: string
+  history?: GistHistoryEntry[]
+}
+
+export interface CloudRecoveryResult {
+  payload: BackupPayload
+  /** Numero di revisioni esaminate nello storico. */
+  revisionsScanned: number
+  /** True se la versione scelta è una precedente (non l'ultima). */
+  fromHistory: boolean
 }
 
 export function getCloudToken(): string | null {
@@ -288,6 +302,93 @@ export async function restoreFromCloud(): Promise<BackupPayload | null> {
   if (!payload || countBackupPayload(payload) === 0) return null
   await restoreBackupFromText(JSON.stringify(payload))
   return payload
+}
+
+async function readRevisionText(
+  token: string,
+  gistId: string,
+  version: string,
+): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/gists/${gistId}/${version}`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) return null
+  const gist = (await res.json()) as GistResponse
+  const file = gist.files?.[GIST_FILENAME]
+  if (!file) return null
+  if (file.truncated && file.raw_url) {
+    const rawRes = await fetch(file.raw_url, { headers: authHeaders(token) })
+    if (!rawRes.ok) return null
+    return rawRes.text()
+  }
+  return file.content ?? null
+}
+
+/**
+ * Cerca nello storico del gist la versione **più completa** (con più note,
+ * poi più elementi in totale) e la restituisce senza applicarla.
+ * Utile quando l'ultima versione ha perso dei dati.
+ */
+export async function findMostCompleteCloudBackup(
+  maxRevisions = 30,
+): Promise<CloudRecoveryResult | null> {
+  const token = getCloudToken()
+  if (!token) return null
+  let gistId = getCloudGistId()
+  if (!gistId) {
+    gistId = await findExistingBackupGist(token)
+    if (gistId) localStorage.setItem(GIST_ID_KEY, gistId)
+  }
+  if (!gistId) return null
+
+  const res = await fetch(`${API_BASE}/gists/${gistId}`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw await apiError(res)
+  const gist = (await res.json()) as GistResponse
+
+  const versions = (gist.history ?? [])
+    .map((h) => h.version)
+    .slice(0, maxRevisions)
+
+  let best: BackupPayload | null = null
+  let bestScore = -1
+  let bestIndex = -1
+
+  for (let i = 0; i < versions.length; i++) {
+    const text = await readRevisionText(token, gistId, versions[i])
+    if (!text) continue
+    let payload: BackupPayload
+    try {
+      payload = parseBackupPayload(text)
+    } catch {
+      continue
+    }
+    // Priorità alle note, poi al totale degli elementi.
+    const score = payload.data.notes.length * 1_000_000 + countBackupPayload(payload)
+    if (score > bestScore) {
+      bestScore = score
+      best = payload
+      bestIndex = i
+    }
+  }
+
+  if (!best || countBackupPayload(best) === 0) return null
+  return {
+    payload: best,
+    revisionsScanned: versions.length,
+    fromHistory: bestIndex > 0,
+  }
+}
+
+/**
+ * Ripristina la versione più completa trovata nello storico del gist.
+ */
+export async function restoreMostCompleteFromCloud(): Promise<CloudRecoveryResult | null> {
+  const result = await findMostCompleteCloudBackup()
+  if (!result) return null
+  await restoreBackupFromText(JSON.stringify(result.payload))
+  return result
 }
 
 let cloudPushTimer: ReturnType<typeof setTimeout> | undefined
