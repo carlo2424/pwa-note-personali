@@ -58,7 +58,7 @@ export function buildHomeDeadlineLine(
   return { label, tone, iso }
 }
 
-/** Card Home Impegni: oggi in rosso, solo la data futura più vicina in grigio. */
+/** Card Home Impegni: oggi/scaduto in rosso, scadenze vicine (entro 7 gg) in amber. */
 export interface HomeImpegniCardLinesResult {
   lines: HomeDeadlineLine[]
   hiddenCount: number
@@ -91,8 +91,8 @@ export function buildHomeImpegniCardLines(
     : []
 
   for (const item of nextDateItems) {
-    const line = buildHomeDeadlineLine(item.title, item.iso)
-    lines.push({ ...line, tone: 'default' })
+    // Mantiene il colore naturale: «tra N giorni» in amber, non grigio.
+    lines.push(buildHomeDeadlineLine(item.title, item.iso))
   }
 
   if (lines.length === 0) {
