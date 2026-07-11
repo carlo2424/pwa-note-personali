@@ -1,6 +1,15 @@
 import { useState } from 'react'
-import { Cloud, CloudOff, History, Loader2, RefreshCw, Download } from 'lucide-react'
 import {
+  Cloud,
+  CloudOff,
+  Download,
+  History,
+  Link as LinkIcon,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react'
+import {
+  buildCloudRecoveryLink,
   connectCloudBackup,
   disconnectCloudBackup,
   getCloudStatus,
@@ -138,6 +147,20 @@ export function CloudBackupPanel() {
     setMessage('Backup cloud scollegato.')
   }
 
+  async function handleCopyRecoveryLink() {
+    const link = buildCloudRecoveryLink()
+    if (!link) return
+    try {
+      await navigator.clipboard.writeText(link)
+      setMessage(
+        'Collegamento di ripristino copiato. Salvalo tra i segnalibri di Brave.',
+      )
+    } catch {
+      // Fallback: mostra il link da copiare a mano.
+      window.prompt('Copia questo collegamento e salvalo tra i segnalibri:', link)
+    }
+  }
+
   const accent = status.connected
     ? 'bg-emerald-100 text-emerald-600'
     : 'bg-slate-200 text-slate-500'
@@ -216,6 +239,29 @@ export function CloudBackupPanel() {
               )}
               Recupera versione più completa
             </button>
+
+            <div className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2.5 text-[11px] leading-snug text-sky-900">
+              <p className="font-semibold">
+                Ripristino automatico anche se Brave cancella i dati
+              </p>
+              <p className="mt-1">
+                Crea un segnalibro speciale che contiene il token: aprendo
+                l’app da lì, i dati tornano da soli senza reincollare nulla.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleCopyRecoveryLink()}
+                className="mt-2 inline-flex items-center gap-1 rounded-md border border-sky-300 bg-white px-2.5 py-1 font-semibold text-sky-800"
+              >
+                <LinkIcon className="h-3.5 w-3.5" />
+                Copia collegamento di ripristino
+              </button>
+              <p className="mt-1.5 text-sky-700">
+                Poi in Brave: menu ⋮ → «Segnalibri» → incolla e salva. Apri
+                sempre l’app da questo segnalibro. Tienilo privato.
+              </p>
+            </div>
+
             <button
               type="button"
               disabled={busy !== null}

@@ -16,7 +16,11 @@ import {
 } from '../utils/storagePersistence'
 import { updateDataFingerprint } from '../utils/dataFingerprint'
 import { hasBackupableData, saveAutoSnapshot, tryAutoRestore } from '../utils/backup'
-import { isCloudBackupEnabled, restoreFromCloud } from '../utils/cloudBackup'
+import {
+  isCloudBackupEnabled,
+  restoreFromCloud,
+  seedCloudTokenFromUrl,
+} from '../utils/cloudBackup'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
@@ -89,7 +93,10 @@ export function Bootstrap() {
         if (cancelled) return
 
         // Se anche le copie locali sono vuote, prova il backup cloud.
+        // Prima re-inserisce il token dall'URL (collegamento di ripristino),
+        // così il recupero è automatico anche dopo una cancellazione di Brave.
         try {
+          seedCloudTokenFromUrl()
           if (isCloudBackupEnabled() && !(await hasBackupableData())) {
             await restoreFromCloud()
           }

@@ -87,6 +87,54 @@ function setLastSyncNow(): void {
   localStorage.setItem(LAST_SYNC_KEY, String(Date.now()))
 }
 
+const URL_TOKEN_PARAM = 'cloudtoken'
+
+/**
+ * Legge un token dal parametro nell'URL (hash o query) e lo memorizza.
+ * Serve al "collegamento di ripristino": aprendo l'app da quel segnalibro, il
+ * token viene re-inserito anche dopo che Brave ha cancellato i dati del sito.
+ * Restituisce true se un token è stato trovato e salvato.
+ */
+export function seedCloudTokenFromUrl(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const fromHash = new URLSearchParams(
+      window.location.hash.replace(/^#/, ''),
+    ).get(URL_TOKEN_PARAM)
+    const fromQuery = new URLSearchParams(window.location.search).get(
+      URL_TOKEN_PARAM,
+    )
+    const token = (fromHash ?? fromQuery ?? '').trim()
+    if (!token) return false
+
+    const previous = getCloudToken()
+    localStorage.setItem(TOKEN_KEY, token)
+    if (previous !== token) localStorage.removeItem(GIST_ID_KEY)
+
+    // Toglie il token dalla barra indirizzi visibile (il segnalibro conserva
+    // comunque l'URL originale, quindi il riavvio successivo lo re-inserisce).
+    try {
+      const url = new URL(window.location.href)
+      url.hash = ''
+      url.searchParams.delete(URL_TOKEN_PARAM)
+      window.history.replaceState(null, '', url.toString())
+    } catch {
+      // ignora
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Costruisce il collegamento di ripristino con il token incorporato. */
+export function buildCloudRecoveryLink(): string | null {
+  const token = getCloudToken()
+  if (!token || typeof window === 'undefined') return null
+  const base = `${window.location.origin}${window.location.pathname}`
+  return `${base}#${URL_TOKEN_PARAM}=${encodeURIComponent(token)}`
+}
+
 function authHeaders(token: string): HeadersInit {
   return {
     Authorization: `Bearer ${token}`,
