@@ -1,5 +1,5 @@
 import { db, type Event, type Note, type RecurrenceFrequency } from '../db'
-import { isPastDue } from './countdown'
+import { isPastDue, todayIso } from './countdown'
 import { addRecurrence, parseIsoDate, toIsoDateLocal, repairCorruptedRenewalPatch, computeNextRenewalDate } from './impegnoDates'
 import { isAutomatedPaymentMethod, eventRequiresManualDone } from './paymentMethod'
 import { isOverdueEvent } from './overdue'
@@ -20,7 +20,8 @@ export function isRecurringPeriodReadyForDone(
   if (isAutomatedPaymentMethod(event.paymentMethod)) return false
   if (!event.recurrenceFrequency) return true
   if (isOverdueEvent(event)) return true
-  if (event.renewalDate && isPastDue(event.renewalDate)) return true
+  // Convalidabile anche il giorno della scadenza (oggi), non solo se passata.
+  if (event.renewalDate && event.renewalDate <= todayIso()) return true
   return false
 }
 
