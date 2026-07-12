@@ -15,12 +15,12 @@ import {
   schedulePersistentStorageOnInteraction,
 } from '../utils/storagePersistence'
 import { updateDataFingerprint } from '../utils/dataFingerprint'
-import { hasBackupableData, saveAutoSnapshot, tryAutoRestore } from '../utils/backup'
+import { saveAutoSnapshot, tryAutoRestore } from '../utils/backup'
 import {
-  isCloudBackupEnabled,
-  restoreFromCloud,
-  seedCloudTokenFromUrl,
+  hydrateCloudCredentials,
+  runCloudStartupSync,
 } from '../utils/cloudBackup'
+import { installAutoCloudSyncHooks } from '../utils/autoCloudSync'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
@@ -83,6 +83,16 @@ export function Bootstrap() {
         await db.open()
         if (cancelled) return
 
+        installAutoCloudSyncHooks()
+
+        // Credenziali cloud (URL segnalibro → localStorage → OPFS).
+        try {
+          await hydrateCloudCredentials()
+        } catch (err) {
+          console.error('[Cloud] Credenziali non recuperate:', err)
+        }
+        if (cancelled) return
+
         // Recupero automatico: se il DB è vuoto ma esiste uno snapshot,
         // ripristina prima di mostrare l'app (protezione perdita dati Brave).
         try {
@@ -92,16 +102,11 @@ export function Bootstrap() {
         }
         if (cancelled) return
 
-        // Se anche le copie locali sono vuote, prova il backup cloud.
-        // Prima re-inserisce il token dall'URL (collegamento di ripristino),
-        // così il recupero è automatico anche dopo una cancellazione di Brave.
+        // GitHub Gist: scarica ultimo backup se vuoto, altrimenti carica locale.
         try {
-          seedCloudTokenFromUrl()
-          if (isCloudBackupEnabled() && !(await hasBackupableData())) {
-            await restoreFromCloud()
-          }
+          await runCloudStartupSync()
         } catch (err) {
-          console.error('[Cloud] Ripristino dal cloud non riuscito:', err)
+          console.error('[Cloud] Sincronizzazione avvio non riuscita:', err)
         }
         if (cancelled) return
 

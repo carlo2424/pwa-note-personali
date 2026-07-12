@@ -18,6 +18,7 @@ import {
 const TOKEN_KEY = 'pwa-cloud-gist-token'
 const GIST_ID_KEY = 'pwa-cloud-gist-id'
 const LAST_SYNC_KEY = 'pwa-cloud-last-sync'
+const OPFS_CREDS_FILE = 'pwa-cloud-creds.json'
 
 const API_BASE = 'https://api.github.com'
 const GIST_FILENAME = 'note-personali-backup.json'
@@ -87,6 +88,122 @@ function setLastSyncNow(): void {
   localStorage.setItem(LAST_SYNC_KEY, String(Date.now()))
 }
 
+function supportsOpfs(): boolean {
+  return typeof navigator.storage?.getDirectory === 'function'
+}
+
+async function writeOpfsText(fileName: string, content: string): Promise<void> {
+  if (!supportsOpfs()) return
+  const root = await navigator.storage.getDirectory()
+  const fileHandle = await root.getFileHandle(fileName, { create: true })
+  const writable = await fileHandle.createWritable()
+  await writable.write(content)
+  await writable.close()
+}
+
+async function readOpfsText(fileName: string): Promise<string | null> {
+  if (!supportsOpfs()) return null
+  try {
+    const root = await navigator.storage.getDirectory()
+    const fileHandle = await root.getFileHandle(fileName)
+    const file = await fileHandle.getFile()
+    return await file.text()
+  } catch {
+    return null
+  }
+}
+
+async function removeOpfsFile(fileName: string): Promise<void> {
+  if (!supportsOpfs()) return
+  try {
+    const root = await navigator.storage.getDirectory()
+    await root.removeEntry(fileName)
+  } catch {
+    // ignora
+  }
+}
+
+/** Salva token e gistId in localStorage e copia ridondante OPFS. */
+export async function persistCloudCredentials(
+  token: string,
+  gistId?: string | null,
+): Promise<void> {
+  localStorage.setItem(TOKEN_KEY, token)
+  if (gistId) localStorage.setItem(GIST_ID_KEY, gistId)
+  try {
+    await writeOpfsText(
+      OPFS_CREDS_FILE,
+      JSON.stringify({ token, gistId: gistId ?? null }),
+    )
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Ripristina le credenziali cloud dopo una cancellazione del browser:
+ * 1) token nell'URL (segnalibro di ripristino)
+ * 2) copia OPFS
+ */
+export async function hydrateCloudCredentials(): Promise<boolean> {
+  seedCloudTokenFromUrl()
+
+  if (getCloudToken()) {
+    await ensureCloudGistLinked()
+    return true
+  }
+
+  try {
+    const raw = await readOpfsText(OPFS_CREDS_FILE)
+    if (!raw) return false
+    const parsed = JSON.parse(raw) as { token?: string; gistId?: string | null }
+    const token = parsed.token?.trim()
+    if (!token) return false
+    localStorage.setItem(TOKEN_KEY, token)
+    if (parsed.gistId) localStorage.setItem(GIST_ID_KEY, parsed.gistId)
+    await ensureCloudGistLinked()
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function ensureCloudGistLinked(): Promise<void> {
+  const token = getCloudToken()
+  if (!token || getCloudGistId()) return
+  const existing = await findExistingBackupGist(token)
+  if (existing) {
+    localStorage.setItem(GIST_ID_KEY, existing)
+    await persistCloudCredentials(token, existing)
+  }
+}
+
+export type CloudStartupResult = 'restored' | 'pushed' | 'idle' | 'no-cloud'
+
+/**
+ * All'avvio: se il cloud è collegato, scarica l'ultimo backup se il DB è
+ * vuoto, altrimenti carica su GitHub lo stato locale (sovrascrive il gist).
+ */
+export async function runCloudStartupSync(): Promise<CloudStartupResult> {
+  if (!isCloudBackupEnabled()) return 'no-cloud'
+
+  try {
+    await ensureCloudGistLinked()
+    const localHasData = await hasBackupableData()
+
+    if (!localHasData) {
+      const restored = await restoreFromCloud()
+      return restored ? 'restored' : 'idle'
+    }
+
+    const pushed = await pushToCloud()
+    return pushed ? 'pushed' : 'idle'
+  } catch (err) {
+    console.error('[Cloud] Sincronizzazione avvio non riuscita:', err)
+    return 'idle'
+  }
+}
+
 const URL_TOKEN_PARAM = 'cloudtoken'
 
 /**
@@ -110,6 +227,7 @@ export function seedCloudTokenFromUrl(): boolean {
     const previous = getCloudToken()
     localStorage.setItem(TOKEN_KEY, token)
     if (previous !== token) localStorage.removeItem(GIST_ID_KEY)
+    void persistCloudCredentials(token, getCloudGistId())
 
     // Toglie il token dalla barra indirizzi visibile (il segnalibro conserva
     // comunque l'URL originale, quindi il riavvio successivo lo re-inserisce).
@@ -199,12 +317,7 @@ export async function connectCloudBackup(
   const existing = await findExistingBackupGist(token)
   const previousToken = localStorage.getItem(TOKEN_KEY)
   const previousGistId = localStorage.getItem(GIST_ID_KEY)
-  localStorage.setItem(TOKEN_KEY, token)
-  if (existing) {
-    localStorage.setItem(GIST_ID_KEY, existing)
-  } else {
-    localStorage.removeItem(GIST_ID_KEY)
-  }
+  await persistCloudCredentials(token, existing ?? null)
 
   try {
     const localHasData = await hasBackupableData()
@@ -234,6 +347,7 @@ export function disconnectCloudBackup(): void {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(GIST_ID_KEY)
   localStorage.removeItem(LAST_SYNC_KEY)
+  void removeOpfsFile(OPFS_CREDS_FILE)
 }
 
 async function createGist(token: string, content: string): Promise<string> {
@@ -304,6 +418,7 @@ export async function pushToCloud(options?: {
   } else {
     const newId = await createGist(token, content)
     localStorage.setItem(GIST_ID_KEY, newId)
+    await persistCloudCredentials(token, newId)
   }
   setLastSyncNow()
   return true

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import { installReloadPersistenceGuards } from './utils/autoCloudSync'
 import { Bootstrap } from './components/Bootstrap.tsx'
 import {
   applyAppUpdateReload,
@@ -31,6 +32,8 @@ async function clearPwaCacheInDev(): Promise<void> {
 }
 
 void clearPwaCacheInDev()
+
+installReloadPersistenceGuards()
 
 async function startApp(): Promise<void> {
   const action = await prepareAppUpdate()
