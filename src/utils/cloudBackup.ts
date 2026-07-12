@@ -1,6 +1,7 @@
 import {
   countBackupPayload,
   exportBackup,
+  getLatestLocalChangeMs,
   hasBackupableData,
   parseBackupPayload,
   restoreBackupFromText,
@@ -20,6 +21,11 @@ const GIST_ID_KEY = 'pwa-cloud-gist-id'
 const LAST_SYNC_KEY = 'pwa-cloud-last-sync'
 const OPFS_CREDS_FILE = 'pwa-cloud-creds.json'
 const OPFS_SYNC_META_FILE = 'pwa-cloud-sync-meta.json'
+const CREDS_IDB_NAME = 'note-personali-cloud-creds'
+const CREDS_IDB_VERSION = 1
+const CREDS_IDB_KEY = 'github'
+
+type StoredCloudCreds = { token: string; gistId: string | null }
 
 interface CloudSyncMeta {
   total: number
@@ -27,18 +33,6 @@ interface CloudSyncMeta {
   events: number
   expenses: number
   at: number
-}
-
-async function readSyncMeta(): Promise<CloudSyncMeta | null> {
-  try {
-    const raw = await readOpfsText(OPFS_SYNC_META_FILE)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as CloudSyncMeta
-    if (typeof parsed.total !== 'number') return null
-    return parsed
-  } catch {
-    return null
-  }
 }
 
 async function writeSyncMeta(payload: BackupPayload): Promise<void> {
@@ -56,38 +50,9 @@ async function writeSyncMeta(payload: BackupPayload): Promise<void> {
   }
 }
 
-function payloadCounts(payload: BackupPayload) {
-  return {
-    notes: payload.data.notes.length,
-    events: payload.data.events.length,
-    expenses: payload.data.expenses.length,
-    total: countBackupPayload(payload),
-  }
-}
-
-/** True se il backup cloud ha più dati del locale (perdita parziale overnight). */
-function isCloudRicherThanLocal(
-  cloud: BackupPayload,
-  local: BackupPayload,
-): boolean {
-  const c = payloadCounts(cloud)
-  const l = payloadCounts(local)
-  if (c.total > l.total) return true
-  // Le note spariscono spesso per prime dopo una pulizia del browser.
-  if (c.notes > l.notes) return true
-  return false
-}
-
-/** Blocca upload se i dati locali sono calati rispetto all'ultimo salvataggio buono. */
-async function isLocalBackupDegraded(
-  payload: BackupPayload,
-): Promise<boolean> {
-  const meta = await readSyncMeta()
-  if (!meta) return false
-  const current = payloadCounts(payload)
-  if (current.total < meta.total) return true
-  if (current.notes < meta.notes) return true
-  return false
+function cloudExportedAtMs(payload: BackupPayload): number {
+  const ms = Date.parse(payload.exportedAt)
+  return Number.isFinite(ms) ? ms : 0
 }
 
 const API_BASE = 'https://api.github.com'
@@ -193,6 +158,91 @@ async function removeOpfsFile(fileName: string): Promise<void> {
   }
 }
 
+function openCredsIdb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(CREDS_IDB_NAME, CREDS_IDB_VERSION)
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore('creds')
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function idbPutCreds(creds: StoredCloudCreds): Promise<void> {
+  const db = await openCredsIdb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('creds', 'readwrite')
+    tx.objectStore('creds').put(creds, CREDS_IDB_KEY)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+  db.close()
+}
+
+async function idbGetCreds(): Promise<StoredCloudCreds | null> {
+  const db = await openCredsIdb()
+  const value = await new Promise<StoredCloudCreds | null>((resolve, reject) => {
+    const tx = db.transaction('creds', 'readonly')
+    const req = tx.objectStore('creds').get(CREDS_IDB_KEY)
+    req.onsuccess = () =>
+      resolve((req.result as StoredCloudCreds | undefined) ?? null)
+    req.onerror = () => reject(req.error)
+  })
+  db.close()
+  return value
+}
+
+async function idbClearCreds(): Promise<void> {
+  try {
+    const db = await openCredsIdb()
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('creds', 'readwrite')
+      tx.objectStore('creds').delete(CREDS_IDB_KEY)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+    db.close()
+  } catch {
+    // ignora
+  }
+}
+
+async function applyStoredCreds(creds: StoredCloudCreds): Promise<boolean> {
+  const token = creds.token?.trim()
+  if (!token) return false
+  localStorage.setItem(TOKEN_KEY, token)
+  if (creds.gistId) localStorage.setItem(GIST_ID_KEY, creds.gistId)
+  await ensureCloudGistLinked()
+  return true
+}
+
+/** Ripara le copie ridondanti se localStorage ha il token ma OPFS/IDB no. */
+async function repairRedundantCredentialCopies(): Promise<void> {
+  const token = getCloudToken()
+  if (!token) return
+  const gistId = getCloudGistId()
+  const payload = JSON.stringify({ token, gistId })
+
+  const opfsRaw = await readOpfsText(OPFS_CREDS_FILE)
+  if (!opfsRaw) {
+    try {
+      await writeOpfsText(OPFS_CREDS_FILE, payload)
+    } catch {
+      // best-effort
+    }
+  }
+
+  const idb = await idbGetCreds().catch(() => null)
+  if (!idb?.token) {
+    try {
+      await idbPutCreds({ token, gistId })
+    } catch {
+      // best-effort
+    }
+  }
+}
+
 /** Salva token e gistId in localStorage e copia ridondante OPFS. */
 export async function persistCloudCredentials(
   token: string,
@@ -200,42 +250,66 @@ export async function persistCloudCredentials(
 ): Promise<void> {
   localStorage.setItem(TOKEN_KEY, token)
   if (gistId) localStorage.setItem(GIST_ID_KEY, gistId)
+  const stored: StoredCloudCreds = { token, gistId: gistId ?? getCloudGistId() }
   try {
-    await writeOpfsText(
-      OPFS_CREDS_FILE,
-      JSON.stringify({ token, gistId: gistId ?? null }),
-    )
+    await writeOpfsText(OPFS_CREDS_FILE, JSON.stringify(stored))
+  } catch {
+    // best-effort
+  }
+  try {
+    await idbPutCreds(stored)
   } catch {
     // best-effort
   }
 }
 
 /**
- * Ripristina le credenziali cloud dopo una cancellazione del browser:
- * 1) token nell'URL (segnalibro di ripristino)
- * 2) copia OPFS
+ * Garantisce che token e gistId siano in localStorage, recuperandoli se mancano.
+ * Ordine: URL segnalibro → OPFS → IndexedDB dedicato.
  */
-export async function hydrateCloudCredentials(): Promise<boolean> {
+export async function ensureCloudCredentials(): Promise<boolean> {
   seedCloudTokenFromUrl()
 
   if (getCloudToken()) {
     await ensureCloudGistLinked()
+    await repairRedundantCredentialCopies()
     return true
   }
 
   try {
     const raw = await readOpfsText(OPFS_CREDS_FILE)
-    if (!raw) return false
-    const parsed = JSON.parse(raw) as { token?: string; gistId?: string | null }
-    const token = parsed.token?.trim()
-    if (!token) return false
-    localStorage.setItem(TOKEN_KEY, token)
-    if (parsed.gistId) localStorage.setItem(GIST_ID_KEY, parsed.gistId)
-    await ensureCloudGistLinked()
-    return true
+    if (raw) {
+      const parsed = JSON.parse(raw) as StoredCloudCreds
+      if (await applyStoredCreds(parsed)) {
+        console.info('[Cloud] Token reinserito automaticamente (copia OPFS).')
+        await repairRedundantCredentialCopies()
+        return true
+      }
+    }
   } catch {
-    return false
+    // prova la copia successiva
   }
+
+  try {
+    const stored = await idbGetCreds()
+    if (stored && (await applyStoredCreds(stored))) {
+      console.info('[Cloud] Token reinserito automaticamente (copia IndexedDB).')
+      await repairRedundantCredentialCopies()
+      return true
+    }
+  } catch {
+    // nessuna copia disponibile
+  }
+
+  return false
+}
+
+/**
+ * Ripristina le credenziali cloud dopo una cancellazione del browser.
+ * Alias di ensureCloudCredentials per compatibilità.
+ */
+export async function hydrateCloudCredentials(): Promise<boolean> {
+  return ensureCloudCredentials()
 }
 
 async function ensureCloudGistLinked(): Promise<void> {
@@ -251,11 +325,11 @@ async function ensureCloudGistLinked(): Promise<void> {
 export type CloudStartupResult = 'restored' | 'pushed' | 'idle' | 'no-cloud'
 
 /**
- * All'avvio: confronta locale e cloud. Se il cloud ha più dati (perdita
- * parziale overnight), ripristina. Altrimenti carica il locale su GitHub.
+ * All'avvio: confronta locale e cloud per data. Il backup GitHub più recente
+ * vince (modifiche reali dell'utente). Altrimenti carica il locale su GitHub.
  */
 export async function runCloudStartupSync(): Promise<CloudStartupResult> {
-  if (!isCloudBackupEnabled()) return 'no-cloud'
+  if (!(await ensureCloudCredentials())) return 'no-cloud'
 
   try {
     await ensureCloudGistLinked()
@@ -271,8 +345,9 @@ export async function runCloudStartupSync(): Promise<CloudStartupResult> {
         return 'restored'
       }
 
-      const localPayload = await exportBackup({ includeBlobs: true })
-      if (isCloudRicherThanLocal(cloudPayload, localPayload)) {
+      const cloudAt = cloudExportedAtMs(cloudPayload)
+      const localAt = await getLatestLocalChangeMs()
+      if (cloudAt > localAt) {
         await restoreBackupFromText(JSON.stringify(cloudPayload))
         await writeSyncMeta(cloudPayload)
         return 'restored'
@@ -419,7 +494,18 @@ export async function connectCloudBackup(
       return { action: 'linked', payload: null }
     }
 
-    // Ci sono dati locali: salvali nel cloud.
+    if (existing) {
+      const cloudPayload = await fetchCloudBackup()
+      if (cloudPayload && countBackupPayload(cloudPayload) > 0) {
+        const cloudAt = cloudExportedAtMs(cloudPayload)
+        const localAt = await getLatestLocalChangeMs()
+        if (cloudAt > localAt) {
+          const restored = await restoreFromCloud()
+          if (restored) return { action: 'restored', payload: restored }
+        }
+      }
+    }
+
     const pushed = await pushToCloud({ force: true })
     return { action: pushed ? 'pushed' : 'linked', payload: null }
   } catch (err) {
@@ -438,6 +524,7 @@ export function disconnectCloudBackup(): void {
   localStorage.removeItem(LAST_SYNC_KEY)
   void removeOpfsFile(OPFS_CREDS_FILE)
   void removeOpfsFile(OPFS_SYNC_META_FILE)
+  void idbClearCreds()
 }
 
 async function createGist(token: string, content: string): Promise<string> {
@@ -491,18 +578,13 @@ export async function pushToCloud(options?: {
   keepalive?: boolean
   force?: boolean
 }): Promise<boolean> {
+  if (!(await ensureCloudCredentials())) return false
+
   const token = getCloudToken()
   if (!token) return false
 
   const payload = await exportBackup({ includeBlobs: true })
   if (countBackupPayload(payload) === 0 && !options?.force) {
-    return false
-  }
-
-  if (!options?.force && (await isLocalBackupDegraded(payload))) {
-    console.warn(
-      '[Cloud] Salvataggio bloccato: dati locali ridotti rispetto all\'ultimo backup noto.',
-    )
     return false
   }
 

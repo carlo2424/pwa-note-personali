@@ -423,6 +423,51 @@ export async function hasBackupableData(): Promise<boolean> {
   return counts.some((c) => c > 0)
 }
 
+/** Millisecondi dell'ultima modifica locale (confronto con exportedAt del cloud). */
+export async function getLatestLocalChangeMs(): Promise<number> {
+  const [
+    notes,
+    events,
+    expenses,
+    tasks,
+    taskLists,
+    areas,
+    archive,
+    paymentCards,
+  ] = await Promise.all([
+    db.notes.toArray(),
+    db.events.toArray(),
+    db.expenses.toArray(),
+    db.tasks.toArray(),
+    db.taskLists.toArray(),
+    db.areas.toArray(),
+    db.archive.toArray(),
+    db.paymentCards.toArray(),
+  ])
+
+  let max = 0
+  const bump = (n: number | undefined) => {
+    if (typeof n === 'number' && n > max) max = n
+  }
+
+  for (const n of notes) {
+    bump(n.updatedAt)
+    bump(n.createdAt)
+  }
+  for (const e of events) {
+    bump(e.updatedAt)
+    bump(e.createdAt)
+  }
+  for (const x of expenses) bump(x.createdAt)
+  for (const t of tasks) bump(t.createdAt)
+  for (const l of taskLists) bump(l.createdAt)
+  for (const a of areas) bump(a.createdAt)
+  for (const p of paymentCards) bump(p.createdAt)
+  for (const a of archive) bump(a.archivedAt)
+
+  return max
+}
+
 /* ---------------------------------------------------------------------------
  * Snapshot automatico ridondante (protezione perdita dati)
  *

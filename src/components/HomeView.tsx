@@ -44,6 +44,10 @@ import {
   shareExpensesSection,
   shareImpegnoRowsSection,
 } from '../utils/share'
+import {
+  isEventImpegnoPending,
+  isNoteImpegnoPending,
+} from '../utils/impegnoDone'
 import { deadlineLabel, compareDeadlineIso, eventDeadlineIso, noteKeyDate, sortNotesByUrgency, buildHomeImpegniCardLines, buildHomeDeadlineLine, buildHomeItemSummaryLine, isDeadlineThisWeek, noteSummaryLineTone, sortHomeDeadlineLines, type HomeDeadlineLine } from '../utils/homeSpotlight'
 import { sortExpensesByDeadline } from '../utils/homeFeed'
 import { isNoteChecklist } from '../utils/noteKind'
@@ -387,7 +391,19 @@ export function HomeView({
   const displayNotes = areaFilterActive ? areaPlainNotes : monthHomeNotes
   const displayExpenses = areaFilterActive ? areaExpensesList : monthExpensesList
 
+  const pendingImpegni = useMemo((): ImpegnoRow[] => {
+    const taskList = tasks ?? []
+    return displayImpegni.filter((row) => {
+      if (row.kind === 'event') return isEventImpegnoPending(row.item)
+      return isNoteImpegnoPending(
+        row.item,
+        tasksForNote(taskList, row.item.id),
+      )
+    })
+  }, [displayImpegni, tasks])
+
   const impegnoCount = displayImpegni.length
+  const pendingImpegnoCount = pendingImpegni.length
   const noteCount = displayNotes.length
   const expenseCount = displayExpenses.length
 
@@ -460,7 +476,7 @@ export function HomeView({
 
   const homeImpegniSubtitle = useMemo(() => {
     const parts = [
-      `${impegnoCount} ${impegnoCount === 1 ? 'impegno' : 'impegni'}`,
+      `${pendingImpegnoCount} ${pendingImpegnoCount === 1 ? 'impegno' : 'impegni'}`,
     ]
     if (monthPlannedTotal > 0) {
       parts.push(
@@ -473,11 +489,11 @@ export function HomeView({
       }
     }
     return parts.join(' · ')
-  }, [displayImpegni, impegnoCount, monthPlannedTotal])
+  }, [displayImpegni, pendingImpegnoCount, monthPlannedTotal])
 
   const homeImpegniCardLines = useMemo(() => {
     return buildHomeImpegniCardLines(
-      displayImpegni.flatMap((row) => {
+      pendingImpegni.flatMap((row) => {
         const iso = impegnoRowDeadline(row)
         if (!iso) return []
         return [
@@ -492,7 +508,7 @@ export function HomeView({
         ]
       }),
     )
-  }, [displayImpegni, areas])
+  }, [pendingImpegni, areas])
 
   const homeNoteSummaryLines = useMemo(() => {
     return [...homeTextNotes]
@@ -585,18 +601,18 @@ export function HomeView({
     expenseCount === 0
 
   const impegnoSectionSubtitle = useMemo(() => {
-    for (const row of displayImpegni) {
+    for (const row of pendingImpegni) {
       if (row.kind !== 'event') continue
       const iso =
         row.item.renewalDate ?? row.item.endDate ?? row.item.startDate
       const label = deadlineLabel(iso)
       if (label) return label
     }
-    return `${impegnoCount} ${impegnoCount === 1 ? 'elemento' : 'elementi'}`
-  }, [displayImpegni, impegnoCount])
+    return `${pendingImpegnoCount} ${pendingImpegnoCount === 1 ? 'elemento' : 'elementi'}`
+  }, [pendingImpegni, pendingImpegnoCount])
 
   const impegnoSectionUrgent = useMemo(() => {
-    for (const row of displayImpegni) {
+    for (const row of pendingImpegni) {
       if (row.kind !== 'event') continue
       const iso =
         row.item.renewalDate ?? row.item.endDate ?? row.item.startDate
@@ -604,7 +620,7 @@ export function HomeView({
       if (u === 'expired' || u === 'today' || u === 'soon') return true
     }
     return false
-  }, [displayImpegni])
+  }, [pendingImpegni])
 
   if (loading) {
     return <p className="text-sm text-slate-400">Caricamento...</p>
@@ -622,7 +638,7 @@ export function HomeView({
     !areaFilterActive || areaSelection.kind === 'group'
 
   const impegnoSectionTitle =
-    displayImpegni[0]?.item.title ?? ''
+    pendingImpegni[0]?.item.title ?? ''
 
   const shareSectionImpegni = () =>
     void shareImpegnoRowsSection(displayImpegni, (id) => areaNameById(areas ?? [], id), {

@@ -50,6 +50,27 @@ export function isNoteImpegnoMarkedDone(
   return linkedTasks.every((t) => t.done)
 }
 
+/** Impegno ancora da completare (escluso dalla card Home chiusa). */
+export function isEventImpegnoPending(
+  event: Pick<
+    Event,
+    | 'completedAt'
+    | 'renewalDate'
+    | 'recurrenceFrequency'
+    | 'paymentMethod'
+    | 'startDate'
+  >,
+): boolean {
+  return !isEventMarkedDone(event)
+}
+
+export function isNoteImpegnoPending(
+  note: Pick<Note, 'completedAt'>,
+  linkedTasks: { done: boolean }[] = [],
+): boolean {
+  return !isNoteImpegnoMarkedDone(note, linkedTasks)
+}
+
 /** Prossima data rinnovo dopo aver segnato fatto (>= oggi). */
 export function advanceRenewalAfterDone(
   renewalDate: string,
@@ -72,6 +93,24 @@ export async function markEventDone(event: Event): Promise<void> {
     !isAutomatedPaymentMethod(event.paymentMethod) &&
     !isRecurringPeriodReadyForDone(event)
   ) {
+    return
+  }
+
+  if (
+    event.recurrenceFrequency &&
+    !isAutomatedPaymentMethod(event.paymentMethod) &&
+    event.renewalDate &&
+    event.renewalDate <= todayIso()
+  ) {
+    const renewalDate = advanceRenewalAfterDone(
+      event.renewalDate,
+      event.recurrenceFrequency,
+    )
+    await db.events.update(event.id, {
+      renewalDate,
+      completedAt: undefined,
+      updatedAt: now,
+    })
     return
   }
 
@@ -220,7 +259,7 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
   if (
     event.recurrenceFrequency &&
     event.renewalDate &&
-    !isPastDue(event.renewalDate) &&
+    event.renewalDate > todayIso() &&
     event.completedAt &&
     !isAutomatedPaymentMethod(event.paymentMethod)
   ) {

@@ -1,6 +1,10 @@
 import { db } from '../db'
 import { saveAutoSnapshot, scheduleAutoSnapshot } from './backup'
-import { isCloudBackupEnabled, pushToCloud } from './cloudBackup'
+import {
+  ensureCloudCredentials,
+  isCloudBackupEnabled,
+  pushToCloud,
+} from './cloudBackup'
 
 let cloudPushTimer: ReturnType<typeof setTimeout> | undefined
 let hooksInstalled = false
@@ -9,13 +13,17 @@ let reloadGuardsInstalled = false
 /** Dopo ogni modifica locale: snapshot + upload GitHub (debounced). */
 export function notifyLocalDataChanged(delayMs = 400): void {
   scheduleAutoSnapshot(300)
-  if (!isCloudBackupEnabled()) return
   if (cloudPushTimer) clearTimeout(cloudPushTimer)
   cloudPushTimer = setTimeout(() => {
     cloudPushTimer = undefined
-    void pushToCloud().catch((err) => {
-      console.warn('[Cloud] Salvataggio automatico non riuscito:', err)
-    })
+    void (async () => {
+      if (!(await ensureCloudCredentials()) || !isCloudBackupEnabled()) return
+      try {
+        await pushToCloud()
+      } catch (err) {
+        console.warn('[Cloud] Salvataggio automatico non riuscito:', err)
+      }
+    })()
   }, delayMs)
 }
 
@@ -26,8 +34,14 @@ export function flushBeforePageLeave(): void {
     cloudPushTimer = undefined
   }
   void saveAutoSnapshot()
-  if (!isCloudBackupEnabled()) return
-  void pushToCloud({ keepalive: true }).catch(() => {})
+  void (async () => {
+    if (!(await ensureCloudCredentials()) || !isCloudBackupEnabled()) return
+    try {
+      await pushToCloud({ keepalive: true })
+    } catch {
+      // best-effort in chiusura pagina
+    }
+  })()
 }
 
 /** @deprecated Usa flushBeforePageLeave */
@@ -50,7 +64,11 @@ export function installReloadPersistenceGuards(): void {
   window.addEventListener('pagehide', flush)
   window.addEventListener('beforeunload', flush)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flush()
+    if (document.visibilityState === 'hidden') {
+      flush()
+      return
+    }
+    void ensureCloudCredentials()
   })
 
   // Gesto pull-to-refresh: in cima alla pagina, al primo trascinamento verso il basso.

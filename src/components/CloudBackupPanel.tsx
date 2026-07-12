@@ -197,6 +197,11 @@ export function CloudBackupPanel() {
             <span className="font-medium text-slate-700">
               {formatSync(status.lastSyncAt)}
             </span>
+            <br />
+            <span className="text-slate-400">
+              Il token è salvato automaticamente sul dispositivo e reinserito se
+              Brave cancella la cache.
+            </span>
           </p>
 
           <div className="flex flex-col gap-2">
