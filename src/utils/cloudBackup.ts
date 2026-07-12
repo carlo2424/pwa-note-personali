@@ -19,6 +19,76 @@ const TOKEN_KEY = 'pwa-cloud-gist-token'
 const GIST_ID_KEY = 'pwa-cloud-gist-id'
 const LAST_SYNC_KEY = 'pwa-cloud-last-sync'
 const OPFS_CREDS_FILE = 'pwa-cloud-creds.json'
+const OPFS_SYNC_META_FILE = 'pwa-cloud-sync-meta.json'
+
+interface CloudSyncMeta {
+  total: number
+  notes: number
+  events: number
+  expenses: number
+  at: number
+}
+
+async function readSyncMeta(): Promise<CloudSyncMeta | null> {
+  try {
+    const raw = await readOpfsText(OPFS_SYNC_META_FILE)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as CloudSyncMeta
+    if (typeof parsed.total !== 'number') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+async function writeSyncMeta(payload: BackupPayload): Promise<void> {
+  const meta: CloudSyncMeta = {
+    notes: payload.data.notes.length,
+    events: payload.data.events.length,
+    expenses: payload.data.expenses.length,
+    total: countBackupPayload(payload),
+    at: Date.now(),
+  }
+  try {
+    await writeOpfsText(OPFS_SYNC_META_FILE, JSON.stringify(meta))
+  } catch {
+    // best-effort
+  }
+}
+
+function payloadCounts(payload: BackupPayload) {
+  return {
+    notes: payload.data.notes.length,
+    events: payload.data.events.length,
+    expenses: payload.data.expenses.length,
+    total: countBackupPayload(payload),
+  }
+}
+
+/** True se il backup cloud ha più dati del locale (perdita parziale overnight). */
+function isCloudRicherThanLocal(
+  cloud: BackupPayload,
+  local: BackupPayload,
+): boolean {
+  const c = payloadCounts(cloud)
+  const l = payloadCounts(local)
+  if (c.total > l.total) return true
+  // Le note spariscono spesso per prime dopo una pulizia del browser.
+  if (c.notes > l.notes) return true
+  return false
+}
+
+/** Blocca upload se i dati locali sono calati rispetto all'ultimo salvataggio buono. */
+async function isLocalBackupDegraded(
+  payload: BackupPayload,
+): Promise<boolean> {
+  const meta = await readSyncMeta()
+  if (!meta) return false
+  const current = payloadCounts(payload)
+  if (current.total < meta.total) return true
+  if (current.notes < meta.notes) return true
+  return false
+}
 
 const API_BASE = 'https://api.github.com'
 const GIST_FILENAME = 'note-personali-backup.json'
@@ -181,22 +251,41 @@ async function ensureCloudGistLinked(): Promise<void> {
 export type CloudStartupResult = 'restored' | 'pushed' | 'idle' | 'no-cloud'
 
 /**
- * All'avvio: se il cloud è collegato, scarica l'ultimo backup se il DB è
- * vuoto, altrimenti carica su GitHub lo stato locale (sovrascrive il gist).
+ * All'avvio: confronta locale e cloud. Se il cloud ha più dati (perdita
+ * parziale overnight), ripristina. Altrimenti carica il locale su GitHub.
  */
 export async function runCloudStartupSync(): Promise<CloudStartupResult> {
   if (!isCloudBackupEnabled()) return 'no-cloud'
 
   try {
     await ensureCloudGistLinked()
+
+    const cloudPayload = await fetchCloudBackup()
+    const cloudTotal = cloudPayload ? countBackupPayload(cloudPayload) : 0
     const localHasData = await hasBackupableData()
 
-    if (!localHasData) {
-      const restored = await restoreFromCloud()
-      return restored ? 'restored' : 'idle'
+    if (cloudPayload && cloudTotal > 0) {
+      if (!localHasData) {
+        await restoreBackupFromText(JSON.stringify(cloudPayload))
+        await writeSyncMeta(cloudPayload)
+        return 'restored'
+      }
+
+      const localPayload = await exportBackup({ includeBlobs: true })
+      if (isCloudRicherThanLocal(cloudPayload, localPayload)) {
+        await restoreBackupFromText(JSON.stringify(cloudPayload))
+        await writeSyncMeta(cloudPayload)
+        return 'restored'
+      }
     }
 
+    if (!localHasData) return 'idle'
+
     const pushed = await pushToCloud()
+    if (pushed) {
+      const localPayload = await exportBackup({ includeBlobs: false })
+      await writeSyncMeta(localPayload)
+    }
     return pushed ? 'pushed' : 'idle'
   } catch (err) {
     console.error('[Cloud] Sincronizzazione avvio non riuscita:', err)
@@ -348,6 +437,7 @@ export function disconnectCloudBackup(): void {
   localStorage.removeItem(GIST_ID_KEY)
   localStorage.removeItem(LAST_SYNC_KEY)
   void removeOpfsFile(OPFS_CREDS_FILE)
+  void removeOpfsFile(OPFS_SYNC_META_FILE)
 }
 
 async function createGist(token: string, content: string): Promise<string> {
@@ -406,9 +496,16 @@ export async function pushToCloud(options?: {
 
   const payload = await exportBackup({ includeBlobs: true })
   if (countBackupPayload(payload) === 0 && !options?.force) {
-    // Nessun dato: non sovrascrivere un eventuale backup cloud valido.
     return false
   }
+
+  if (!options?.force && (await isLocalBackupDegraded(payload))) {
+    console.warn(
+      '[Cloud] Salvataggio bloccato: dati locali ridotti rispetto all\'ultimo backup noto.',
+    )
+    return false
+  }
+
   const content = JSON.stringify(payload)
   const gistId = getCloudGistId()
   const keepalive = options?.keepalive ?? false
@@ -421,6 +518,7 @@ export async function pushToCloud(options?: {
     await persistCloudCredentials(token, newId)
   }
   setLastSyncNow()
+  await writeSyncMeta(payload)
   return true
 }
 
@@ -464,6 +562,7 @@ export async function restoreFromCloud(): Promise<BackupPayload | null> {
   const payload = await fetchCloudBackup()
   if (!payload || countBackupPayload(payload) === 0) return null
   await restoreBackupFromText(JSON.stringify(payload))
+  await writeSyncMeta(payload)
   return payload
 }
 

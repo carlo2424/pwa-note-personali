@@ -59,9 +59,10 @@ export async function updateDataFingerprint(): Promise<void> {
   localStorage.setItem(FINGERPRINT_KEY, JSON.stringify(fingerprint))
 }
 
-/** True se prima c’erano dati e ora il database risulta vuoto. */
+/** True se prima c’erano più dati e ora ne mancano (totale o parziale). */
 export async function detectPossibleDataLoss(): Promise<{
   lost: boolean
+  partial?: boolean
   previous?: DataFingerprint
 }> {
   const previous = readRaw()
@@ -71,9 +72,18 @@ export async function detectPossibleDataLoss(): Promise<{
   if (previousTotal === 0) return { lost: false }
 
   const current = await countLocalData()
-  if (current.total > 0) return { lost: false }
+  if (current.total === 0) {
+    return { lost: true, previous }
+  }
 
-  return { lost: true, previous }
+  // Perdita parziale: calo evidente (es. note sparite overnight).
+  const notesDropped = current.notes < previous.notes
+  const totalDropped = current.total < previousTotal
+  if (totalDropped && (notesDropped || current.total <= previousTotal * 0.85)) {
+    return { lost: true, partial: true, previous }
+  }
+
+  return { lost: false }
 }
 
 export function clearDataFingerprint(): void {
