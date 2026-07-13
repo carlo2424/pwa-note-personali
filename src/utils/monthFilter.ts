@@ -63,7 +63,7 @@ export function noteInCurrentMonth(
   return noteInHomeMonth(note)
 }
 
-/** Note/liste in Home: date nel mese corrente; senza date, solo se aggiornate nel mese. */
+/** Note/liste in Home: sempre visibili, anche con data inizio lontana. */
 export function noteInHomeMonth(
   note: Pick<Note, 'startDate' | 'endDate' | 'updatedAt'> &
     Partial<Pick<Note, 'kind' | 'content'>>,
@@ -71,12 +71,7 @@ export function noteInHomeMonth(
   if (isNoteImpegno(note)) {
     return periodOverlapsCurrentMonth(note.startDate, note.endDate)
   }
-  if (note.endDate && isoInCurrentMonth(note.endDate)) return true
-  if (note.startDate && isoInCurrentMonth(note.startDate)) return true
-  if (!note.startDate && !note.endDate) {
-    return timestampInCurrentMonth(note.updatedAt)
-  }
-  return false
+  return true
 }
 
 export function expenseInCurrentMonth(expense: Pick<Expense, 'date'>): boolean {

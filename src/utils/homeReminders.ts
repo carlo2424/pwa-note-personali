@@ -1,9 +1,8 @@
 import type { Note } from '../db'
 import { daysUntil, isPastDue } from './countdown'
-import { isNoteImpegno } from './impegno'
-import { noteKeyDate } from './homeSpotlight'
 import {
   isoInCurrentMonth,
+  noteInHomeMonth,
   periodOverlapsCurrentMonth,
   timestampInCurrentMonth,
 } from './monthFilter'
@@ -16,35 +15,14 @@ function isImminent(iso: string): boolean {
 }
 
 /**
- * Una nota/lista compare in Home se:
- * - senza date: aggiornata nel mese corrente
- * - con date (promemoria/impegno): periodo nel mese, scaduta, o scadenza/inizio imminente
+ * Una nota/lista compare in Home se aggiornata nel mese corrente oppure ha una
+ * data (anche lontana). In pratica le note/liste restano sempre in Home.
  */
 export function noteVisibleOnHome(
   note: Pick<Note, 'startDate' | 'endDate' | 'updatedAt'> &
     Partial<Pick<Note, 'kind' | 'content'>>,
 ): boolean {
-  const key = noteKeyDate(note)
-
-  if (!key && !note.startDate) {
-    return timestampInCurrentMonth(note.updatedAt)
-  }
-
-  if (isNoteImpegno(note)) {
-    if (periodOverlapsCurrentMonth(note.startDate, note.endDate)) return true
-    if (note.endDate && (isPastDue(note.endDate) || isImminent(note.endDate))) {
-      return true
-    }
-    if (note.startDate && isImminent(note.startDate)) return true
-    return false
-  }
-
-  if (key) {
-    if (isoInCurrentMonth(key)) return true
-    if (isPastDue(key) || isImminent(key)) return true
-  }
-
-  return timestampInCurrentMonth(note.updatedAt)
+  return noteInHomeMonth(note)
 }
 
 /** Eventi/impegni con date imminenti o nel mese corrente */
