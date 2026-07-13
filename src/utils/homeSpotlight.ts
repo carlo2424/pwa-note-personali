@@ -145,6 +145,38 @@ export function buildHomeItemSummaryLine(
   ]
 }
 
+/** Card Home Note/Liste: titolo, data inizio (se presente), ultima modifica. */
+export function buildHomeStartDateSummaryLine(
+  title: string,
+  updatedAt: number,
+  startDate?: string,
+): HomeDeadlineLine[] {
+  const lines: HomeDeadlineLine[] = [{ label: title, tone: 'default' }]
+
+  if (startDate) {
+    const when = homeDeadlineWhenWord(startDate)
+    const date = formatHomeDeadlineDate(startDate)
+    const days = daysUntil(startDate)
+    let tone: HomeDeadlineTone = 'default'
+    if (days < 0) tone = 'overdue'
+    else if (days === 0) tone = 'today'
+    else if (days <= 7) tone = 'soon'
+    lines.push({
+      label: when ? `Inizio ${when} ${date}` : `Inizio ${date}`,
+      tone,
+      iso: startDate,
+    })
+  }
+
+  lines.push({
+    label: formatModifiedLong(updatedAt),
+    tone: 'default',
+    alignRight: true,
+  })
+
+  return lines
+}
+
 export type DateUrgency = ReturnType<typeof countdownUrgency>
 
 /** Etichetta breve per scadenze imminenti (liste, impegni, note) */

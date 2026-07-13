@@ -21,7 +21,8 @@ function isImminent(iso: string): boolean {
  * - con date (promemoria/impegno): periodo nel mese, scaduta, o scadenza/inizio imminente
  */
 export function noteVisibleOnHome(
-  note: Pick<Note, 'startDate' | 'endDate' | 'updatedAt'>,
+  note: Pick<Note, 'startDate' | 'endDate' | 'updatedAt'> &
+    Partial<Pick<Note, 'kind' | 'content'>>,
 ): boolean {
   const key = noteKeyDate(note)
 

@@ -48,7 +48,7 @@ import {
   isEventImpegnoPending,
   isNoteImpegnoPending,
 } from '../utils/impegnoDone'
-import { deadlineLabel, compareDeadlineIso, eventDeadlineIso, noteKeyDate, sortNotesByUrgency, buildHomeImpegniCardLines, buildHomeDeadlineLine, buildHomeItemSummaryLine, isDeadlineThisWeek, noteSummaryLineTone, sortHomeDeadlineLines, type HomeDeadlineLine } from '../utils/homeSpotlight'
+import { deadlineLabel, compareDeadlineIso, eventDeadlineIso, noteKeyDate, sortNotesByUrgency, buildHomeImpegniCardLines, buildHomeDeadlineLine, buildHomeStartDateSummaryLine, type HomeDeadlineLine } from '../utils/homeSpotlight'
 import { sortExpensesByDeadline } from '../utils/homeFeed'
 import { isNoteChecklist } from '../utils/noteKind'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
@@ -128,16 +128,6 @@ function itemDisplayTitle(
     return `${member} ${title.toLocaleLowerCase('it-IT')}`
   }
   return title
-}
-
-function buildWeekDeadlineLines(
-  items: { title: string; iso: string }[],
-): HomeDeadlineLine[] {
-  return sortHomeDeadlineLines(
-    items
-      .filter((item) => isDeadlineThisWeek(item.iso))
-      .map((item) => buildHomeDeadlineLine(item.title, item.iso)),
-  )
 }
 
 function buildFutureMonthExpenseLines(
@@ -514,38 +504,35 @@ export function HomeView({
     return [...homeTextNotes]
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .flatMap((note) =>
-        buildHomeItemSummaryLine(
-          noteItemTitle(note),
+        buildHomeStartDateSummaryLine(
+          itemDisplayTitle(noteItemTitle(note), note.areaId, areas),
           note.updatedAt,
-          noteSummaryLineTone(note),
+          note.startDate,
         ),
       )
-  }, [homeTextNotes])
+  }, [homeTextNotes, areas])
 
   const homeNoteSubtitle = useMemo(() => {
     const parts = [
       `${textNoteCount} ${textNoteCount === 1 ? 'nota' : 'note'}`,
     ]
-    const withDeadline = homeTextNotes.filter((n) => noteKeyDate(n)).length
-    if (withDeadline > 0) {
-      parts.push(`${withDeadline} con scadenza`)
+    const withStartDate = homeTextNotes.filter((n) => n.startDate).length
+    if (withStartDate > 0) {
+      parts.push(`${withStartDate} con data inizio`)
     }
     return parts.join(' · ')
   }, [textNoteCount, homeTextNotes])
 
-  const homeChecklistDeadlineLines = useMemo(() => {
-    return buildWeekDeadlineLines(
-      homeChecklists.flatMap((note) => {
-        const iso = noteKeyDate(note)
-        if (!iso) return []
-        return [
-          {
-            title: itemDisplayTitle(noteItemTitle(note), note.areaId, areas),
-            iso,
-          },
-        ]
-      }),
-    )
+  const homeChecklistSummaryLines = useMemo(() => {
+    return [...homeChecklists]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .flatMap((note) =>
+        buildHomeStartDateSummaryLine(
+          itemDisplayTitle(noteItemTitle(note), note.areaId, areas),
+          note.updatedAt,
+          note.startDate,
+        ),
+      )
   }, [homeChecklists, areas])
 
   const homeChecklistItemCount = useMemo(() => {
@@ -922,7 +909,10 @@ export function HomeView({
           typeLabel="Lista"
           homeLayout
           subtitle={homeChecklistSubtitle}
-          deadlineLines={homeChecklistDeadlineLines}
+          summaryLines={homeChecklistSummaryLines}
+          summaryOverflowLabel={(hidden) =>
+            `+${hidden} ${hidden === 1 ? 'altra lista' : 'altre liste'}`
+          }
           icon={checklistSectionIcon}
           containerClassName={
             checklistSectionUrgent

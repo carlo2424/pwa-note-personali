@@ -58,14 +58,15 @@ export function eventInHomeMonth(
 }
 
 export function noteInCurrentMonth(
-  note: Pick<Note, 'startDate' | 'endDate' | 'updatedAt'>,
+  note: Pick<Note, 'startDate' | 'endDate' | 'updatedAt' | 'kind' | 'content'>,
 ): boolean {
   return noteInHomeMonth(note)
 }
 
 /** Note/liste in Home: date nel mese corrente; senza date, solo se aggiornate nel mese. */
 export function noteInHomeMonth(
-  note: Pick<Note, 'startDate' | 'endDate' | 'updatedAt'>,
+  note: Pick<Note, 'startDate' | 'endDate' | 'updatedAt'> &
+    Partial<Pick<Note, 'kind' | 'content'>>,
 ): boolean {
   if (isNoteImpegno(note)) {
     return periodOverlapsCurrentMonth(note.startDate, note.endDate)

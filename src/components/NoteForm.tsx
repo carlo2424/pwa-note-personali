@@ -4,7 +4,6 @@ import { db, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { resolveAreaId, areaNameById } from '../utils/areas'
 import { sentenceCase } from '../utils/format'
-import { clampEndDateToStart } from '../utils/recurring'
 import { EVENT_ICONS } from '../constants/events'
 import { iconColorClass } from '../constants/itemColors'
 import { type NoteKind, resolveNoteKind } from '../utils/noteKind'
@@ -83,8 +82,6 @@ export function NoteForm({
     note?.content ? sentenceCase(note.content) : '',
   )
   const [startDate, setStartDate] = useState(note?.startDate ?? '')
-  const [endDate, setEndDate] = useState(note?.endDate ?? '')
-  const [endManual, setEndManual] = useState(!!note?.endDate)
   const [color, setColor] = useState(note?.color ?? 'indigo')
   const [icon, setIcon] = useState(
     note?.icon ?? defaultNoteIcon(note ? resolveNoteKind(note) : defaultKind),
@@ -115,24 +112,8 @@ export function NoteForm({
 
   const [saving, setSaving] = useState(false)
 
-  function handleStartDateChange(date: string) {
-    setStartDate(date)
-    if (!date) {
-      if (!endManual) setEndDate('')
-      return
-    }
-    if (!endDate && !endManual) {
-      setEndDate(date)
-      return
-    }
-    if (!endManual) {
-      setEndDate(clampEndDateToStart(date, endDate))
-    }
-  }
-
-  function handleEndDateChange(date: string) {
-    setEndManual(true)
-    setEndDate(startDate ? clampEndDateToStart(startDate, date) : date)
+  function handleKindChange(next: NoteKind) {
+    setKind(next)
   }
 
   function handleDictationListening(listening: boolean) {
@@ -173,7 +154,7 @@ export function NoteForm({
         icon,
         photoBlob: isChecklist ? undefined : photoBlob,
         startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        endDate: undefined,
         areaId,
         updatedAt: now,
       }
@@ -201,7 +182,7 @@ export function NoteForm({
         <label className="mb-1.5 block text-sm font-medium text-slate-700">
           Tipo
         </label>
-        <NoteKindToggle kind={kind} onChange={setKind} disabled={saving} />
+        <NoteKindToggle kind={kind} onChange={handleKindChange} disabled={saving} />
       </div>
 
       <div>
@@ -255,33 +236,21 @@ export function NoteForm({
         previewIcon={icon}
       />
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-xs text-slate-600">Data inizio</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => handleStartDateChange(e.target.value)}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-slate-600">Data fine</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => handleEndDateChange(e.target.value)}
-            className={inputClass}
-            min={startDate || undefined}
-          />
-        </div>
-      </div>
-      {startDate && endDate && (
-        <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
-          Con data inizio e fine {isChecklist ? 'questa lista' : 'questa nota'}{' '}
-          compare anche tra gli <span className="font-semibold">Impegni</span>.
+      <div>
+        <label className="mb-1 block text-xs text-slate-600">Data inizio</label>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          className={inputClass}
+        />
+        <p className="mt-1 text-xs text-slate-400">
+          Opzionale.{' '}
+          {isChecklist
+            ? 'La lista resta nella sezione Liste, non passa tra gli Impegni.'
+            : 'La nota resta nella sezione Note, non passa tra gli Impegni.'}
         </p>
-      )}
+      </div>
 
       <div>
         <div className="mb-1 flex items-center justify-between gap-2">

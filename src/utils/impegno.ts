@@ -1,6 +1,6 @@
 import type { Event, Note } from '../db'
 
-/** Data inizio + data fine = impegno (per note, eventi, ecc.) */
+/** Data inizio + data fine = impegno (solo eventi). */
 export function hasImpegnoPeriod(item: {
   startDate?: string
   endDate?: string
@@ -14,8 +14,12 @@ export function isEventImpegno(
   return hasImpegnoPeriod(event)
 }
 
-export function isNoteImpegno(note: Pick<Note, 'startDate' | 'endDate'>): boolean {
-  return hasImpegnoPeriod(note)
+/** Note e liste restano nelle rispettive sezioni (solo data inizio opzionale). */
+export function isNoteImpegno(
+  _note: Pick<Note, 'startDate' | 'endDate'> &
+    Partial<Pick<Note, 'kind' | 'content'>>,
+): boolean {
+  return false
 }
 
 export function filterEventImpegni<
@@ -25,13 +29,15 @@ export function filterEventImpegni<
 }
 
 export function filterNoteImpegni<
-  T extends Pick<Note, 'startDate' | 'endDate'>,
+  T extends Pick<Note, 'startDate' | 'endDate'> &
+    Partial<Pick<Note, 'kind' | 'content'>>,
 >(notes: T[]): T[] {
   return notes.filter(isNoteImpegno)
 }
 
 export function filterPlainNotes<
-  T extends Pick<Note, 'startDate' | 'endDate'>,
+  T extends Pick<Note, 'startDate' | 'endDate'> &
+    Partial<Pick<Note, 'kind' | 'content'>>,
 >(notes: T[]): T[] {
   return notes.filter((n) => !isNoteImpegno(n))
 }
