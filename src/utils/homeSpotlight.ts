@@ -10,6 +10,8 @@ export interface HomeDeadlineLine {
   iso?: string
   /** Solo per righe «Ultima modifica» in Home */
   alignRight?: boolean
+  /** Testo secondario sulla stessa riga del titolo (es. ultima modifica a destra) */
+  inlineRight?: string
 }
 
 export function deadlineToneClassName(tone: HomeDeadlineTone): string {
@@ -145,13 +147,19 @@ export function buildHomeItemSummaryLine(
   ]
 }
 
-/** Card Home Note/Liste: titolo, data inizio (se presente), ultima modifica. */
+/** Card Home Note/Liste: titolo + modifica a destra, sotto data inizio. */
 export function buildHomeStartDateSummaryLine(
   title: string,
   updatedAt: number,
   startDate?: string,
 ): HomeDeadlineLine[] {
-  const lines: HomeDeadlineLine[] = [{ label: title, tone: 'default' }]
+  const lines: HomeDeadlineLine[] = [
+    {
+      label: title,
+      tone: 'default',
+      inlineRight: formatModifiedLong(updatedAt),
+    },
+  ]
 
   if (startDate) {
     const when = homeDeadlineWhenWord(startDate)
@@ -167,12 +175,6 @@ export function buildHomeStartDateSummaryLine(
       iso: startDate,
     })
   }
-
-  lines.push({
-    label: formatModifiedLong(updatedAt),
-    tone: 'default',
-    alignRight: true,
-  })
 
   return lines
 }

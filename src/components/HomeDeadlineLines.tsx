@@ -28,16 +28,38 @@ export function HomeDeadlineLines({
 
   return (
     <div className="space-y-0.5">
-      {visible.map((line, index) => (
-        <p
-          key={`${line.label}-${index}`}
-          className={`whitespace-normal leading-snug ${deadlineToneClassName(line.tone)} ${
-            line.alignRight ? 'text-right text-slate-400' : ''
-          } ${compact ? 'text-[10px]' : 'text-xs'}`}
-        >
-          {line.label}
-        </p>
-      ))}
+      {visible.map((line, index) =>
+        line.inlineRight ? (
+          <div
+            key={`${line.label}-${index}`}
+            className="flex items-start justify-between gap-2"
+          >
+            <p
+              className={`min-w-0 flex-1 whitespace-normal leading-snug ${deadlineToneClassName(line.tone)} ${
+                compact ? 'text-[10px]' : 'text-xs'
+              }`}
+            >
+              {line.label}
+            </p>
+            <p
+              className={`shrink-0 whitespace-normal text-right leading-snug text-slate-400 ${
+                compact ? 'text-[10px]' : 'text-xs'
+              }`}
+            >
+              {line.inlineRight}
+            </p>
+          </div>
+        ) : (
+          <p
+            key={`${line.label}-${index}`}
+            className={`whitespace-normal leading-snug ${deadlineToneClassName(line.tone)} ${
+              line.alignRight ? 'text-right text-slate-400' : ''
+            } ${compact ? 'text-[10px]' : 'text-xs'}`}
+          >
+            {line.label}
+          </p>
+        ),
+      )}
       {hidden > 0 && (
         <p className={`text-slate-400 ${compact ? 'text-[9px]' : 'text-[10px]'}`}>
           {overflowLabel

@@ -60,8 +60,9 @@ export function CollapsibleSection({
   if (!alwaysShow && count === 0) return null
 
   const resolvedSubtitle =
-    subtitle ??
-    `${count} ${count === 1 ? 'elemento' : 'elementi'}`
+    subtitle !== undefined
+      ? subtitle || undefined
+      : `${count} ${count === 1 ? 'elemento' : 'elementi'}`
 
   const showTotal = totalAmount != null && totalAmount > 0 && count > 0
 

@@ -512,16 +512,7 @@ export function HomeView({
       )
   }, [homeTextNotes, areas])
 
-  const homeNoteSubtitle = useMemo(() => {
-    const parts = [
-      `${textNoteCount} ${textNoteCount === 1 ? 'nota' : 'note'}`,
-    ]
-    const withStartDate = homeTextNotes.filter((n) => n.startDate).length
-    if (withStartDate > 0) {
-      parts.push(`${withStartDate} con data inizio`)
-    }
-    return parts.join(' · ')
-  }, [textNoteCount, homeTextNotes])
+  const homeNoteCountLabel = `${textNoteCount} ${textNoteCount === 1 ? 'nota' : 'note'}`
 
   const homeChecklistSummaryLines = useMemo(() => {
     return [...homeChecklists]
@@ -881,11 +872,11 @@ export function HomeView({
       {!areaFilterActive && textNoteCount > 0 && (
         <CollapsibleSection
           {...sectionComfort}
-          title="Note"
+          title={homeNoteCountLabel}
           count={textNoteCount}
           typeLabel="Nota"
           homeLayout
-          subtitle={homeNoteSubtitle}
+          subtitle=""
           summaryLines={homeNoteSummaryLines}
           summaryOverflowLabel={(hidden) =>
             `+${hidden} ${hidden === 1 ? 'altra nota' : 'altre note'}`
