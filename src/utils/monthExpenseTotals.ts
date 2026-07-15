@@ -1,7 +1,6 @@
-import type { Event, Expense } from '../db'
+import type { Expense } from '../db'
 import { daysUntil, todayIso } from './countdown'
 import { formatAmount, sentenceCase } from './format'
-import { filterEventImpegni } from './impegno'
 import { expenseInCurrentMonth, isoInCurrentMonth } from './monthFilter'
 
 export interface UpcomingMonthExpense {
@@ -81,6 +80,11 @@ export function computeMonthUpcomingExpenses(
   )
 }
 
+/** Totale spese future nel mese corrente (allineato all'elenco in Home). */
+export function computeMonthUpcomingTotal(expenses: Expense[]): number {
+  return computeMonthUpcomingExpenses(expenses).reduce((s, u) => s + u.amount, 0)
+}
+
 export interface MonthExpenseOverviewItem {
   expense: Expense
   occurred: boolean
@@ -113,19 +117,4 @@ export function formatMonthExpenseOverviewLabel(
   const days = daysUntil(expense.date)
   const giorni = days === 1 ? 'giorno' : 'giorni'
   return `${desc} · ${amount} fra ${days} ${giorni}`
-}
-
-/**
- * Addebiti previsti nel mese: impegni con prossimo addebito nel mese corrente.
- */
-export function computeMonthPlannedTotal(events: Event[]): number {
-  return filterEventImpegni(events)
-    .filter(
-      (e) =>
-        e.renewalDate &&
-        isoInCurrentMonth(e.renewalDate) &&
-        e.cost != null &&
-        e.cost > 0,
-    )
-    .reduce((s, e) => s + e.cost!, 0)
 }

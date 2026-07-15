@@ -31,7 +31,7 @@ import {
 } from '../utils/monthFilter'
 import {
   computeMonthPaidTotal,
-  computeMonthPlannedTotal,
+  computeMonthUpcomingTotal,
   countMonthPaidExpenses,
   sumOccurredPositiveExpenses,
 } from '../utils/monthExpenseTotals'
@@ -408,8 +408,8 @@ export function HomeView({
   )
 
   const monthPlannedTotal = useMemo(
-    () => computeMonthPlannedTotal(events ?? []),
-    [events],
+    () => computeMonthUpcomingTotal(expenses ?? []),
+    [expenses],
   )
 
   const monthlySubs = (areaFilterActive ? areaEvents : monthEvents)
