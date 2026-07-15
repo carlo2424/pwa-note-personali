@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Cloud,
   CloudOff,
@@ -13,6 +13,8 @@ import {
   connectCloudBackup,
   disconnectCloudBackup,
   getCloudStatus,
+  getCloudToken,
+  persistCloudCredentials,
   pushToCloud,
   restoreFromCloud,
   restoreMostCompleteFromCloud,
@@ -42,8 +44,20 @@ export function CloudBackupPanel() {
   >(null)
   const [message, setMessage] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (status.connected) {
+      setToken(getCloudToken() ?? '')
+    }
+  }, [status.connected])
+
   function refresh() {
     setStatus(getCloudStatus())
+  }
+
+  async function persistTokenField(next: string) {
+    const trimmed = next.trim()
+    if (!trimmed || !status.connected) return
+    await persistCloudCredentials(trimmed, status.gistId)
   }
 
   async function handleConnect() {
@@ -52,8 +66,8 @@ export function CloudBackupPanel() {
     setMessage(null)
     try {
       const result = await connectCloudBackup(token)
-      setToken('')
       refresh()
+      setToken(getCloudToken() ?? token.trim())
       if (result.action === 'restored' && result.payload) {
         clearDataFingerprint()
         setMessage(
@@ -143,6 +157,7 @@ export function CloudBackupPanel() {
     )
     if (!ok) return
     disconnectCloudBackup()
+    setToken('')
     refresh()
     setMessage('Backup cloud scollegato.')
   }
@@ -199,10 +214,21 @@ export function CloudBackupPanel() {
             </span>
             <br />
             <span className="text-slate-400">
-              Il token è salvato automaticamente sul dispositivo e reinserito se
-              Brave cancella la cache.
+              Il token resta nel campo sotto per un recupero rapido; è salvato
+              anche in copie ridondanti sul dispositivo.
             </span>
           </p>
+
+          <input
+            type="text"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            onBlur={() => void persistTokenField(token)}
+            placeholder="Token GitHub"
+            autoComplete="off"
+            spellCheck={false}
+            className="mb-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-800 focus:border-sky-400 focus:ring-sky-500"
+          />
 
           <div className="flex flex-col gap-2">
             <button

@@ -6,6 +6,7 @@ import { useDictationField } from '../hooks/useDictationField'
 import { sentenceCase } from '../utils/format'
 import { resolveAreaId, areaNameById } from '../utils/areas'
 import { filterPaymentAccounts } from '../utils/paymentAccounts'
+import { flushCloudSyncNow } from '../utils/autoCloudSync'
 import { AreaInput } from './AreaInput'
 import { SpeechDictation } from './SpeechDictation'
 
@@ -91,6 +92,7 @@ export function ExpenseForm({ expense, defaultAreaName, onSave, onClose }: Expen
           createdAt: now,
         })
       }
+      flushCloudSyncNow()
       onSave()
       onClose()
     } catch (err) {

@@ -9,39 +9,86 @@ import {
 let cloudPushTimer: ReturnType<typeof setTimeout> | undefined
 let hooksInstalled = false
 let reloadGuardsInstalled = false
+let pushInFlight: Promise<boolean> | null = null
+let pushPending = false
+let retryTimer: ReturnType<typeof setTimeout> | undefined
 
-/** Dopo ogni modifica locale: snapshot + upload GitHub (debounced). */
-export function notifyLocalDataChanged(delayMs = 400): void {
-  scheduleAutoSnapshot(300)
-  if (cloudPushTimer) clearTimeout(cloudPushTimer)
-  cloudPushTimer = setTimeout(() => {
-    cloudPushTimer = undefined
-    void (async () => {
-      if (!(await ensureCloudCredentials()) || !isCloudBackupEnabled()) return
+const PUSH_DEBOUNCE_MS = 150
+const PUSH_MAX_ATTEMPTS = 3
+const PUSH_RETRY_BACKOFF_MS = 800
+
+async function executeCloudPush(options?: {
+  keepalive?: boolean
+}): Promise<boolean> {
+  if (!(await ensureCloudCredentials()) || !isCloudBackupEnabled()) {
+    return false
+  }
+
+  if (pushInFlight) {
+    pushPending = true
+    return pushInFlight
+  }
+
+  const run = async (): Promise<boolean> => {
+    for (let attempt = 1; attempt <= PUSH_MAX_ATTEMPTS; attempt++) {
       try {
-        await pushToCloud()
+        return await pushToCloud({ keepalive: options?.keepalive })
       } catch (err) {
-        console.warn('[Cloud] Salvataggio automatico non riuscito:', err)
+        if (attempt >= PUSH_MAX_ATTEMPTS) {
+          console.warn('[Cloud] Salvataggio automatico non riuscito:', err)
+          scheduleCloudPushRetry()
+          return false
+        }
+        await new Promise((resolve) =>
+          setTimeout(resolve, PUSH_RETRY_BACKOFF_MS * attempt),
+        )
       }
-    })()
+    }
+    return false
+  }
+
+  pushInFlight = run().finally(() => {
+    pushInFlight = null
+    if (pushPending) {
+      pushPending = false
+      void executeCloudPush(options)
+    }
+  })
+
+  return pushInFlight
+}
+
+function scheduleCloudPushRetry(delayMs = 15_000): void {
+  if (retryTimer || typeof window === 'undefined') return
+  retryTimer = setTimeout(() => {
+    retryTimer = undefined
+    void executeCloudPush()
   }, delayMs)
 }
 
-/** Salva subito locale + GitHub (chiusura app, pull-to-refresh, cambio tab). */
-export function flushBeforePageLeave(): void {
+/** Salvataggio cloud immediato (form, chiusura app, rete tornata online). */
+export function flushCloudSyncNow(options?: { keepalive?: boolean }): void {
   if (cloudPushTimer) {
     clearTimeout(cloudPushTimer)
     cloudPushTimer = undefined
   }
   void saveAutoSnapshot()
-  void (async () => {
-    if (!(await ensureCloudCredentials()) || !isCloudBackupEnabled()) return
-    try {
-      await pushToCloud({ keepalive: true })
-    } catch {
-      // best-effort in chiusura pagina
-    }
-  })()
+  void executeCloudPush(options)
+}
+
+/** Dopo ogni modifica locale: snapshot + upload GitHub (debounced). */
+export function notifyLocalDataChanged(delayMs = PUSH_DEBOUNCE_MS): void {
+  scheduleAutoSnapshot(200)
+  if (cloudPushTimer) clearTimeout(cloudPushTimer)
+  cloudPushTimer = setTimeout(() => {
+    cloudPushTimer = undefined
+    void executeCloudPush()
+  }, delayMs)
+}
+
+/** Salva subito locale + GitHub (chiusura app, pull-to-refresh, cambio tab). */
+export function flushBeforePageLeave(): void {
+  flushCloudSyncNow({ keepalive: true })
 }
 
 /** @deprecated Usa flushBeforePageLeave */
@@ -63,6 +110,11 @@ export function installReloadPersistenceGuards(): void {
 
   window.addEventListener('pagehide', flush)
   window.addEventListener('beforeunload', flush)
+  window.addEventListener('online', () => {
+    void ensureCloudCredentials().then((ok) => {
+      if (ok) flushCloudSyncNow()
+    })
+  })
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       flush()
@@ -71,7 +123,6 @@ export function installReloadPersistenceGuards(): void {
     void ensureCloudCredentials()
   })
 
-  // Gesto pull-to-refresh: in cima alla pagina, al primo trascinamento verso il basso.
   let touchStartY = 0
   let pullFlushDone = false
   window.addEventListener(

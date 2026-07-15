@@ -291,7 +291,7 @@ function App() {
           flushBeforePageLeave()
         }
       },
-      5 * 60 * 1000,
+      2 * 60 * 1000,
     )
 
     document.addEventListener('visibilitychange', onVisibilityChange)

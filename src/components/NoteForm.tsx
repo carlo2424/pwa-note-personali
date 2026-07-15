@@ -9,6 +9,7 @@ import { iconColorClass } from '../constants/itemColors'
 import { type NoteKind, resolveNoteKind } from '../utils/noteKind'
 import { defaultNoteIcon } from '../utils/noteIcon'
 import { syncChecklistForNote } from '../utils/noteTasks'
+import { flushCloudSyncNow } from '../utils/autoCloudSync'
 import { AreaInput } from './AreaInput'
 import { CameraCapture } from './CameraCapture'
 import { EventIcon } from './EventIcon'
@@ -169,6 +170,7 @@ export function NoteForm({
         })
         if (id !== undefined) await syncChecklistForNote(id, content, kind)
       }
+      flushCloudSyncNow()
       onSave()
       onClose()
     } finally {

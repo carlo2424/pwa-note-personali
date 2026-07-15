@@ -8,6 +8,7 @@ import {
   voiceCreateKindLabel,
   type VoiceCreateResult,
 } from '../utils/voiceCreate'
+import { flushCloudSyncNow } from '../utils/autoCloudSync'
 
 interface VoiceCreateButtonProps {
   onEditNote: (note: Note) => void
@@ -144,6 +145,7 @@ export function VoiceCreateButton({
     setBusy(true)
     try {
       const result = await createFromVoiceCommand(parsed.command)
+      flushCloudSyncNow()
       const kindLabel = voiceCreateKindLabel(result.kind)
       const review = result.needsReview ? ' — controlla importo' : ''
       setFeedback({

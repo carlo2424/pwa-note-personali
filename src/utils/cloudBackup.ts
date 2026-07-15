@@ -734,21 +734,3 @@ export async function restoreMostCompleteFromCloud(): Promise<CloudRecoveryResul
   await restoreBackupFromText(JSON.stringify(result.payload))
   return result
 }
-
-let cloudPushTimer: ReturnType<typeof setTimeout> | undefined
-
-/** Pianifica un salvataggio cloud unendo modifiche ravvicinate. */
-export function scheduleCloudPush(delayMs = 4000): void {
-  if (!isCloudBackupEnabled()) return
-  if (typeof window === 'undefined') {
-    void pushToCloud().catch(() => {})
-    return
-  }
-  if (cloudPushTimer) clearTimeout(cloudPushTimer)
-  cloudPushTimer = setTimeout(() => {
-    cloudPushTimer = undefined
-    void pushToCloud().catch((err) => {
-      console.warn('[Cloud] Salvataggio automatico non riuscito:', err)
-    })
-  }, delayMs)
-}

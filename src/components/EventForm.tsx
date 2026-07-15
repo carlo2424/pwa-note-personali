@@ -17,6 +17,7 @@ import { VoiceRecorder } from './VoiceRecorder'
 import { SpeechDictation } from './SpeechDictation'
 import { syncExpensesForEvent } from '../utils/eventExpenses'
 import { syncTasksForEvent, type TodoInput } from '../utils/eventTasks'
+import { flushCloudSyncNow } from '../utils/autoCloudSync'
 import { resolveAreaId, areaNameById } from '../utils/areas'
 import { filterPaymentAccounts } from '../utils/paymentAccounts'
 import { RECURRENCE_OPTIONS, deriveImpegnoPeriodFields, computeDurationFromRange, computeEndDateFromDuration, clampEndDateToStart } from '../utils/recurring'
@@ -280,6 +281,7 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
               createdAt: now,
             })
           }
+          flushCloudSyncNow()
           onSave()
           onClose()
         } catch (err) {
@@ -335,6 +337,7 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
         await syncExpensesForEvent(id, data)
         await syncTasksForEvent(id, todos)
       }
+      flushCloudSyncNow()
       onSave()
       onClose()
     } catch (err) {
