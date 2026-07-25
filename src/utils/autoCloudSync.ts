@@ -196,9 +196,6 @@ export function installPeriodicCloudReconcile(): void {
   const run = () => {
     if (isCloudSyncPaused() || !isCloudBackupEnabled()) return
     void reconcileCloudSync()
-      .then((result) => {
-        if (result === 'restored') window.location.reload()
-      })
       .catch((err) => {
         console.warn('[Cloud] Riconciliazione periodica non riuscita:', err)
       })

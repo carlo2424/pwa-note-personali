@@ -29,6 +29,7 @@ const OPFS_CREDS_FILE = 'pwa-cloud-creds.json'
 const OPFS_SYNC_META_FILE = 'pwa-cloud-sync-meta.json'
 const OPFS_MIRROR_FILE = 'pwa-cloud-mirror-backup.json'
 const SYNC_META_LS_KEY = 'pwa-cloud-sync-meta-v2'
+const LAST_APPLIED_EXPORT_KEY = 'pwa-cloud-last-applied-export'
 const CREDS_IDB_NAME = 'note-personali-cloud-creds'
 const CREDS_IDB_VERSION = 1
 const CREDS_IDB_KEY = 'github'
@@ -112,6 +113,7 @@ export async function tryRestoreFromCloudMirror(): Promise<BackupPayload | null>
   try {
     await restoreBackupFromText(JSON.stringify(mirror))
     await writeSyncMeta(mirror, getCloudGistId())
+    markCloudExportApplied(mirror.exportedAt)
     return mirror
   } finally {
     resume()
@@ -135,6 +137,39 @@ async function verifyRemoteBackup(
 function cloudExportedAtMs(payload: BackupPayload): number {
   const ms = Date.parse(payload.exportedAt)
   return Number.isFinite(ms) ? ms : 0
+}
+
+async function applyCloudPayload(payload: BackupPayload): Promise<void> {
+  await restoreBackupFromText(JSON.stringify(payload))
+  await writeSyncMeta(payload, getCloudGistId())
+  await saveCloudMirror(payload)
+  markCloudExportApplied(payload.exportedAt)
+}
+
+function getLastAppliedCloudExport(): string | null {
+  return localStorage.getItem(LAST_APPLIED_EXPORT_KEY)
+}
+
+function markCloudExportApplied(exportedAt: string): void {
+  localStorage.setItem(LAST_APPLIED_EXPORT_KEY, exportedAt)
+}
+
+/** True se questo backup cloud è già stato importato in locale. */
+function isCloudExportAlreadyApplied(payload: BackupPayload): boolean {
+  return getLastAppliedCloudExport() === payload.exportedAt
+}
+
+function shouldRestoreFromCloud(
+  payload: BackupPayload,
+  localHasData: boolean,
+  localAt: number,
+): boolean {
+  if (isCloudExportAlreadyApplied(payload)) return false
+  if (!localHasData) return true
+  const cloudAt = cloudExportedAtMs(payload)
+  const lastAppliedMs = Date.parse(getLastAppliedCloudExport() ?? '')
+  if (Number.isFinite(lastAppliedMs) && cloudAt <= lastAppliedMs) return false
+  return cloudAt > localAt
 }
 
 const API_BASE = 'https://api.github.com'
@@ -471,19 +506,9 @@ export async function reconcileCloudSync(options?: {
     const cloudTotal = cloudPayload ? countBackupPayload(cloudPayload) : 0
 
     if (cloudPayload && cloudTotal > 0) {
-      if (!localHasData) {
-        await restoreBackupFromText(JSON.stringify(cloudPayload))
-        await writeSyncMeta(cloudPayload, getCloudGistId())
-        await saveCloudMirror(cloudPayload)
-        return 'restored'
-      }
-
-      const cloudAt = cloudExportedAtMs(cloudPayload)
       const localAt = await getLatestLocalChangeMs()
-      if (cloudAt > localAt) {
-        await restoreBackupFromText(JSON.stringify(cloudPayload))
-        await writeSyncMeta(cloudPayload, getCloudGistId())
-        await saveCloudMirror(cloudPayload)
+      if (shouldRestoreFromCloud(cloudPayload, localHasData, localAt)) {
+        await applyCloudPayload(cloudPayload)
         return 'restored'
       }
     }
@@ -501,6 +526,7 @@ export async function reconcileCloudSync(options?: {
       const localPayload = await exportBackup({ includeBlobs: false })
       await writeSyncMeta(localPayload, getCloudGistId())
       await saveCloudMirror(localPayload)
+      markCloudExportApplied(localPayload.exportedAt)
     }
     return pushed ? 'pushed' : 'idle'
   } catch (err) {
@@ -803,6 +829,7 @@ export function disconnectCloudBackup(): void {
   localStorage.removeItem(GIST_ID_KEY)
   localStorage.removeItem(LAST_SYNC_KEY)
   localStorage.removeItem(SYNC_META_LS_KEY)
+  localStorage.removeItem(LAST_APPLIED_EXPORT_KEY)
   void removeOpfsFile(OPFS_CREDS_FILE)
   void removeOpfsFile(OPFS_SYNC_META_FILE)
   void removeOpfsFile(OPFS_MIRROR_FILE)
@@ -925,6 +952,7 @@ export async function pushToCloud(options?: {
   setLastSyncNow()
   await writeSyncMeta(payload, gistId)
   await saveCloudMirror(payload)
+  markCloudExportApplied(payload.exportedAt)
   void pruneOrphanEmptyBackupGists(token, gistId)
   return true
 }
@@ -998,9 +1026,7 @@ export async function restoreFromCloud(): Promise<BackupPayload | null> {
   try {
     const payload = await fetchCloudBackup({ deepScan: true })
     if (!payload) return null
-    await restoreBackupFromText(JSON.stringify(payload))
-    await writeSyncMeta(payload, getCloudGistId())
-    await saveCloudMirror(payload)
+    await applyCloudPayload(payload)
     return payload
   } finally {
     resume()
@@ -1127,9 +1153,7 @@ export async function restoreMostCompleteFromCloud(): Promise<CloudRecoveryResul
   try {
     const result = await findMostCompleteCloudBackup()
     if (!result) return null
-    await restoreBackupFromText(JSON.stringify(result.payload))
-    await writeSyncMeta(result.payload, getCloudGistId())
-    await saveCloudMirror(result.payload)
+    await applyCloudPayload(result.payload)
     return result
   } finally {
     resume()

@@ -121,10 +121,6 @@ export function Bootstrap() {
 
         if (raced === 'restored') {
           setBootPhase(null)
-        } else if (raced === 'timeout') {
-          void cloudWork.then((result) => {
-            if (result === 'restored') window.location.reload()
-          })
         }
         if (cancelled) return
 
