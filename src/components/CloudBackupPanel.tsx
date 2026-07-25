@@ -242,8 +242,8 @@ export function CloudBackupPanel() {
             Backup cloud (GitHub Gist)
           </h4>
           <p className="mt-0.5 text-xs text-slate-500">
-            Copia gratuita e privata online. Sopravvive anche se il browser
-            cancella tutti i dati del sito.
+            Un solo file su GitHub, sempre aggiornato (sovrascritto a ogni
+            salvataggio). Copia di riserva sul dispositivo, anch’essa unica.
           </p>
         </div>
       </div>
@@ -259,8 +259,8 @@ export function CloudBackupPanel() {
             </span>
             <br />
             <span className="text-slate-400">
-              Salvataggio automatico a ogni modifica, verifica dopo ogni upload e
-              copia di riserva locale. Il token resta nel campo sotto.
+              Salvataggio automatico a ogni modifica: stesso file, nessuna copia
+              extra su GitHub. Verifica dopo ogni upload e mirror locale unico.
             </span>
           </p>
 

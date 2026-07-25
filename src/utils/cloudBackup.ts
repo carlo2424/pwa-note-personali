@@ -16,6 +16,10 @@ import { pauseCloudSync, isCloudSyncPaused } from './cloudSyncPause'
  * L'utente crea una volta un token classico con il solo scope `gist` e lo
  * incolla in Impostazioni. Da quel momento l'app salva il backup nel gist a
  * ogni modifica e lo ripristina in automatico se i dati locali spariscono.
+ *
+ * Un solo gist GitHub con un solo file (`note-personali-backup.json`):
+ * ogni salvataggio SOVRASCRIVE lo stesso file (nessun file nuovo aggiunto).
+ * Sul dispositivo: una copia di riserva locale (sempre sostituita, non accumulata).
  */
 
 const TOKEN_KEY = 'pwa-cloud-gist-token'
@@ -820,6 +824,27 @@ async function createGist(token: string, content: string): Promise<string> {
   return gist.id
 }
 
+/** Elimina gist di backup vuoti/invalidi, lasciando solo quello canonico con dati. */
+async function pruneOrphanEmptyBackupGists(
+  token: string,
+  keepGistId: string,
+): Promise<void> {
+  const gists = await findAllBackupGists(token)
+  for (const gist of gists) {
+    if (gist.id === keepGistId) continue
+    const text = await readGistContent(token, gist.id)
+    if (tryParseGistBackupText(text)) continue
+    try {
+      await githubFetch(`${API_BASE}/gists/${gist.id}`, {
+        method: 'DELETE',
+        headers: authHeaders(token),
+      })
+    } catch {
+      // best-effort: non bloccare il salvataggio
+    }
+  }
+}
+
 async function updateGist(
   token: string,
   gistId: string,
@@ -900,6 +925,7 @@ export async function pushToCloud(options?: {
   setLastSyncNow()
   await writeSyncMeta(payload, gistId)
   await saveCloudMirror(payload)
+  void pruneOrphanEmptyBackupGists(token, gistId)
   return true
 }
 
