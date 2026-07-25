@@ -8,7 +8,7 @@ import {
   summarizeBackup,
   type BackupPayload,
 } from './backup'
-import { pauseCloudSync } from './cloudSyncPause'
+import { pauseCloudSync, isCloudSyncPaused } from './cloudSyncPause'
 
 /**
  * Backup cloud gratuito su GitHub Gist (privato).
@@ -23,6 +23,8 @@ const GIST_ID_KEY = 'pwa-cloud-gist-id'
 const LAST_SYNC_KEY = 'pwa-cloud-last-sync'
 const OPFS_CREDS_FILE = 'pwa-cloud-creds.json'
 const OPFS_SYNC_META_FILE = 'pwa-cloud-sync-meta.json'
+const OPFS_MIRROR_FILE = 'pwa-cloud-mirror-backup.json'
+const SYNC_META_LS_KEY = 'pwa-cloud-sync-meta-v2'
 const CREDS_IDB_NAME = 'note-personali-cloud-creds'
 const CREDS_IDB_VERSION = 1
 const CREDS_IDB_KEY = 'github'
@@ -34,22 +36,96 @@ interface CloudSyncMeta {
   notes: number
   events: number
   expenses: number
-  at: number
+  exportedAt: string
+  gistId: string | null
+  pushedAt: number
+  verifiedAt: number
 }
 
-async function writeSyncMeta(payload: BackupPayload): Promise<void> {
+function readSyncMetaFromJson(raw: string | null): CloudSyncMeta | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as CloudSyncMeta
+    if (typeof parsed.total !== 'number' || parsed.total <= 0) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+async function readSyncMeta(): Promise<CloudSyncMeta | null> {
+  const local = readSyncMetaFromJson(localStorage.getItem(SYNC_META_LS_KEY))
+  if (local) return local
+  return readSyncMetaFromJson(await readOpfsText(OPFS_SYNC_META_FILE))
+}
+
+async function writeSyncMeta(
+  payload: BackupPayload,
+  gistId?: string | null,
+): Promise<void> {
+  const now = Date.now()
   const meta: CloudSyncMeta = {
     notes: payload.data.notes.length,
     events: payload.data.events.length,
     expenses: payload.data.expenses.length,
     total: countBackupPayload(payload),
-    at: Date.now(),
+    exportedAt: payload.exportedAt,
+    gistId: gistId ?? getCloudGistId(),
+    pushedAt: now,
+    verifiedAt: now,
+  }
+  try {
+    localStorage.setItem(SYNC_META_LS_KEY, JSON.stringify(meta))
+  } catch {
+    // best-effort
   }
   try {
     await writeOpfsText(OPFS_SYNC_META_FILE, JSON.stringify(meta))
   } catch {
     // best-effort
   }
+}
+
+async function saveCloudMirror(payload: BackupPayload): Promise<void> {
+  try {
+    await writeOpfsText(OPFS_MIRROR_FILE, JSON.stringify(payload))
+  } catch {
+    // best-effort
+  }
+}
+
+async function loadCloudMirror(): Promise<BackupPayload | null> {
+  const raw = await readOpfsText(OPFS_MIRROR_FILE)
+  return tryParseGistBackupText(raw)
+}
+
+/** Ripristino offline dal mirror OPFS (fallback se GitHub non risponde). */
+export async function tryRestoreFromCloudMirror(): Promise<BackupPayload | null> {
+  if (await hasBackupableData()) return null
+  const mirror = await loadCloudMirror()
+  if (!mirror) return null
+  const resume = pauseCloudSync()
+  try {
+    await restoreBackupFromText(JSON.stringify(mirror))
+    await writeSyncMeta(mirror, getCloudGistId())
+    return mirror
+  } finally {
+    resume()
+  }
+}
+
+async function verifyRemoteBackup(
+  token: string,
+  gistId: string,
+  expected: BackupPayload,
+): Promise<boolean> {
+  const text = await readGistContent(token, gistId)
+  const remote = tryParseGistBackupText(text)
+  if (!remote) return false
+  const expectedTotal = countBackupPayload(expected)
+  const remoteTotal = countBackupPayload(remote)
+  if (remoteTotal < expectedTotal) return false
+  return cloudExportedAtMs(remote) >= cloudExportedAtMs(expected) - 5_000
 }
 
 function cloudExportedAtMs(payload: BackupPayload): number {
@@ -94,6 +170,13 @@ export interface CloudBackupPreview {
   summary: string
   exportedAt: string
   backupGistsFound: number
+  lastVerifiedAt: number | null
+  hasLocalMirror: boolean
+}
+
+/** Metadati dell'ultimo backup cloud verificato in locale. */
+export async function getCloudSyncMeta(): Promise<CloudSyncMeta | null> {
+  return readSyncMeta()
 }
 
 export interface CloudRecoveryResult {
@@ -356,27 +439,38 @@ async function githubFetch(
 }
 
 /**
- * All'avvio: confronta locale e cloud per data. Il backup GitHub più recente
- * vince (modifiche reali dell'utente). Altrimenti carica il locale su GitHub.
+ * Confronta locale e cloud; ripristina o carica la versione più recente.
+ * Usata all'avvio e in background mentre l'app è aperta.
  */
-export async function runCloudStartupSync(): Promise<CloudStartupResult> {
+export async function reconcileCloudSync(options?: {
+  deepScan?: boolean
+}): Promise<CloudStartupResult> {
   if (!(await ensureCloudCredentials())) return 'no-cloud'
+  if (isCloudSyncPaused()) return 'idle'
 
   const resume = pauseCloudSync()
   try {
     await ensureCloudGistLinked()
 
     const localHasData = await hasBackupableData()
-    let cloudPayload = await fetchCloudBackup({ deepScan: false })
+    let cloudPayload = await fetchCloudBackup({
+      deepScan: options?.deepScan ?? false,
+    })
     if (!cloudPayload && !localHasData) {
       cloudPayload = await fetchCloudBackup({ deepScan: true })
     }
+    if (!cloudPayload && !localHasData) {
+      const mirror = await tryRestoreFromCloudMirror()
+      return mirror ? 'restored' : 'idle'
+    }
+
     const cloudTotal = cloudPayload ? countBackupPayload(cloudPayload) : 0
 
     if (cloudPayload && cloudTotal > 0) {
       if (!localHasData) {
         await restoreBackupFromText(JSON.stringify(cloudPayload))
-        await writeSyncMeta(cloudPayload)
+        await writeSyncMeta(cloudPayload, getCloudGistId())
+        await saveCloudMirror(cloudPayload)
         return 'restored'
       }
 
@@ -384,25 +478,42 @@ export async function runCloudStartupSync(): Promise<CloudStartupResult> {
       const localAt = await getLatestLocalChangeMs()
       if (cloudAt > localAt) {
         await restoreBackupFromText(JSON.stringify(cloudPayload))
-        await writeSyncMeta(cloudPayload)
+        await writeSyncMeta(cloudPayload, getCloudGistId())
+        await saveCloudMirror(cloudPayload)
         return 'restored'
       }
     }
 
     if (!localHasData) return 'idle'
 
+    const localAt = await getLatestLocalChangeMs()
+    const lastPush = getCloudLastSyncAt() ?? 0
+    if (localAt <= lastPush + 1_000) {
+      return 'idle'
+    }
+
     const pushed = await pushToCloud()
     if (pushed) {
       const localPayload = await exportBackup({ includeBlobs: false })
-      await writeSyncMeta(localPayload)
+      await writeSyncMeta(localPayload, getCloudGistId())
+      await saveCloudMirror(localPayload)
     }
     return pushed ? 'pushed' : 'idle'
   } catch (err) {
-    console.error('[Cloud] Sincronizzazione avvio non riuscita:', err)
+    console.error('[Cloud] Riconciliazione non riuscita:', err)
     return 'idle'
   } finally {
     resume()
   }
+}
+
+/**
+ * All'avvio: confronta locale e cloud per data. Il backup GitHub più recente
+ * vince (modifiche reali dell'utente). Altrimenti carica il locale su GitHub.
+ */
+export async function runCloudStartupSync(): Promise<CloudStartupResult> {
+  const localHasData = await hasBackupableData()
+  return reconcileCloudSync({ deepScan: !localHasData })
 }
 
 const URL_TOKEN_PARAM = 'cloudtoken'
@@ -687,8 +798,10 @@ export function disconnectCloudBackup(): void {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(GIST_ID_KEY)
   localStorage.removeItem(LAST_SYNC_KEY)
+  localStorage.removeItem(SYNC_META_LS_KEY)
   void removeOpfsFile(OPFS_CREDS_FILE)
   void removeOpfsFile(OPFS_SYNC_META_FILE)
+  void removeOpfsFile(OPFS_MIRROR_FILE)
   void idbClearCreds()
 }
 
@@ -768,13 +881,25 @@ export async function pushToCloud(options?: {
 
   if (gistId) {
     await updateGist(token, gistId, content, keepalive)
+    const verified = await verifyRemoteBackup(token, gistId, payload)
+    if (!verified) {
+      await updateGist(token, gistId, content, keepalive)
+      if (!(await verifyRemoteBackup(token, gistId, payload))) {
+        throw new Error('Verifica backup cloud non riuscita dopo il salvataggio.')
+      }
+    }
   } else {
     const newId = await createGist(token, content)
     localStorage.setItem(GIST_ID_KEY, newId)
     await persistCloudCredentials(token, newId)
+    gistId = newId
+    if (!(await verifyRemoteBackup(token, newId, payload))) {
+      throw new Error('Verifica backup cloud non riuscita dopo la creazione del gist.')
+    }
   }
   setLastSyncNow()
-  await writeSyncMeta(payload)
+  await writeSyncMeta(payload, gistId)
+  await saveCloudMirror(payload)
   return true
 }
 
@@ -806,12 +931,17 @@ export async function previewCloudBackup(): Promise<CloudBackupPreview | null> {
   const payload = await fetchCloudBackup({ deepScan: true })
   if (!payload) return null
 
+  const meta = await readSyncMeta()
+  const mirror = await loadCloudMirror()
+
   return {
     gistId,
     total: countBackupPayload(payload),
     summary: summarizeBackup(payload),
     exportedAt: payload.exportedAt,
     backupGistsFound: backupGists.length,
+    lastVerifiedAt: meta?.verifiedAt ?? null,
+    hasLocalMirror: !!mirror,
   }
 }
 
@@ -843,7 +973,8 @@ export async function restoreFromCloud(): Promise<BackupPayload | null> {
     const payload = await fetchCloudBackup({ deepScan: true })
     if (!payload) return null
     await restoreBackupFromText(JSON.stringify(payload))
-    await writeSyncMeta(payload)
+    await writeSyncMeta(payload, getCloudGistId())
+    await saveCloudMirror(payload)
     return payload
   } finally {
     resume()
@@ -882,6 +1013,7 @@ async function scanGistHistoryForBest(
 
   let best: BackupPayload | null = null
   let bestScore = -1
+  let bestExportedAt = -1
   let bestIndex = -1
 
   for (let i = 0; i < versions.length; i++) {
@@ -889,8 +1021,13 @@ async function scanGistHistoryForBest(
     const payload = tryParseGistBackupText(text)
     if (!payload) continue
     const score = scoreBackupPayload(payload)
-    if (score > bestScore) {
+    const exportedAt = cloudExportedAtMs(payload)
+    if (
+      score > bestScore ||
+      (score === bestScore && exportedAt > bestExportedAt)
+    ) {
       bestScore = score
+      bestExportedAt = exportedAt
       best = payload
       bestIndex = i
     }
@@ -925,6 +1062,7 @@ export async function findMostCompleteCloudBackup(
 
   let best: BackupPayload | null = null
   let bestScore = -1
+  let bestExportedAt = -1
   let bestIndex = -1
   let revisionsScanned = 0
 
@@ -933,8 +1071,13 @@ export async function findMostCompleteCloudBackup(
     revisionsScanned += result.scanned
     if (!result.best) continue
     const score = scoreBackupPayload(result.best)
-    if (score > bestScore) {
+    const exportedAt = cloudExportedAtMs(result.best)
+    if (
+      score > bestScore ||
+      (score === bestScore && exportedAt > bestExportedAt)
+    ) {
       bestScore = score
+      bestExportedAt = exportedAt
       best = result.best
       bestIndex = result.bestIndex
       localStorage.setItem(GIST_ID_KEY, gistId)
@@ -959,7 +1102,8 @@ export async function restoreMostCompleteFromCloud(): Promise<CloudRecoveryResul
     const result = await findMostCompleteCloudBackup()
     if (!result) return null
     await restoreBackupFromText(JSON.stringify(result.payload))
-    await writeSyncMeta(result.payload)
+    await writeSyncMeta(result.payload, getCloudGistId())
+    await saveCloudMirror(result.payload)
     return result
   } finally {
     resume()

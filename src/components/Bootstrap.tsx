@@ -20,7 +20,7 @@ import {
   hydrateCloudCredentials,
   runCloudStartupSync,
 } from '../utils/cloudBackup'
-import { installAutoCloudSyncHooks } from '../utils/autoCloudSync'
+import { installAutoCloudSyncHooks, installPeriodicCloudReconcile } from '../utils/autoCloudSync'
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
@@ -86,6 +86,7 @@ export function Bootstrap() {
         if (cancelled) return
 
         installAutoCloudSyncHooks()
+        installPeriodicCloudReconcile()
 
         // Credenziali cloud (URL segnalibro → localStorage → OPFS).
         try {

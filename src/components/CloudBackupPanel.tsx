@@ -58,6 +58,10 @@ export function CloudBackupPanel() {
           }
           setCloudPreview(
             `Cloud: ${preview.summary} · aggiornato ${new Date(preview.exportedAt).toLocaleString('it-IT')}` +
+              (preview.lastVerifiedAt
+                ? ` · verificato ${formatSync(preview.lastVerifiedAt)}`
+                : '') +
+              (preview.hasLocalMirror ? ' · copia locale di riserva' : '') +
               (preview.backupGistsFound > 1
                 ? ` · ${preview.backupGistsFound} gist di backup`
                 : ''),
@@ -255,8 +259,8 @@ export function CloudBackupPanel() {
             </span>
             <br />
             <span className="text-slate-400">
-              Il token resta nel campo sotto per un recupero rapido; è salvato
-              anche in copie ridondanti sul dispositivo.
+              Salvataggio automatico a ogni modifica, verifica dopo ogni upload e
+              copia di riserva locale. Il token resta nel campo sotto.
             </span>
           </p>
 

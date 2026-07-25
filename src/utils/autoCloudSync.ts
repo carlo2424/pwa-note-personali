@@ -4,6 +4,7 @@ import {
   ensureCloudCredentials,
   isCloudBackupEnabled,
   pushToCloud,
+  reconcileCloudSync,
 } from './cloudBackup'
 import { isCloudSyncPaused } from './cloudSyncPause'
 
@@ -14,9 +15,12 @@ let pushInFlight: Promise<boolean> | null = null
 let pushPending = false
 let retryTimer: ReturnType<typeof setTimeout> | undefined
 
+let reconcileInstalled = false
+
 const PUSH_DEBOUNCE_MS = 150
-const PUSH_MAX_ATTEMPTS = 3
+const PUSH_MAX_ATTEMPTS = 5
 const PUSH_RETRY_BACKOFF_MS = 800
+const RECONCILE_INTERVAL_MS = 3 * 60 * 1000
 
 async function executeCloudPush(options?: {
   keepalive?: boolean
@@ -60,7 +64,7 @@ async function executeCloudPush(options?: {
   return pushInFlight
 }
 
-function scheduleCloudPushRetry(delayMs = 15_000): void {
+function scheduleCloudPushRetry(delayMs = 30_000): void {
   if (retryTimer || typeof window === 'undefined') return
   retryTimer = setTimeout(() => {
     retryTimer = undefined
@@ -179,4 +183,30 @@ export function installAutoCloudSyncHooks(): void {
     table.hook('updating', onChange)
     table.hook('deleting', onChange)
   }
+}
+
+/**
+ * Ogni 3 minuti (e al ritorno in primo piano) confronta locale/cloud e
+ * ripristina o salva la versione più recente.
+ */
+export function installPeriodicCloudReconcile(): void {
+  if (reconcileInstalled || typeof window === 'undefined') return
+  reconcileInstalled = true
+
+  const run = () => {
+    if (isCloudSyncPaused() || !isCloudBackupEnabled()) return
+    void reconcileCloudSync()
+      .then((result) => {
+        if (result === 'restored') window.location.reload()
+      })
+      .catch((err) => {
+        console.warn('[Cloud] Riconciliazione periodica non riuscita:', err)
+      })
+  }
+
+  window.setTimeout(run, 5_000)
+  window.setInterval(run, RECONCILE_INTERVAL_MS)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') run()
+  })
 }
