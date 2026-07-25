@@ -5,6 +5,7 @@ import {
   isCloudBackupEnabled,
   pushToCloud,
 } from './cloudBackup'
+import { isCloudSyncPaused } from './cloudSyncPause'
 
 let cloudPushTimer: ReturnType<typeof setTimeout> | undefined
 let hooksInstalled = false
@@ -20,6 +21,7 @@ const PUSH_RETRY_BACKOFF_MS = 800
 async function executeCloudPush(options?: {
   keepalive?: boolean
 }): Promise<boolean> {
+  if (isCloudSyncPaused()) return false
   if (!(await ensureCloudCredentials()) || !isCloudBackupEnabled()) {
     return false
   }
@@ -78,6 +80,7 @@ export function flushCloudSyncNow(options?: { keepalive?: boolean }): void {
 
 /** Dopo ogni modifica locale: snapshot + upload GitHub (debounced). */
 export function notifyLocalDataChanged(delayMs = PUSH_DEBOUNCE_MS): void {
+  if (isCloudSyncPaused()) return
   scheduleAutoSnapshot(200)
   if (cloudPushTimer) clearTimeout(cloudPushTimer)
   cloudPushTimer = setTimeout(() => {

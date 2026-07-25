@@ -12,9 +12,11 @@ import {
   buildCloudRecoveryLink,
   connectCloudBackup,
   disconnectCloudBackup,
+  ensureCloudCredentials,
   getCloudStatus,
   getCloudToken,
   persistCloudCredentials,
+  previewCloudBackup,
   pushToCloud,
   restoreFromCloud,
   restoreMostCompleteFromCloud,
@@ -43,12 +45,33 @@ export function CloudBackupPanel() {
     'connect' | 'push' | 'restore' | 'history' | null
   >(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [cloudPreview, setCloudPreview] = useState<string | null>(null)
 
   useEffect(() => {
     if (status.connected) {
       setToken(getCloudToken() ?? '')
+      void previewCloudBackup()
+        .then((preview) => {
+          if (!preview) {
+            setCloudPreview('Nessun backup con dati trovato su GitHub.')
+            return
+          }
+          setCloudPreview(
+            `Cloud: ${preview.summary} · aggiornato ${new Date(preview.exportedAt).toLocaleString('it-IT')}` +
+              (preview.backupGistsFound > 1
+                ? ` · ${preview.backupGistsFound} gist di backup`
+                : ''),
+          )
+        })
+        .catch((err) => {
+          setCloudPreview(
+            err instanceof Error ? err.message : 'Impossibile leggere il cloud.',
+          )
+        })
+    } else {
+      setCloudPreview(null)
     }
-  }, [status.connected])
+  }, [status.connected, status.lastSyncAt])
 
   function refresh() {
     setStatus(getCloudStatus())
@@ -58,6 +81,19 @@ export function CloudBackupPanel() {
     const trimmed = next.trim()
     if (!trimmed || !status.connected) return
     await persistCloudCredentials(trimmed, status.gistId)
+  }
+
+  async function prepareCloudAccess() {
+    await persistTokenField(token)
+    const ok = await ensureCloudCredentials()
+    if (!ok) {
+      throw new Error('Token cloud non valido o assente.')
+    }
+  }
+
+  function reloadAfterRestore(summary: string) {
+    setMessage(`${summary} Ricarico l'app…`)
+    window.setTimeout(() => window.location.reload(), 600)
   }
 
   async function handleConnect() {
@@ -70,9 +106,10 @@ export function CloudBackupPanel() {
       setToken(getCloudToken() ?? token.trim())
       if (result.action === 'restored' && result.payload) {
         clearDataFingerprint()
-        setMessage(
+        reloadAfterRestore(
           `Collegato e dati ripristinati dal cloud: ${summarizeBackup(result.payload)}.`,
         )
+        return
       } else if (result.action === 'pushed') {
         setMessage('Backup cloud collegato e primo salvataggio eseguito.')
       } else {
@@ -111,14 +148,16 @@ export function CloudBackupPanel() {
     setBusy('restore')
     setMessage(null)
     try {
+      await prepareCloudAccess()
       const payload = await restoreFromCloud()
       if (!payload) {
-        setMessage('Nessun backup trovato nel cloud.')
+        setMessage(
+          'Nessun backup con dati trovato su GitHub. Verifica il token e che il gist non sia stato eliminato.',
+        )
         return
       }
       clearDataFingerprint()
-      refresh()
-      setMessage(`Ripristinato dal cloud: ${summarizeBackup(payload)}.`)
+      reloadAfterRestore(`Ripristinato dal cloud: ${summarizeBackup(payload)}.`)
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Ripristino non riuscito.')
     } finally {
@@ -134,15 +173,17 @@ export function CloudBackupPanel() {
     setBusy('history')
     setMessage(null)
     try {
+      await prepareCloudAccess()
       const result = await restoreMostCompleteFromCloud()
       if (!result) {
-        setMessage('Nessuna versione con dati trovata nello storico del cloud.')
+        setMessage(
+          'Nessuna versione con dati trovata su GitHub (controllati gist e storico).',
+        )
         return
       }
       clearDataFingerprint()
-      refresh()
-      setMessage(
-        `Ripristinata versione più completa (${result.revisionsScanned} versioni esaminate): ${summarizeBackup(result.payload)}.`,
+      reloadAfterRestore(
+        `Ripristinata versione più completa (${result.revisionsScanned} revisioni): ${summarizeBackup(result.payload)}.`,
       )
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Recupero non riuscito.')
@@ -229,6 +270,12 @@ export function CloudBackupPanel() {
             spellCheck={false}
             className="mb-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-800 focus:border-sky-400 focus:ring-sky-500"
           />
+
+          {cloudPreview && (
+            <p className="mb-2 text-[11px] leading-snug text-slate-600">
+              {cloudPreview}
+            </p>
+          )}
 
           <div className="flex flex-col gap-2">
             <button
