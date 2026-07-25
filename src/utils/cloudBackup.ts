@@ -60,6 +60,7 @@ function cloudExportedAtMs(payload: BackupPayload): number {
 const API_BASE = 'https://api.github.com'
 const GIST_FILENAME = 'note-personali-backup.json'
 const GIST_DESCRIPTION = 'Note Personali – backup automatico (non modificare)'
+const GITHUB_FETCH_TIMEOUT_MS = 12_000
 
 export interface CloudStatus {
   connected: boolean
@@ -324,11 +325,35 @@ export async function hydrateCloudCredentials(): Promise<boolean> {
 
 async function ensureCloudGistLinked(): Promise<void> {
   const token = getCloudToken()
-  if (!token) return
-  await resolveBackupGistId(token)
+  if (!token || getCloudGistId()) return
+  const gists = await findAllBackupGists(token)
+  const id = gists[0]?.id
+  if (id) {
+    localStorage.setItem(GIST_ID_KEY, id)
+    await persistCloudCredentials(token, id)
+  }
 }
 
 export type CloudStartupResult = 'restored' | 'pushed' | 'idle' | 'no-cloud'
+
+async function githubFetch(
+  url: string,
+  init: RequestInit,
+  timeoutMs = GITHUB_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Timeout connessione GitHub. Riprova con rete migliore.')
+    }
+    throw err
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
 
 /**
  * All'avvio: confronta locale e cloud per data. Il backup GitHub più recente
@@ -337,12 +362,16 @@ export type CloudStartupResult = 'restored' | 'pushed' | 'idle' | 'no-cloud'
 export async function runCloudStartupSync(): Promise<CloudStartupResult> {
   if (!(await ensureCloudCredentials())) return 'no-cloud'
 
+  const resume = pauseCloudSync()
   try {
     await ensureCloudGistLinked()
 
-    const cloudPayload = await fetchCloudBackup()
-    const cloudTotal = cloudPayload ? countBackupPayload(cloudPayload) : 0
     const localHasData = await hasBackupableData()
+    let cloudPayload = await fetchCloudBackup({ deepScan: false })
+    if (!cloudPayload && !localHasData) {
+      cloudPayload = await fetchCloudBackup({ deepScan: true })
+    }
+    const cloudTotal = cloudPayload ? countBackupPayload(cloudPayload) : 0
 
     if (cloudPayload && cloudTotal > 0) {
       if (!localHasData) {
@@ -371,6 +400,8 @@ export async function runCloudStartupSync(): Promise<CloudStartupResult> {
   } catch (err) {
     console.error('[Cloud] Sincronizzazione avvio non riuscita:', err)
     return 'idle'
+  } finally {
+    resume()
   }
 }
 
@@ -473,7 +504,7 @@ function tryParseGistBackupText(text: string | null): BackupPayload | null {
 
 /** Elenco di tutti i gist di backup sull'account (max 100). */
 async function findAllBackupGists(token: string): Promise<GistResponse[]> {
-  const res = await fetch(`${API_BASE}/gists?per_page=100`, {
+  const res = await githubFetch(`${API_BASE}/gists?per_page=100`, {
     headers: authHeaders(token),
   })
   if (!res.ok) throw await apiError(res)
@@ -481,39 +512,72 @@ async function findAllBackupGists(token: string): Promise<GistResponse[]> {
   return list.filter(isBackupGist)
 }
 
+type ResolveGistOptions = { deepScan?: boolean }
+
 /**
- * Trova il gist con il backup più ricco. Se quello salvato localmente è vuoto
- * o errato, ne cerca un altro tra tutti i gist dell'account.
+ * Trova il gist con backup valido.
+ * - fast (default): usa quello salvato o il primo gist con dati (avvio veloce).
+ * - deep: legge tutti i gist e sceglie il più completo (ripristino manuale).
  */
-async function resolveBackupGistId(token: string): Promise<string | null> {
-  const candidates = new Set<string>()
+async function resolveBackupGistId(
+  token: string,
+  options?: ResolveGistOptions,
+): Promise<string | null> {
+  const deepScan = options?.deepScan ?? false
   const stored = getCloudGistId()
-  if (stored) candidates.add(stored)
 
-  for (const gist of await findAllBackupGists(token)) {
-    candidates.add(gist.id)
-  }
-
-  let bestId: string | null = null
-  let bestScore = -1
-
-  for (const gistId of candidates) {
+  async function scoreGist(
+    gistId: string,
+  ): Promise<{ id: string; score: number } | null> {
     const text = await readGistContent(token, gistId)
     const payload = tryParseGistBackupText(text)
-    if (!payload) continue
-    const score = scoreBackupPayload(payload)
-    if (score > bestScore) {
-      bestScore = score
-      bestId = gistId
+    if (!payload) return null
+    return { id: gistId, score: scoreBackupPayload(payload) }
+  }
+
+  if (stored) {
+    const hit = await scoreGist(stored)
+    if (hit && !deepScan) return hit.id
+    if (hit && deepScan) {
+      let best = hit
+      const gists = await findAllBackupGists(token)
+      for (const gist of gists) {
+        if (gist.id === stored) continue
+        const next = await scoreGist(gist.id)
+        if (next && next.score > best.score) best = next
+      }
+      if (best.id !== stored) {
+        localStorage.setItem(GIST_ID_KEY, best.id)
+        await persistCloudCredentials(token, best.id)
+      }
+      return best.id
     }
   }
 
-  if (bestId && bestId !== stored) {
-    localStorage.setItem(GIST_ID_KEY, bestId)
-    await persistCloudCredentials(token, bestId)
+  const gists = await findAllBackupGists(token)
+  let best: { id: string; score: number } | null = null
+
+  for (const gist of gists) {
+    if (stored && gist.id === stored) continue
+    const hit = await scoreGist(gist.id)
+    if (!hit) continue
+    if (!deepScan) {
+      localStorage.setItem(GIST_ID_KEY, hit.id)
+      await persistCloudCredentials(token, hit.id)
+      return hit.id
+    }
+    if (!best || hit.score > best.score) best = hit
   }
 
-  return bestId
+  if (best) {
+    if (best.id !== stored) {
+      localStorage.setItem(GIST_ID_KEY, best.id)
+      await persistCloudCredentials(token, best.id)
+    }
+    return best.id
+  }
+
+  return null
 }
 
 async function fetchGistFileContent(
@@ -527,7 +591,7 @@ async function fetchGistFileContent(
 
   if (file.raw_url) {
     try {
-      const rawRes = await fetch(file.raw_url, {
+      const rawRes = await githubFetch(file.raw_url, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/vnd.github.raw',
@@ -543,7 +607,7 @@ async function fetchGistFileContent(
   }
 
   try {
-    const rawRes = await fetch(`${API_BASE}/gists/${gistId}`, {
+    const rawRes = await githubFetch(`${API_BASE}/gists/${gistId}`, {
       headers: {
         ...authHeaders(token),
         Accept: 'application/vnd.github.v3.raw',
@@ -579,7 +643,7 @@ export async function connectCloudBackup(
   const token = rawToken.trim()
   if (!token) throw new Error('Inserisci un token GitHub valido.')
 
-  const existing = await resolveBackupGistId(token)
+  const existing = await resolveBackupGistId(token, { deepScan: true })
   const previousToken = localStorage.getItem(TOKEN_KEY)
   const previousGistId = localStorage.getItem(GIST_ID_KEY)
   await persistCloudCredentials(token, existing ?? null)
@@ -629,7 +693,7 @@ export function disconnectCloudBackup(): void {
 }
 
 async function createGist(token: string, content: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/gists`, {
+  const res = await githubFetch(`${API_BASE}/gists`, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({
@@ -649,7 +713,7 @@ async function updateGist(
   content: string,
   keepalive: boolean,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/gists/${gistId}`, {
+  const res = await githubFetch(`${API_BASE}/gists/${gistId}`, {
     method: 'PATCH',
     headers: authHeaders(token),
     body: JSON.stringify({
@@ -659,7 +723,7 @@ async function updateGist(
     keepalive,
   })
   if (res.status === 404) {
-    const recovered = await resolveBackupGistId(token)
+    const recovered = await resolveBackupGistId(token, { deepScan: true })
     if (recovered && recovered !== gistId) {
       await updateGist(token, recovered, content, keepalive)
       return
@@ -695,7 +759,11 @@ export async function pushToCloud(options?: {
   }
 
   const content = JSON.stringify(payload)
-  const gistId = (await resolveBackupGistId(token)) ?? getCloudGistId()
+  let gistId = getCloudGistId()
+  if (!gistId) {
+    await ensureCloudGistLinked()
+    gistId = getCloudGistId()
+  }
   const keepalive = options?.keepalive ?? false
 
   if (gistId) {
@@ -714,7 +782,7 @@ async function readGistContent(
   token: string,
   gistId: string,
 ): Promise<string | null> {
-  const res = await fetch(`${API_BASE}/gists/${gistId}`, {
+  const res = await githubFetch(`${API_BASE}/gists/${gistId}`, {
     headers: authHeaders(token),
   })
   if (res.status === 404) return null
@@ -732,10 +800,10 @@ export async function previewCloudBackup(): Promise<CloudBackupPreview | null> {
   if (!token) return null
 
   const backupGists = await findAllBackupGists(token)
-  const gistId = await resolveBackupGistId(token)
+  const gistId = await resolveBackupGistId(token, { deepScan: true })
   if (!gistId) return null
 
-  const payload = await fetchCloudBackup()
+  const payload = await fetchCloudBackup({ deepScan: true })
   if (!payload) return null
 
   return {
@@ -748,12 +816,16 @@ export async function previewCloudBackup(): Promise<CloudBackupPreview | null> {
 }
 
 /** Legge il backup dal cloud senza applicarlo (per anteprima/conteggio). */
-export async function fetchCloudBackup(): Promise<BackupPayload | null> {
+export async function fetchCloudBackup(options?: {
+  deepScan?: boolean
+}): Promise<BackupPayload | null> {
   if (!(await ensureCloudCredentials())) return null
   const token = getCloudToken()
   if (!token) return null
 
-  const gistId = await resolveBackupGistId(token)
+  const gistId = await resolveBackupGistId(token, {
+    deepScan: options?.deepScan,
+  })
   if (!gistId) return null
 
   const text = await readGistContent(token, gistId)
@@ -768,7 +840,7 @@ export async function restoreFromCloud(): Promise<BackupPayload | null> {
 
   const resume = pauseCloudSync()
   try {
-    const payload = await fetchCloudBackup()
+    const payload = await fetchCloudBackup({ deepScan: true })
     if (!payload) return null
     await restoreBackupFromText(JSON.stringify(payload))
     await writeSyncMeta(payload)
@@ -783,7 +855,7 @@ async function readRevisionText(
   gistId: string,
   version: string,
 ): Promise<string | null> {
-  const res = await fetch(`${API_BASE}/gists/${gistId}/${version}`, {
+  const res = await githubFetch(`${API_BASE}/gists/${gistId}/${version}`, {
     headers: authHeaders(token),
   })
   if (!res.ok) return null
@@ -798,7 +870,7 @@ async function scanGistHistoryForBest(
   gistId: string,
   maxRevisions: number,
 ): Promise<{ best: BackupPayload | null; bestIndex: number; scanned: number }> {
-  const res = await fetch(`${API_BASE}/gists/${gistId}`, {
+  const res = await githubFetch(`${API_BASE}/gists/${gistId}`, {
     headers: authHeaders(token),
   })
   if (!res.ok) throw await apiError(res)

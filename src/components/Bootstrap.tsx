@@ -25,6 +25,7 @@ import { installAutoCloudSyncHooks } from '../utils/autoCloudSync'
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
 const BOOT_TIMEOUT_MS = 12_000
+const BOOT_CLOUD_WAIT_MS = 10_000
 
 async function runPostOpenTasks(): Promise<void> {
   const events = await db.events.toArray()
@@ -68,6 +69,7 @@ export function Bootstrap() {
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [slowBoot, setSlowBoot] = useState(false)
+  const [bootPhase, setBootPhase] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -102,14 +104,30 @@ export function Bootstrap() {
         }
         if (cancelled) return
 
-        // GitHub Gist: scarica ultimo backup se vuoto, altrimenti carica locale.
-        try {
-          await runCloudStartupSync()
-        } catch (err) {
+        // GitHub Gist: attende al massimo BOOT_CLOUD_WAIT_MS, poi apre l'app
+        // e continua il ripristino in background (reload se trova dati).
+        setBootPhase('Recupero dati dal cloud…')
+        const cloudWork = runCloudStartupSync().catch((err) => {
           console.error('[Cloud] Sincronizzazione avvio non riuscita:', err)
+          return 'idle' as const
+        })
+        const raced = await Promise.race([
+          cloudWork,
+          new Promise<'timeout'>((resolve) => {
+            window.setTimeout(() => resolve('timeout'), BOOT_CLOUD_WAIT_MS)
+          }),
+        ])
+
+        if (raced === 'restored') {
+          setBootPhase(null)
+        } else if (raced === 'timeout') {
+          void cloudWork.then((result) => {
+            if (result === 'restored') window.location.reload()
+          })
         }
         if (cancelled) return
 
+        setBootPhase(null)
         await updateDataFingerprint()
         if (cancelled) return
         setReady(true)
@@ -146,9 +164,8 @@ export function Bootstrap() {
     return (
       <RecoveryScreen
         title={
-          slowBoot
-            ? 'Caricamento lento…'
-            : 'Caricamento Note Personali…'
+          bootPhase ??
+          (slowBoot ? 'Caricamento lento…' : 'Caricamento Note Personali…')
         }
         showLoadingHint
       />

@@ -2,7 +2,6 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { installReloadPersistenceGuards } from './utils/autoCloudSync'
-import { ensureCloudCredentials } from './utils/cloudBackup'
 import { Bootstrap } from './components/Bootstrap.tsx'
 import {
   applyAppUpdateReload,
@@ -45,12 +44,6 @@ async function startApp(): Promise<void> {
 
   registerProductionServiceWorker()
   scheduleRemoteBuildChecks()
-
-  try {
-    await ensureCloudCredentials()
-  } catch (err) {
-    console.error('[Cloud] Credenziali non recuperate:', err)
-  }
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
