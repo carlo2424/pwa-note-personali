@@ -3,15 +3,16 @@ import { isPastDue, todayIso } from './countdown'
 import { addRecurrence, parseIsoDate, toIsoDateLocal, repairCorruptedRenewalPatch, computeNextRenewalDate } from './impegnoDates'
 import { isAutomatedPaymentMethod, eventRequiresManualDone } from './paymentMethod'
 import { isOverdueEvent } from './overdue'
-import { syncExpensesForEvent, ensurePeriodExpenseForEvent, closedPeriodChargeDate } from './eventExpenses'
+import { syncExpensesForEvent, ensurePeriodExpenseForEvent, closedPeriodChargeDate, isImpegnoScadenzaPassed } from './eventExpenses'
 
 export { eventRequiresManualDone }
 
-/** Il periodo corrente è convalidabile (scaduto o rinnovo passato), non futuro. */
-export function isRecurringPeriodReadyForDone(
+/** Il periodo corrente è convalidabile (scadenza ≤ oggi), non prima. */
+export function isImpegnoPeriodReadyForDone(
   event: Pick<
     Event,
     | 'startDate'
+    | 'endDate'
     | 'renewalDate'
     | 'recurrenceFrequency'
     | 'paymentMethod'
@@ -19,26 +20,27 @@ export function isRecurringPeriodReadyForDone(
   >,
 ): boolean {
   if (isAutomatedPaymentMethod(event.paymentMethod)) return false
-  if (!event.recurrenceFrequency) return true
-  if (isOverdueEvent(event)) return true
-  // Convalidabile anche il giorno della scadenza (oggi), non solo se passata.
-  if (event.renewalDate && event.renewalDate <= todayIso()) return true
+  if (isImpegnoScadenzaPassed(event)) return true
+  if (event.recurrenceFrequency && isOverdueEvent(event)) return true
   return false
 }
+
+/** @deprecated Usare isImpegnoPeriodReadyForDone */
+export const isRecurringPeriodReadyForDone = isImpegnoPeriodReadyForDone
 
 export function isEventMarkedDone(
   event: Pick<
     Event,
-    'completedAt' | 'renewalDate' | 'recurrenceFrequency' | 'paymentMethod' | 'startDate'
+    | 'completedAt'
+    | 'renewalDate'
+    | 'recurrenceFrequency'
+    | 'paymentMethod'
+    | 'startDate'
+    | 'endDate'
   >,
 ): boolean {
   if (event.completedAt == null) return false
-  if (
-    event.recurrenceFrequency &&
-    !isRecurringPeriodReadyForDone(event)
-  ) {
-    return false
-  }
+  if (!isImpegnoPeriodReadyForDone(event)) return false
   return true
 }
 
@@ -92,12 +94,12 @@ export async function markEventDone(event: Event): Promise<void> {
   if (
     event.recurrenceFrequency &&
     !isAutomatedPaymentMethod(event.paymentMethod) &&
-    !isRecurringPeriodReadyForDone(event)
+    !isImpegnoPeriodReadyForDone(event)
   ) {
     return
   }
 
-  if (event.cost || event.received) {
+  if ((event.cost || event.received) && isImpegnoScadenzaPassed(event)) {
     await ensurePeriodExpenseForEvent(
       event.id,
       event,
@@ -175,7 +177,7 @@ export async function toggleEventDone(event: Event): Promise<void> {
   if (
     fresh.completedAt &&
     fresh.recurrenceFrequency &&
-    !isRecurringPeriodReadyForDone(fresh)
+    !isImpegnoPeriodReadyForDone(fresh)
   ) {
     await unmarkEventDone(fresh)
     return

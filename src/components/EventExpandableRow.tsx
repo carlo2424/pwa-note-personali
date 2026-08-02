@@ -7,10 +7,11 @@ import { markImpegnoDoneConfirmCopy } from '../utils/confirmMessages'
 import {
   eventRequiresManualDone,
   isEventMarkedDone,
-  isRecurringPeriodReadyForDone,
+  isImpegnoPeriodReadyForDone,
   markEventDone,
   toggleEventDone,
 } from '../utils/impegnoDone'
+import { impegnoScadenzaDate } from '../utils/eventExpenses'
 import { recurrenceShort } from '../utils/recurring'
 import { summarizeText } from '../utils/textSummary'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -67,13 +68,10 @@ export function EventExpandableRow({
   const homeCard = compact && showTypeLabel
   const markedDone = isEventMarkedDone(event)
   const showDoneToggle = eventRequiresManualDone(event)
-  const checkDisabled =
-    !!event.recurrenceFrequency && !isRecurringPeriodReadyForDone(event)
+  const periodReady = isImpegnoPeriodReadyForDone(event)
+  const checkDisabled = showDoneToggle && !periodReady
   const invalidStoredDone =
-    showDoneToggle &&
-    event.completedAt != null &&
-    !!event.recurrenceFrequency &&
-    !isRecurringPeriodReadyForDone(event)
+    showDoneToggle && event.completedAt != null && !periodReady
   const doneConfirmCopy = markImpegnoDoneConfirmCopy(event.title, {
     recurring: !!event.recurrenceFrequency,
   })
@@ -112,7 +110,7 @@ export function EventExpandableRow({
     }
     subtitle = line2Parts.length > 0 ? line2Parts.join(' · ') : undefined
 
-    const deadlineIso = event.renewalDate ?? event.endDate ?? event.startDate
+    const deadlineIso = impegnoScadenzaDate(event)
     const line3Parts: string[] = []
     const countdown = countdownLabel(deadlineIso)
     line3Parts.push(

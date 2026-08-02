@@ -2,14 +2,31 @@ import { db, type Event } from '../db'
 import { todayIso } from './countdown'
 import { lastRecurrenceDueOnOrBeforeToday } from './impegnoDates'
 
-/** Data effettiva di addebito: rinnovo, oppure fine periodo (impegni singoli), altrimenti inizio. */
+/** Scadenza/addebito: fine periodo o rinnovo (mai solo inizio se esiste una scadenza). */
+export function impegnoScadenzaDate(
+  event: Pick<Event, 'renewalDate' | 'startDate' | 'endDate' | 'recurrenceFrequency'>,
+): string {
+  if (event.recurrenceFrequency) {
+    return event.renewalDate ?? event.endDate ?? event.startDate
+  }
+  if (event.startDate && event.endDate && event.endDate >= event.startDate) {
+    return event.endDate
+  }
+  return event.endDate ?? event.startDate
+}
+
+/** Alias semantico: data di addebito = scadenza del periodo. */
 export function eventChargeDate(
   event: Pick<Event, 'renewalDate' | 'startDate' | 'endDate' | 'recurrenceFrequency'>,
 ): string {
-  if (event.renewalDate) return event.renewalDate
-  if (event.recurrenceFrequency) return event.startDate
-  if (event.endDate) return event.endDate
-  return event.startDate
+  return impegnoScadenzaDate(event)
+}
+
+export function isImpegnoScadenzaPassed(
+  event: Pick<Event, 'renewalDate' | 'startDate' | 'endDate' | 'recurrenceFrequency'>,
+): boolean {
+  const scadenza = impegnoScadenzaDate(event)
+  return !!scadenza && scadenza <= todayIso()
 }
 
 /** Periodo appena convalidato con la spunta (rinnovo/scadenza passata). */
@@ -27,9 +44,14 @@ export function closedPeriodChargeDate(
       event.startDate,
       event.recurrenceFrequency,
     )
-    if (lastDue) return lastDue
+    if (lastDue) {
+      if (event.endDate && event.endDate >= lastDue && event.endDate <= todayIso()) {
+        return event.endDate
+      }
+      return lastDue
+    }
   }
-  return event.endDate ?? event.startDate ?? todayIso()
+  return impegnoScadenzaDate(event)
 }
 
 /** Registra la spesa del periodo convalidato senza cancellare lo storico. */

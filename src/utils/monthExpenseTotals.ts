@@ -1,6 +1,6 @@
 import type { Event, Expense } from '../db'
 import { daysUntil, todayIso } from './countdown'
-import { eventChargeDate } from './eventExpenses'
+import { impegnoScadenzaDate } from './eventExpenses'
 import { addRecurrence, lastRecurrenceDueOnOrBeforeToday, parseIsoDate, toIsoDateLocal } from './impegnoDates'
 import { formatAmount, sentenceCase } from './format'
 import {
@@ -73,8 +73,8 @@ export function impegnoPaidChargeInCurrentMonth(ev: Event): string | null {
   if (!Number.isFinite(cost) || cost <= 0) return null
 
   const today = todayIso()
-  const charge = eventChargeDate(ev)
-  if (isoInCurrentMonth(charge) && charge <= today) return charge
+  const scadenza = impegnoScadenzaDate(ev)
+  if (isoInCurrentMonth(scadenza) && scadenza <= today) return scadenza
 
   if (
     !ev.recurrenceFrequency &&
@@ -107,8 +107,18 @@ function eventUpcomingChargeInCurrentMonth(ev: Event): string | null {
   if (!Number.isFinite(cost) || cost <= 0) return null
 
   const today = todayIso()
-  const charge = eventChargeDate(ev)
-  if (isoInCurrentMonth(charge) && charge > today) return charge
+  const scadenza = impegnoScadenzaDate(ev)
+  if (isoInCurrentMonth(scadenza) && scadenza > today) return scadenza
+
+  if (
+    !ev.recurrenceFrequency &&
+    ev.startDate &&
+    ev.endDate &&
+    periodOverlapsCurrentMonth(ev.startDate, ev.endDate)
+  ) {
+    const due = ev.endDate
+    if (isoInCurrentMonth(due) && due > today) return due
+  }
 
   if (!ev.recurrenceFrequency || !ev.startDate) return null
 
