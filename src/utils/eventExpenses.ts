@@ -1,13 +1,65 @@
 import { db, type Event } from '../db'
 import { todayIso } from './countdown'
-import { lastRecurrenceDueOnOrBeforeToday } from './impegnoDates'
+import {
+  addRecurrence,
+  computeEndDateFromFrequency,
+  lastRecurrenceDueOnOrBeforeTodayCapped,
+  parseIsoDate,
+  toIsoDateLocal,
+} from './impegnoDates'
 
-/** Scadenza/addebito: fine periodo o rinnovo (mai solo inizio se esiste una scadenza). */
+function isoInCurrentMonth(iso: string): boolean {
+  const now = new Date()
+  const startMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+  const endMs = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999,
+  ).getTime()
+  const t = new Date(iso + 'T00:00:00').getTime()
+  return t >= startMs && t <= endMs
+}
+
+function monthBoundsIso(): { start: string; end: string } {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return { start: toIsoDateLocal(start), end: toIsoDateLocal(end) }
+}
+
+/** Fine definitiva impegno (ultimo pagamento possibile). Per ricorrenti: data fine oltre il 1° periodo. */
+export function impegnoDefinitiveEndDate(
+  event: Pick<Event, 'startDate' | 'endDate' | 'recurrenceFrequency'>,
+): string | undefined {
+  if (!event.endDate || !event.startDate) return undefined
+  if (!event.recurrenceFrequency) return event.endDate
+  const periodEnd = computeEndDateFromFrequency(
+    event.startDate,
+    event.recurrenceFrequency,
+  )
+  if (event.endDate > periodEnd) return event.endDate
+  return undefined
+}
+
+/** Impegno ancora attivo: fine definitiva non superata (o assente = senza termine). */
+export function isImpegnoCommitmentActive(
+  event: Pick<Event, 'startDate' | 'endDate' | 'recurrenceFrequency'>,
+): boolean {
+  const definitive = impegnoDefinitiveEndDate(event)
+  if (!definitive) return true
+  return todayIso() <= definitive
+}
+
+/** Prossimo addebito di periodo (rinnovo), non la fine definitiva dell'impegno. */
 export function impegnoScadenzaDate(
   event: Pick<Event, 'renewalDate' | 'startDate' | 'endDate' | 'recurrenceFrequency'>,
 ): string {
   if (event.recurrenceFrequency) {
-    return event.renewalDate ?? event.endDate ?? event.startDate
+    return event.renewalDate ?? event.startDate
   }
   if (event.startDate && event.endDate && event.endDate >= event.startDate) {
     return event.endDate
@@ -15,7 +67,7 @@ export function impegnoScadenzaDate(
   return event.endDate ?? event.startDate
 }
 
-/** Alias semantico: data di addebito = scadenza del periodo. */
+/** Alias semantico: data di addebito del periodo corrente. */
 export function eventChargeDate(
   event: Pick<Event, 'renewalDate' | 'startDate' | 'endDate' | 'recurrenceFrequency'>,
 ): string {
@@ -29,6 +81,69 @@ export function isImpegnoScadenzaPassed(
   return !!scadenza && scadenza <= todayIso()
 }
 
+function recurrenceChargeInMonth(
+  ev: Event,
+  test: (iso: string) => boolean,
+): string | null {
+  if (!ev.recurrenceFrequency || !ev.startDate) return null
+
+  const definitive = impegnoDefinitiveEndDate(ev)
+  const { start: monthStart, end: monthEnd } = monthBoundsIso()
+
+  if (definitive && definitive < monthStart) return null
+
+  const renewal = ev.renewalDate
+  if (renewal && renewal >= monthStart && renewal <= monthEnd && test(renewal)) {
+    if (!definitive || renewal <= definitive) return renewal
+  }
+
+  let current = parseIsoDate(ev.startDate)
+  for (let i = 0; i < 600; i++) {
+    const iso = toIsoDateLocal(current)
+    if (definitive && iso > definitive) break
+    if (iso > monthEnd) break
+    if (iso >= monthStart && iso <= monthEnd && test(iso)) {
+      if (!definitive || iso <= definitive) return iso
+    }
+    const next = addRecurrence(current, ev.recurrenceFrequency)
+    if (toIsoDateLocal(next) === iso) break
+    current = next
+  }
+  return null
+}
+
+/** Addebito impegno già avvenuto nel mese corrente, entro la fine definitiva. */
+export function impegnoPaidChargeInCurrentMonth(ev: Event): string | null {
+  const cost = Number(ev.cost)
+  if (!Number.isFinite(cost) || cost <= 0) return null
+
+  const today = todayIso()
+  const definitive = impegnoDefinitiveEndDate(ev)
+  const { start: monthStart } = monthBoundsIso()
+
+  if (definitive && definitive < monthStart) return null
+
+  if (!ev.recurrenceFrequency) {
+    const scadenza = impegnoScadenzaDate(ev)
+    if (isoInCurrentMonth(scadenza) && scadenza <= today) {
+      if (!definitive || scadenza <= definitive) return scadenza
+    }
+    return null
+  }
+
+  return recurrenceChargeInMonth(ev, (iso) => iso <= today)
+}
+
+/** Prossimo addebito nel mese corrente (fine definitiva ancora in vigore). */
+export function impegnoUpcomingChargeInCurrentMonth(ev: Event): string | null {
+  const cost = Number(ev.cost)
+  if (!Number.isFinite(cost) || cost <= 0) return null
+  if (!isImpegnoCommitmentActive(ev)) return null
+
+  const today = todayIso()
+  return recurrenceChargeInMonth(ev, (iso) => iso > today)
+}
+
 /** Periodo appena convalidato con la spunta (rinnovo/scadenza passata). */
 export function closedPeriodChargeDate(
   event: Pick<
@@ -36,20 +151,20 @@ export function closedPeriodChargeDate(
     'renewalDate' | 'startDate' | 'endDate' | 'recurrenceFrequency'
   >,
 ): string {
+  const definitive = impegnoDefinitiveEndDate(event)
+
   if (event.recurrenceFrequency && event.startDate) {
     if (event.renewalDate && event.renewalDate <= todayIso()) {
-      return event.renewalDate
+      if (!definitive || event.renewalDate <= definitive) {
+        return event.renewalDate
+      }
     }
-    const lastDue = lastRecurrenceDueOnOrBeforeToday(
+    const lastDue = lastRecurrenceDueOnOrBeforeTodayCapped(
       event.startDate,
       event.recurrenceFrequency,
+      definitive,
     )
-    if (lastDue) {
-      if (event.endDate && event.endDate >= lastDue && event.endDate <= todayIso()) {
-        return event.endDate
-      }
-      return lastDue
-    }
+    if (lastDue) return lastDue
   }
   return impegnoScadenzaDate(event)
 }
@@ -109,8 +224,16 @@ export async function syncExpensesForEvent(
   eventId: number,
   event: Omit<Event, 'id'>,
 ): Promise<void> {
+  if (!isImpegnoCommitmentActive(event)) {
+    return
+  }
+
   const linked = await db.expenses.where('eventId').equals(eventId).toArray()
-  const chargeDate = eventChargeDate(event)
+  let chargeDate = eventChargeDate(event)
+  const definitive = impegnoDefinitiveEndDate(event)
+  if (definitive && chargeDate > definitive) {
+    chargeDate = definitive
+  }
   const now = Date.now()
   const category = event.labels[0] || 'Abbonamenti'
 
@@ -143,7 +266,7 @@ export async function syncExpensesForEvent(
       Math.abs(e.amount) === event.received,
   )
 
-  if (event.cost != null && event.cost > 0 && !hasCost) {
+  if (event.cost != null && event.cost > 0 && !hasCost && chargeDate >= todayIso()) {
     await db.expenses.add({
       amount: event.cost,
       description: event.title,
@@ -157,7 +280,12 @@ export async function syncExpensesForEvent(
     })
   }
 
-  if (event.received != null && event.received > 0 && !hasReceived) {
+  if (
+    event.received != null &&
+    event.received > 0 &&
+    !hasReceived &&
+    chargeDate >= todayIso()
+  ) {
     await db.expenses.add({
       amount: -event.received,
       description: `${event.title} (ricevuto)`,

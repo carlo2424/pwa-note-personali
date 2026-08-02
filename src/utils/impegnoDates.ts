@@ -75,6 +75,29 @@ export function lastRecurrenceDueOnOrBeforeToday(
   return lastDue
 }
 
+/** Ultimo addebito ricorrente ≤ oggi, senza superare la fine definitiva impegno. */
+export function lastRecurrenceDueOnOrBeforeTodayCapped(
+  startDate: string,
+  frequency: RecurrenceFrequency,
+  definitiveEnd?: string,
+): string | undefined {
+  const lastDue = lastRecurrenceDueOnOrBeforeToday(startDate, frequency)
+  if (!lastDue) return undefined
+  if (definitiveEnd && lastDue > definitiveEnd) {
+    let current = parseIsoDate(startDate)
+    let capped: string | undefined
+    for (;;) {
+      const iso = toIsoDateLocal(current)
+      if (definitiveEnd && iso > definitiveEnd) break
+      if (iso > todayIso()) break
+      capped = iso
+      current = addRecurrence(current, frequency)
+    }
+    return capped
+  }
+  return lastDue
+}
+
 /** Corregge rinnovi saltati in avanti rispetto a inizio + frequenza (bug checkbox precedente). */
 export function repairCorruptedRenewalPatch(event: {
   startDate?: string

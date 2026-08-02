@@ -3,7 +3,7 @@ import { isPastDue, todayIso } from './countdown'
 import { addRecurrence, parseIsoDate, toIsoDateLocal, repairCorruptedRenewalPatch, computeNextRenewalDate } from './impegnoDates'
 import { isAutomatedPaymentMethod, eventRequiresManualDone } from './paymentMethod'
 import { isOverdueEvent } from './overdue'
-import { syncExpensesForEvent, ensurePeriodExpenseForEvent, closedPeriodChargeDate, isImpegnoScadenzaPassed } from './eventExpenses'
+import { syncExpensesForEvent, ensurePeriodExpenseForEvent, closedPeriodChargeDate, isImpegnoScadenzaPassed, impegnoDefinitiveEndDate } from './eventExpenses'
 
 export { eventRequiresManualDone }
 
@@ -74,17 +74,20 @@ export function isNoteImpegnoPending(
   return !isNoteImpegnoMarkedDone(note, linkedTasks)
 }
 
-/** Prossima data rinnovo dopo aver segnato fatto (>= oggi). */
+/** Prossima data rinnovo dopo aver segnato fatto (>= oggi), senza superare la fine definitiva. */
 export function advanceRenewalAfterDone(
   renewalDate: string,
   frequency: RecurrenceFrequency,
+  definitiveEnd?: string,
 ): string {
   const today = toIsoDateLocal(new Date())
   let current = parseIsoDate(renewalDate)
   do {
     current = addRecurrence(current, frequency)
   } while (toIsoDateLocal(current) < today)
-  return toIsoDateLocal(current)
+  const next = toIsoDateLocal(current)
+  if (definitiveEnd && next > definitiveEnd) return definitiveEnd
+  return next
 }
 
 export async function markEventDone(event: Event): Promise<void> {
@@ -113,9 +116,11 @@ export async function markEventDone(event: Event): Promise<void> {
     event.renewalDate &&
     event.renewalDate <= todayIso()
   ) {
+    const definitive = impegnoDefinitiveEndDate(event)
     const renewalDate = advanceRenewalAfterDone(
       event.renewalDate,
       event.recurrenceFrequency,
+      definitive,
     )
     await db.events.update(event.id, {
       renewalDate,
@@ -249,9 +254,11 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
     isPastDue(event.renewalDate)
   ) {
     if (isAutomatedPaymentMethod(event.paymentMethod)) {
+      const definitive = impegnoDefinitiveEndDate(event)
       const renewalDate = advanceRenewalAfterDone(
         event.renewalDate,
         event.recurrenceFrequency,
+        definitive,
       )
       if (renewalDate !== event.renewalDate) {
         if (event.cost || event.received) {
@@ -275,9 +282,11 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
     }
 
     if (event.completedAt) {
+      const definitive = impegnoDefinitiveEndDate(event)
       const renewalDate = advanceRenewalAfterDone(
         event.renewalDate,
         event.recurrenceFrequency,
+        definitive,
       )
       if (renewalDate !== event.renewalDate) {
         if (event.cost || event.received) {
