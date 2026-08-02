@@ -1,7 +1,8 @@
-import type { Expense } from '../db'
+import type { Event, Expense } from '../db'
 import { daysUntil, todayIso } from './countdown'
+import { eventChargeDate } from './eventExpenses'
 import { formatAmount, sentenceCase } from './format'
-import { expenseInCurrentMonth, isoInCurrentMonth } from './monthFilter'
+import { eventInCurrentMonth, expenseInCurrentMonth, isoInCurrentMonth } from './monthFilter'
 
 export interface UpcomingMonthExpense {
   amount: number
@@ -49,40 +50,111 @@ function expenseAmount(expense: Pick<Expense, 'amount'>): number {
   return Number.isFinite(amount) ? amount : 0
 }
 
+function eventIdsWithPositiveExpense(expenses: Expense[]): Set<number> {
+  const ids = new Set<number>()
+  for (const e of expenses) {
+    if (e.eventId != null && expenseAmount(e) > 0) ids.add(e.eventId)
+  }
+  return ids
+}
+
+function eventCountsAsMonthPaid(ev: Event): boolean {
+  const cost = Number(ev.cost)
+  if (!Number.isFinite(cost) || cost <= 0) return false
+  if (!eventInCurrentMonth(ev)) return false
+  return eventChargeDate(ev) <= todayIso()
+}
+
+function eventCountsAsMonthUpcoming(ev: Event): boolean {
+  const cost = Number(ev.cost)
+  if (!Number.isFinite(cost) || cost <= 0) return false
+  const charge = eventChargeDate(ev)
+  if (!isoInCurrentMonth(charge)) return false
+  return charge > todayIso()
+}
+
 /** Spese già avvenute nel mese corrente (data ≤ oggi, importi positivi). */
-export function computeMonthPaidTotal(expenses: Expense[]): number {
+export function computeMonthPaidTotal(
+  expenses: Expense[],
+  events: Event[] = [],
+): number {
   const today = todayIso()
-  return expenses.reduce((sum, expense) => {
+  const linked = eventIdsWithPositiveExpense(expenses)
+
+  let sum = expenses.reduce((acc, expense) => {
     const amount = expenseAmount(expense)
-    if (amount <= 0) return sum
-    if (!expenseInCurrentMonth(expense) || expense.date > today) return sum
-    return sum + amount
+    if (amount <= 0) return acc
+    if (!expenseInCurrentMonth(expense) || expense.date > today) return acc
+    return acc + amount
   }, 0)
+
+  for (const ev of events) {
+    if (!ev.id || linked.has(ev.id)) continue
+    if (!eventCountsAsMonthPaid(ev)) continue
+    sum += Number(ev.cost) || 0
+  }
+
+  return sum
 }
 
 /** Numero di spese positive del mese già sostenute (data ≤ oggi). */
-export function countMonthPaidExpenses(expenses: Expense[]): number {
+export function countMonthPaidExpenses(
+  expenses: Expense[],
+  events: Event[] = [],
+): number {
   const today = todayIso()
-  return expenses.filter(
+  let count = expenses.filter(
     (e) =>
       expenseAmount(e) > 0 &&
       expenseInCurrentMonth(e) &&
       e.date <= today,
   ).length
+
+  const linked = eventIdsWithPositiveExpense(expenses)
+  for (const ev of events) {
+    if (!ev.id || linked.has(ev.id)) continue
+    if (eventCountsAsMonthPaid(ev)) count += 1
+  }
+
+  return count
 }
 
 /** Spese previste nel mese ma con data futura (non ancora avvenute). */
 export function computeMonthUpcomingExpenses(
   expenses: Expense[],
+  events: Event[] = [],
 ): UpcomingMonthExpense[] {
-  return upcomingFromExpenses(expenses).filter((u) =>
+  const linked = eventIdsWithPositiveExpense(expenses)
+  const fromExpenses = upcomingFromExpenses(expenses).filter((u) =>
     isoInCurrentMonth(u.date),
+  )
+
+  const fromEvents: UpcomingMonthExpense[] = []
+  for (const ev of events) {
+    if (!ev.id || linked.has(ev.id)) continue
+    if (!eventCountsAsMonthUpcoming(ev)) continue
+    const charge = eventChargeDate(ev)
+    fromEvents.push({
+      amount: Number(ev.cost) || 0,
+      date: charge,
+      daysUntil: daysUntil(charge),
+    })
+  }
+
+  return [...fromExpenses, ...fromEvents].sort((a, b) =>
+    a.date.localeCompare(b.date),
   )
 }
 
 /** Totale spese future nel mese corrente (allineato all'elenco in Home). */
-export function computeMonthUpcomingTotal(expenses: Expense[]): number {
-  return computeMonthUpcomingExpenses(expenses).reduce((s, u) => s + u.amount, 0)
+export function computeMonthUpcomingTotal(
+  expenses: Expense[],
+  events: Event[] = [],
+): number {
+  return computeMonthUpcomingExpenses(expenses, events).reduce(
+    (s, u) => s + u.amount,
+    0,
+  )
 }
 
 export interface MonthExpenseOverviewItem {

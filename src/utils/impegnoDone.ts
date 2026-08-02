@@ -3,6 +3,7 @@ import { isPastDue, todayIso } from './countdown'
 import { addRecurrence, parseIsoDate, toIsoDateLocal, repairCorruptedRenewalPatch, computeNextRenewalDate } from './impegnoDates'
 import { isAutomatedPaymentMethod, eventRequiresManualDone } from './paymentMethod'
 import { isOverdueEvent } from './overdue'
+import { syncExpensesForEvent } from './eventExpenses'
 
 export { eventRequiresManualDone }
 
@@ -111,6 +112,10 @@ export async function markEventDone(event: Event): Promise<void> {
       completedAt: undefined,
       updatedAt: now,
     })
+    const updated = await db.events.get(event.id)
+    if (updated?.cost || updated?.received) {
+      await syncExpensesForEvent(event.id, updated)
+    }
     return
   }
 
@@ -130,6 +135,10 @@ export async function markEventDone(event: Event): Promise<void> {
       completedAt: undefined,
       updatedAt: now,
     })
+    const updated = await db.events.get(event.id)
+    if (updated?.cost || updated?.received) {
+      await syncExpensesForEvent(event.id, updated)
+    }
     return
   }
 
@@ -236,6 +245,10 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
           completedAt: undefined,
           updatedAt: now,
         })
+        const updated = await db.events.get(event.id)
+        if (updated?.cost || updated?.received) {
+          await syncExpensesForEvent(event.id, updated)
+        }
       }
       return
     }
@@ -251,6 +264,10 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
           completedAt: undefined,
           updatedAt: now,
         })
+        const updated = await db.events.get(event.id)
+        if (updated?.cost || updated?.received) {
+          await syncExpensesForEvent(event.id, updated)
+        }
       }
     }
     return

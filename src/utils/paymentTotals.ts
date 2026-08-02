@@ -5,6 +5,7 @@ import {
   eventInCurrentMonth,
   expenseInCurrentMonth,
 } from './monthFilter'
+import { eventChargeDate } from './eventExpenses'
 import { formatAmount } from './format'
 
 function resolvePaymentMethod(value?: string): PaymentMethod {
@@ -21,10 +22,6 @@ function resolvePaymentMethod(value?: string): PaymentMethod {
 
 function expenseCountsInMonth(e: Expense): boolean {
   return expenseInCurrentMonth(e) && e.date <= todayIso()
-}
-
-function eventChargeDate(ev: Event): string {
-  return ev.renewalDate ?? ev.startDate
 }
 
 function eventCountsInMonth(ev: Event): boolean {

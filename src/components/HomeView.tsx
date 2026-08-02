@@ -398,18 +398,18 @@ export function HomeView({
   const expenseCount = displayExpenses.length
 
   const monthExpensesTotal = useMemo(
-    () => computeMonthPaidTotal(expenses ?? []),
-    [expenses],
+    () => computeMonthPaidTotal(expenses ?? [], events ?? []),
+    [expenses, events],
   )
 
   const monthPaidExpenseCount = useMemo(
-    () => countMonthPaidExpenses(expenses ?? []),
-    [expenses],
+    () => countMonthPaidExpenses(expenses ?? [], events ?? []),
+    [expenses, events],
   )
 
   const monthPlannedTotal = useMemo(
-    () => computeMonthUpcomingTotal(expenses ?? []),
-    [expenses],
+    () => computeMonthUpcomingTotal(expenses ?? [], events ?? []),
+    [expenses, events],
   )
 
   const monthlySubs = (areaFilterActive ? areaEvents : monthEvents)

@@ -53,8 +53,8 @@ export function PaymentOverview({
   )
 
   const monthPaid = useMemo(
-    () => computeMonthPaidTotal(expenses ?? []),
-    [expenses],
+    () => computeMonthPaidTotal(expenses ?? [], events ?? []),
+    [expenses, events],
   )
 
   const monthExpensesForList = useMemo(() => {

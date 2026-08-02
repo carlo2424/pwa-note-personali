@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import App from '../App.tsx'
 import { RecoveryScreen } from './RecoveryScreen.tsx'
 import { db } from '../db'
-import { syncExpensesForEvent } from '../utils/eventExpenses'
+import { syncExpensesForEvent, repairEventExpenseChargeDates } from '../utils/eventExpenses'
 import {
   checkRenewalNotifications,
   pruneSentNotifications,
@@ -24,6 +24,7 @@ import { installAutoCloudSyncHooks, installPeriodicCloudReconcile } from '../uti
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
+const EVENT_EXPENSE_DATE_KEY = 'eventExpenseChargeDateV1'
 const BOOT_TIMEOUT_MS = 12_000
 const BOOT_CLOUD_WAIT_MS = 10_000
 
@@ -53,6 +54,11 @@ async function runPostOpenTasks(): Promise<void> {
       )
     }
     localStorage.setItem(NOTE_CHECKLIST_MIGRATED_KEY, '1')
+  }
+
+  if (!localStorage.getItem(EVENT_EXPENSE_DATE_KEY)) {
+    await repairEventExpenseChargeDates()
+    localStorage.setItem(EVENT_EXPENSE_DATE_KEY, '1')
   }
 
   pruneSentNotifications()
