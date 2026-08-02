@@ -308,12 +308,27 @@ export async function deleteExpensesForEvent(eventId: number): Promise<void> {
   }
 }
 
+/** Elimina righe spesa duplicate collegate allo stesso impegno e data. */
+export async function pruneDuplicateLinkedExpenses(eventId: number): Promise<void> {
+  const linked = await db.expenses.where('eventId').equals(eventId).toArray()
+  const keepKeys = new Map<string, number>()
+  for (const expense of linked.sort((a, b) => a.createdAt - b.createdAt)) {
+    const key = `${expense.date}:${expense.amount}`
+    if (keepKeys.has(key)) {
+      if (expense.id) await db.expenses.delete(expense.id)
+    } else if (expense.id) {
+      keepKeys.set(key, expense.id)
+    }
+  }
+}
+
 /** Allinea spese collegate e recupera periodi pagati mancanti. */
 export async function repairEventExpenseChargeDates(): Promise<void> {
   const events = await db.events.toArray()
   for (const event of events) {
     if (!event.id) continue
     if (!event.cost && !event.received) continue
+    await pruneDuplicateLinkedExpenses(event.id)
     const closed = closedPeriodChargeDate(event)
     if (closed <= todayIso()) {
       await ensurePeriodExpenseForEvent(event.id, event, closed)

@@ -16,7 +16,7 @@ import {
   matchesAreaSelection,
   selectionLabel,
 } from '../utils/areaSelection'
-import { countdownUrgency, todayIso } from '../utils/countdown'
+import { countdownUrgency } from '../utils/countdown'
 import { formatAmount, sentenceCase } from '../utils/format'
 import {
   filterEventImpegni,
@@ -25,9 +25,7 @@ import {
 } from '../utils/impegno'
 import {
   currentMonthBounds,
-  effectiveExpenseChargeDate,
   eventInHomeMonth,
-  eventMapById,
   expenseInCurrentMonthWithEvents,
   noteInHomeMonth,
 } from '../utils/monthFilter'
@@ -35,6 +33,7 @@ import {
   computeMonthPaidTotal,
   computeMonthUpcomingTotal,
   countMonthPaidExpenses,
+  listMonthUpcomingHomeLines,
   sumOccurredPositiveExpenses,
 } from '../utils/monthExpenseTotals'
 import {
@@ -136,29 +135,11 @@ function buildFutureMonthExpenseLines(
   expenses: Expense[],
   events: Event[],
 ): { lines: HomeDeadlineLine[]; hiddenCount: number } {
-  const today = todayIso()
-  const upcoming = expenses
-    .filter(
-      (e) =>
-        e.amount > 0 &&
-        expenseInCurrentMonthWithEvents(e, events) &&
-        effectiveExpenseChargeDate(e, eventMapById(events)) > today,
-    )
-    .sort((a, b) =>
-      effectiveExpenseChargeDate(a, eventMapById(events)).localeCompare(
-        effectiveExpenseChargeDate(b, eventMapById(events)),
-      ),
-    )
-
+  const upcoming = listMonthUpcomingHomeLines(expenses, events)
   return {
     lines: upcoming
       .slice(0, 3)
-      .map((e) =>
-        buildHomeDeadlineLine(
-          sentenceCase(e.description),
-          effectiveExpenseChargeDate(e, eventMapById(events)),
-        ),
-      ),
+      .map(({ label, date }) => buildHomeDeadlineLine(label, date)),
     hiddenCount: Math.max(0, upcoming.length - 3),
   }
 }

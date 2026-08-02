@@ -24,7 +24,7 @@ import { installAutoCloudSyncHooks, installPeriodicCloudReconcile } from '../uti
 
 const TEXT_CASE_MIGRATED_KEY = 'textCaseMigratedV1'
 const NOTE_CHECKLIST_MIGRATED_KEY = 'noteChecklistMigratedV1'
-const EVENT_EXPENSE_DATE_KEY = 'eventExpenseChargeDateV4'
+const EVENT_EXPENSE_DATE_KEY = 'eventExpenseChargeDateV5'
 const BOOT_TIMEOUT_MS = 12_000
 const BOOT_CLOUD_WAIT_MS = 10_000
 

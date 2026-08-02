@@ -19,6 +19,23 @@ export interface UpcomingMonthExpense {
   amount: number
   date: string
   daysUntil: number
+  eventId?: number
+  expenseId?: number
+}
+
+function upcomingDedupeKey(item: UpcomingMonthExpense): string {
+  if (item.eventId != null) return `ev:${item.eventId}:${item.date}`
+  return `ex:${item.expenseId ?? item.amount}:${item.date}`
+}
+
+function dedupeUpcoming(items: UpcomingMonthExpense[]): UpcomingMonthExpense[] {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = upcomingDedupeKey(item)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export function expenseHasOccurred(
@@ -51,7 +68,7 @@ export function upcomingFromExpenses(
 ): UpcomingMonthExpense[] {
   const today = todayIso()
   const eventMap = eventMapById(events)
-  return expenses
+  const raw = expenses
     .filter((e) => e.amount > 0)
     .map((e) => ({
       expense: e,
@@ -62,8 +79,12 @@ export function upcomingFromExpenses(
       amount: expense.amount,
       date: charge,
       daysUntil: daysUntil(charge),
+      eventId: expense.eventId,
+      expenseId: expense.id,
     }))
     .sort((a, b) => a.date.localeCompare(b.date))
+
+  return dedupeUpcoming(raw)
 }
 
 function expenseAmount(expense: Pick<Expense, 'amount'>): number {
@@ -139,21 +160,14 @@ export function computeMonthUpcomingExpenses(
   expenses: Expense[],
   events: Event[] = [],
 ): UpcomingMonthExpense[] {
-  const eventMap = eventMapById(events)
-  const countedEventIds = new Set<number>()
+  const fromExpenses = upcomingFromExpenses(expenses, events).filter((u) =>
+    isoInCurrentMonth(u.date),
+  )
 
-  const fromExpenses = upcomingFromExpenses(expenses, events)
-    .filter((u) => isoInCurrentMonth(u.date))
-    .map((u) => {
-      const linked = expenses.find(
-        (e) =>
-          expenseAmount(e) > 0 &&
-          effectiveExpenseChargeDate(e, eventMap) === u.date &&
-          e.amount === u.amount,
-      )
-      if (linked?.eventId != null) countedEventIds.add(linked.eventId)
-      return u
-    })
+  const countedEventIds = new Set<number>()
+  for (const u of fromExpenses) {
+    if (u.eventId != null) countedEventIds.add(u.eventId)
+  }
 
   const fromEvents: UpcomingMonthExpense[] = []
   for (const ev of events) {
@@ -164,11 +178,14 @@ export function computeMonthUpcomingExpenses(
       amount: Number(ev.cost) || 0,
       date: charge,
       daysUntil: daysUntil(charge),
+      eventId: ev.id,
     })
   }
 
-  return [...fromExpenses, ...fromEvents].sort((a, b) =>
-    a.date.localeCompare(b.date),
+  return dedupeUpcoming(
+    [...fromExpenses, ...fromEvents].sort((a, b) =>
+      a.date.localeCompare(b.date),
+    ),
   )
 }
 
@@ -181,6 +198,27 @@ export function computeMonthUpcomingTotal(
     (s, u) => s + u.amount,
     0,
   )
+}
+
+/** Righe anteprima spese previste in Home (deduplicate per impegno + data). */
+export function listMonthUpcomingHomeLines(
+  expenses: Expense[],
+  events: Event[] = [],
+): { label: string; date: string }[] {
+  const eventMap = eventMapById(events)
+  return computeMonthUpcomingExpenses(expenses, events).map((item) => {
+    const linked = item.expenseId
+      ? expenses.find((e) => e.id === item.expenseId)
+      : expenses.find(
+          (e) =>
+            e.eventId === item.eventId &&
+            effectiveExpenseChargeDate(e, eventMap) === item.date,
+        )
+    const ev =
+      item.eventId != null ? eventMap.get(item.eventId) : undefined
+    const label = sentenceCase(linked?.description ?? ev?.title ?? 'Spesa')
+    return { label, date: item.date }
+  })
 }
 
 export interface MonthExpenseOverviewItem {
