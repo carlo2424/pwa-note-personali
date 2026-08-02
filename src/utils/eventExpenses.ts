@@ -81,67 +81,89 @@ export function isImpegnoScadenzaPassed(
   return !!scadenza && scadenza <= todayIso()
 }
 
-function recurrenceChargeInMonth(
+function listRecurrenceChargesInMonth(
   ev: Event,
   test: (iso: string) => boolean,
-): string | null {
-  if (!ev.recurrenceFrequency || !ev.startDate) return null
+): string[] {
+  if (!ev.recurrenceFrequency || !ev.startDate) return []
 
   const definitive = impegnoDefinitiveEndDate(ev)
   const { start: monthStart, end: monthEnd } = monthBoundsIso()
+  if (definitive && definitive < monthStart) return []
 
-  if (definitive && definitive < monthStart) return null
+  const results: string[] = []
+  const seen = new Set<string>()
 
-  const renewal = ev.renewalDate
-  if (renewal && renewal >= monthStart && renewal <= monthEnd && test(renewal)) {
-    if (!definitive || renewal <= definitive) return renewal
+  const tryAdd = (iso: string) => {
+    if (iso < monthStart || iso > monthEnd) return
+    if (definitive && iso > definitive) return
+    if (!test(iso) || seen.has(iso)) return
+    seen.add(iso)
+    results.push(iso)
   }
+
+  if (ev.renewalDate) tryAdd(ev.renewalDate)
 
   let current = parseIsoDate(ev.startDate)
   for (let i = 0; i < 600; i++) {
     const iso = toIsoDateLocal(current)
     if (definitive && iso > definitive) break
     if (iso > monthEnd) break
-    if (iso >= monthStart && iso <= monthEnd && test(iso)) {
-      if (!definitive || iso <= definitive) return iso
-    }
+    tryAdd(iso)
     const next = addRecurrence(current, ev.recurrenceFrequency)
     if (toIsoDateLocal(next) === iso) break
     current = next
   }
-  return null
+
+  return results.sort()
 }
 
-/** Addebito impegno già avvenuto nel mese corrente, entro la fine definitiva. */
-export function impegnoPaidChargeInCurrentMonth(ev: Event): string | null {
+
+/** Prossimo addebito nel mese corrente (fine definitiva ancora in vigore). */
+export function impegnoPaidChargesInCurrentMonth(ev: Event): string[] {
   const cost = Number(ev.cost)
-  if (!Number.isFinite(cost) || cost <= 0) return null
+  if (!Number.isFinite(cost) || cost <= 0) return []
 
   const today = todayIso()
   const definitive = impegnoDefinitiveEndDate(ev)
   const { start: monthStart } = monthBoundsIso()
-
-  if (definitive && definitive < monthStart) return null
+  if (definitive && definitive < monthStart) return []
 
   if (!ev.recurrenceFrequency) {
     const scadenza = impegnoScadenzaDate(ev)
     if (isoInCurrentMonth(scadenza) && scadenza <= today) {
-      if (!definitive || scadenza <= definitive) return scadenza
+      if (!definitive || scadenza <= definitive) return [scadenza]
     }
-    return null
+    return []
   }
 
-  return recurrenceChargeInMonth(ev, (iso) => iso <= today)
+  return listRecurrenceChargesInMonth(ev, (iso) => iso <= today)
+}
+
+/** Addebito impegno già avvenuto nel mese corrente, entro la fine definitiva. */
+export function impegnoPaidChargeInCurrentMonth(ev: Event): string | null {
+  return impegnoPaidChargesInCurrentMonth(ev)[0] ?? null
+}
+
+/** Tutti gli addebiti futuri nel mese corrente (fine definitiva ancora in vigore). */
+export function impegnoUpcomingChargesInCurrentMonth(ev: Event): string[] {
+  const cost = Number(ev.cost)
+  if (!Number.isFinite(cost) || cost <= 0) return []
+  if (!isImpegnoCommitmentActive(ev)) return []
+
+  const today = todayIso()
+  if (!ev.recurrenceFrequency) {
+    const scadenza = impegnoScadenzaDate(ev)
+    if (isoInCurrentMonth(scadenza) && scadenza > today) return [scadenza]
+    return []
+  }
+
+  return listRecurrenceChargesInMonth(ev, (iso) => iso > today)
 }
 
 /** Prossimo addebito nel mese corrente (fine definitiva ancora in vigore). */
 export function impegnoUpcomingChargeInCurrentMonth(ev: Event): string | null {
-  const cost = Number(ev.cost)
-  if (!Number.isFinite(cost) || cost <= 0) return null
-  if (!isImpegnoCommitmentActive(ev)) return null
-
-  const today = todayIso()
-  return recurrenceChargeInMonth(ev, (iso) => iso > today)
+  return impegnoUpcomingChargesInCurrentMonth(ev)[0] ?? null
 }
 
 /** Periodo appena convalidato con la spunta (rinnovo/scadenza passata). */

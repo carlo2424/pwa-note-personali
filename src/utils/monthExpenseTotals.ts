@@ -1,8 +1,8 @@
 import type { Event, Expense } from '../db'
 import { daysUntil, todayIso } from './countdown'
 import {
-  impegnoPaidChargeInCurrentMonth,
-  impegnoUpcomingChargeInCurrentMonth,
+  impegnoPaidChargesInCurrentMonth,
+  impegnoUpcomingChargesInCurrentMonth,
 } from './eventExpenses'
 import { formatAmount, sentenceCase } from './format'
 import {
@@ -92,12 +92,8 @@ function expenseAmount(expense: Pick<Expense, 'amount'>): number {
   return Number.isFinite(amount) ? amount : 0
 }
 
-function eventCountsAsMonthPaid(ev: Event): boolean {
-  return impegnoPaidChargeInCurrentMonth(ev) != null
-}
-
-function eventUpcomingChargeInCurrentMonth(ev: Event): string | null {
-  return impegnoUpcomingChargeInCurrentMonth(ev)
+function eventChargeDedupeKey(eventId: number | undefined, date: string): string {
+  return eventId != null ? `ev:${eventId}:${date}` : ''
 }
 
 /** Spese già avvenute nel mese corrente (data ≤ oggi, importi positivi). */
@@ -108,7 +104,7 @@ export function computeMonthPaidTotal(
   const today = todayIso()
   const eventMap = eventMapById(events)
   let sum = 0
-  const countedEventIds = new Set<number>()
+  const countedEventCharges = new Set<string>()
 
   for (const expense of expenses) {
     const amount = expenseAmount(expense)
@@ -116,13 +112,20 @@ export function computeMonthPaidTotal(
     const charge = effectiveExpenseChargeDate(expense, eventMap)
     if (!isoInCurrentMonth(charge) || charge > today) continue
     sum += amount
-    if (expense.eventId != null) countedEventIds.add(expense.eventId)
+    if (expense.eventId != null) {
+      countedEventCharges.add(eventChargeDedupeKey(expense.eventId, charge))
+    }
   }
 
   for (const ev of events) {
-    if (!ev.id || countedEventIds.has(ev.id)) continue
-    if (!eventCountsAsMonthPaid(ev)) continue
-    sum += Number(ev.cost) || 0
+    if (!ev.id) continue
+    const cost = Number(ev.cost) || 0
+    if (cost <= 0) continue
+    for (const charge of impegnoPaidChargesInCurrentMonth(ev)) {
+      const key = eventChargeDedupeKey(ev.id, charge)
+      if (countedEventCharges.has(key)) continue
+      sum += cost
+    }
   }
 
   return sum
@@ -136,7 +139,7 @@ export function countMonthPaidExpenses(
   const today = todayIso()
   const eventMap = eventMapById(events)
   let count = 0
-  const countedEventIds = new Set<number>()
+  const countedEventCharges = new Set<string>()
 
   for (const expense of expenses) {
     const amount = expenseAmount(expense)
@@ -144,12 +147,18 @@ export function countMonthPaidExpenses(
     const charge = effectiveExpenseChargeDate(expense, eventMap)
     if (!isoInCurrentMonth(charge) || charge > today) continue
     count += 1
-    if (expense.eventId != null) countedEventIds.add(expense.eventId)
+    if (expense.eventId != null) {
+      countedEventCharges.add(eventChargeDedupeKey(expense.eventId, charge))
+    }
   }
 
   for (const ev of events) {
-    if (!ev.id || countedEventIds.has(ev.id)) continue
-    if (eventCountsAsMonthPaid(ev)) count += 1
+    if (!ev.id) continue
+    for (const charge of impegnoPaidChargesInCurrentMonth(ev)) {
+      const key = eventChargeDedupeKey(ev.id, charge)
+      if (countedEventCharges.has(key)) continue
+      count += 1
+    }
   }
 
   return count
@@ -160,32 +169,41 @@ export function computeMonthUpcomingExpenses(
   expenses: Expense[],
   events: Event[] = [],
 ): UpcomingMonthExpense[] {
-  const fromExpenses = upcomingFromExpenses(expenses, events).filter((u) =>
-    isoInCurrentMonth(u.date),
-  )
+  const today = todayIso()
+  const eventMap = eventMapById(events)
+  const items: UpcomingMonthExpense[] = []
 
-  const countedEventIds = new Set<number>()
-  for (const u of fromExpenses) {
-    if (u.eventId != null) countedEventIds.add(u.eventId)
+  for (const ev of events) {
+    if (!ev.id) continue
+    const amount = Number(ev.cost) || 0
+    if (amount <= 0) continue
+    for (const charge of impegnoUpcomingChargesInCurrentMonth(ev)) {
+      if (!isoInCurrentMonth(charge)) continue
+      items.push({
+        amount,
+        date: charge,
+        daysUntil: daysUntil(charge),
+        eventId: ev.id,
+      })
+    }
   }
 
-  const fromEvents: UpcomingMonthExpense[] = []
-  for (const ev of events) {
-    if (!ev.id || countedEventIds.has(ev.id)) continue
-    const charge = eventUpcomingChargeInCurrentMonth(ev)
-    if (!charge) continue
-    fromEvents.push({
-      amount: Number(ev.cost) || 0,
+  for (const expense of expenses) {
+    const amount = expenseAmount(expense)
+    if (amount <= 0) continue
+    const charge = effectiveExpenseChargeDate(expense, eventMap)
+    if (charge <= today || !isoInCurrentMonth(charge)) continue
+    items.push({
+      amount,
       date: charge,
       daysUntil: daysUntil(charge),
-      eventId: ev.id,
+      eventId: expense.eventId,
+      expenseId: expense.id,
     })
   }
 
   return dedupeUpcoming(
-    [...fromExpenses, ...fromEvents].sort((a, b) =>
-      a.date.localeCompare(b.date),
-    ),
+    items.sort((a, b) => a.date.localeCompare(b.date)),
   )
 }
 
@@ -232,28 +250,38 @@ export function listMonthPositiveExpenses(
   events: Event[] = [],
 ): MonthExpenseOverviewItem[] {
   const eventMap = eventMapById(events)
-  return expenses
-    .filter(
-      (e) =>
-        e.amount > 0 &&
-        (events.length > 0
-          ? expenseInCurrentMonthWithEvents(e, events)
-          : expenseInCurrentMonth(e)),
-    )
-    .sort(
-      (a, b) =>
-        effectiveExpenseChargeDate(a, eventMap).localeCompare(
-          effectiveExpenseChargeDate(b, eventMap),
-        ) ||
-        a.description.localeCompare(b.description, 'it-IT'),
-    )
-    .map((expense) => {
-      const charge = effectiveExpenseChargeDate(expense, eventMap)
-      return {
-        expense,
-        occurred: expenseHasOccurred(expense, charge),
-      }
+  const seen = new Set<string>()
+  const items: MonthExpenseOverviewItem[] = []
+
+  for (const expense of expenses) {
+    if (expense.amount <= 0) continue
+    if (
+      events.length > 0
+        ? !expenseInCurrentMonthWithEvents(expense, events)
+        : !expenseInCurrentMonth(expense)
+    ) {
+      continue
+    }
+    const charge = effectiveExpenseChargeDate(expense, eventMap)
+    const key =
+      expense.eventId != null
+        ? eventChargeDedupeKey(expense.eventId, charge)
+        : `ex:${expense.id ?? expense.description}:${charge}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    items.push({
+      expense,
+      occurred: expenseHasOccurred(expense, charge),
     })
+  }
+
+  return items.sort(
+    (a, b) =>
+      effectiveExpenseChargeDate(a.expense, eventMap).localeCompare(
+        effectiveExpenseChargeDate(b.expense, eventMap),
+      ) ||
+      a.expense.description.localeCompare(b.expense.description, 'it-IT'),
+  )
 }
 
 export function formatMonthExpenseOverviewLabel(
