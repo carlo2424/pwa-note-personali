@@ -9,7 +9,7 @@ interface UpcomingExpenseHintsProps {
   align?: 'left' | 'right'
 }
 
-/** Righe «−30 € fra 3 giorni» per spese non ancora avvenute */
+/** Righe «−30 € tra 3 giorni» per spese non ancora avvenute */
 export function UpcomingExpenseHints({
   items,
   className = '',

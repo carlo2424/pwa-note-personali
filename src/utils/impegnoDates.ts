@@ -32,6 +32,25 @@ export function addRecurrence(date: Date, freq: RecurrenceFrequency): Date {
   return next
 }
 
+export function subtractRecurrence(date: Date, freq: RecurrenceFrequency): Date {
+  const prev = new Date(date)
+  switch (freq) {
+    case 'daily':
+      prev.setDate(prev.getDate() - 1)
+      break
+    case 'weekly':
+      prev.setDate(prev.getDate() - 7)
+      break
+    case 'monthly':
+      prev.setMonth(prev.getMonth() - 1)
+      break
+    case 'yearly':
+      prev.setFullYear(prev.getFullYear() - 1)
+      break
+  }
+  return prev
+}
+
 /** Prossimo addebito: prima occorrenza da startDate in poi (>= oggi). */
 export function computeNextRenewalDate(
   startDate: string,

@@ -1,15 +1,14 @@
-import type { Event, Expense } from '../db'
+import type { Event, Expense, PaymentMethod } from '../db'
 import { daysUntil, todayIso } from './countdown'
 import {
   impegnoPaidChargesInCurrentMonth,
+  impegnoScadenzaDate,
   impegnoUpcomingChargesInCurrentMonth,
 } from './eventExpenses'
 import { formatAmount, sentenceCase } from './format'
 import {
   effectiveExpenseChargeDate,
   eventMapById,
-  expenseInCurrentMonth,
-  expenseInCurrentMonthWithEvents,
   isoInCurrentMonth,
 } from './monthFilter'
 
@@ -50,7 +49,7 @@ export function formatUpcomingExpenseLabel(
   daysUntil: number,
 ): string {
   const giorni = daysUntil === 1 ? 'giorno' : 'giorni'
-  return `−${formatAmount(amount)} fra ${daysUntil} ${giorni}`
+  return `−${formatAmount(amount)} tra ${daysUntil} ${giorni}`
 }
 
 /** Totale spese positive con data già passata (qualsiasi mese). */
@@ -92,7 +91,10 @@ function expenseAmount(expense: Pick<Expense, 'amount'>): number {
   return Number.isFinite(amount) ? amount : 0
 }
 
-function eventChargeDedupeKey(eventId: number | undefined, date: string): string {
+export function eventChargeDedupeKey(
+  eventId: number | undefined,
+  date: string,
+): string {
   return eventId != null ? `ev:${eventId}:${date}` : ''
 }
 
@@ -189,6 +191,7 @@ export function computeMonthUpcomingExpenses(
   }
 
   for (const expense of expenses) {
+    if (expense.eventId != null) continue
     const amount = expenseAmount(expense)
     if (amount <= 0) continue
     const charge = effectiveExpenseChargeDate(expense, eventMap)
@@ -242,44 +245,81 @@ export function listMonthUpcomingHomeLines(
 export interface MonthExpenseOverviewItem {
   expense: Expense
   occurred: boolean
+  chargeDate: string
 }
 
-/** Spese positive del mese corrente, ordinate per data. */
+function expenseStubFromEvent(ev: Event, chargeDate: string): Expense {
+  return {
+    amount: ev.cost ?? 0,
+    description: ev.title,
+    category: ev.labels[0] ?? 'Abbonamenti',
+    date: chargeDate,
+    paymentMethod: ev.paymentMethod,
+    cardId: ev.cardId,
+    eventId: ev.id,
+    areaId: ev.areaId,
+    createdAt: ev.updatedAt,
+  }
+}
+
+/** Spese del mese per elenco riepilogo: data addebito effettiva, ordine cronologico. */
 export function listMonthPositiveExpenses(
   expenses: Expense[],
   events: Event[] = [],
+  filterMethod?: PaymentMethod | null,
 ): MonthExpenseOverviewItem[] {
   const eventMap = eventMapById(events)
+  const today = todayIso()
   const seen = new Set<string>()
   const items: MonthExpenseOverviewItem[] = []
 
-  for (const expense of expenses) {
-    if (expense.amount <= 0) continue
-    if (
-      events.length > 0
-        ? !expenseInCurrentMonthWithEvents(expense, events)
-        : !expenseInCurrentMonth(expense)
-    ) {
-      continue
+  const tryAdd = (
+    expense: Expense,
+    chargeDate: string,
+    eventId?: number,
+  ) => {
+    if (expense.amount <= 0) return
+    if (filterMethod && (expense.paymentMethod ?? 'altro') !== filterMethod) {
+      return
     }
-    const charge = effectiveExpenseChargeDate(expense, eventMap)
+    if (!isoInCurrentMonth(chargeDate)) return
+
     const key =
-      expense.eventId != null
-        ? eventChargeDedupeKey(expense.eventId, charge)
-        : `ex:${expense.id ?? expense.description}:${charge}`
-    if (seen.has(key)) continue
+      eventId != null
+        ? eventChargeDedupeKey(eventId, chargeDate)
+        : `ex:${expense.id ?? expense.description}:${chargeDate}`
+    if (seen.has(key)) return
     seen.add(key)
+
     items.push({
-      expense,
-      occurred: expenseHasOccurred(expense, charge),
+      expense: { ...expense, date: chargeDate },
+      chargeDate,
+      occurred: chargeDate <= today,
     })
+  }
+
+  for (const ev of events) {
+    if (!ev.id || !ev.cost || ev.cost <= 0) continue
+    const linked = expenses.find((e) => e.eventId === ev.id && e.amount > 0)
+    const base = linked ?? expenseStubFromEvent(ev, impegnoScadenzaDate(ev))
+    const charges = [
+      ...impegnoPaidChargesInCurrentMonth(ev),
+      ...impegnoUpcomingChargesInCurrentMonth(ev),
+    ]
+    for (const charge of charges) {
+      tryAdd(base, charge, ev.id)
+    }
+  }
+
+  for (const expense of expenses) {
+    if (expense.eventId != null) continue
+    const charge = effectiveExpenseChargeDate(expense, eventMap)
+    tryAdd(expense, charge)
   }
 
   return items.sort(
     (a, b) =>
-      effectiveExpenseChargeDate(a.expense, eventMap).localeCompare(
-        effectiveExpenseChargeDate(b.expense, eventMap),
-      ) ||
+      a.chargeDate.localeCompare(b.chargeDate) ||
       a.expense.description.localeCompare(b.expense.description, 'it-IT'),
   )
 }
@@ -287,12 +327,13 @@ export function listMonthPositiveExpenses(
 export function formatMonthExpenseOverviewLabel(
   expense: Expense,
   occurred: boolean,
-  chargeDate = expense.date,
+  chargeDate: string,
 ): string {
   const desc = sentenceCase(expense.description)
   const amount = formatAmount(expense.amount)
   if (occurred) return `${desc} · ${amount}`
   const days = daysUntil(chargeDate)
+  if (days <= 0) return `${desc} · ${amount}`
   const giorni = days === 1 ? 'giorno' : 'giorni'
-  return `${desc} · ${amount} fra ${days} ${giorni}`
+  return `${desc} · ${amount} tra ${days} ${giorni}`
 }

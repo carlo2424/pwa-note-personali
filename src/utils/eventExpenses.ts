@@ -1,28 +1,14 @@
 import { db, type Event } from '../db'
 import { todayIso } from './countdown'
+import { isoInCurrentMonth } from './monthFilter'
 import {
   addRecurrence,
   computeEndDateFromFrequency,
   lastRecurrenceDueOnOrBeforeTodayCapped,
   parseIsoDate,
+  subtractRecurrence,
   toIsoDateLocal,
 } from './impegnoDates'
-
-function isoInCurrentMonth(iso: string): boolean {
-  const now = new Date()
-  const startMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
-  const endMs = new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    0,
-    23,
-    59,
-    59,
-    999,
-  ).getTime()
-  const t = new Date(iso + 'T00:00:00').getTime()
-  return t >= startMs && t <= endMs
-}
 
 function monthBoundsIso(): { start: string; end: string } {
   const now = new Date()
@@ -85,7 +71,10 @@ function listRecurrenceChargesInMonth(
   ev: Event,
   test: (iso: string) => boolean,
 ): string[] {
-  if (!ev.recurrenceFrequency || !ev.startDate) return []
+  if (!ev.recurrenceFrequency) return []
+
+  const anchor = ev.renewalDate ?? ev.startDate
+  if (!anchor) return []
 
   const definitive = impegnoDefinitiveEndDate(ev)
   const { start: monthStart, end: monthEnd } = monthBoundsIso()
@@ -102,15 +91,29 @@ function listRecurrenceChargesInMonth(
     results.push(iso)
   }
 
-  if (ev.renewalDate) tryAdd(ev.renewalDate)
+  // Griglia allineata al prossimo addebito (renewalDate), non al solo startDate.
+  let current = parseIsoDate(anchor)
+  const freq = ev.recurrenceFrequency
 
-  let current = parseIsoDate(ev.startDate)
+  while (toIsoDateLocal(current) > monthEnd) {
+    current = subtractRecurrence(current, freq)
+  }
+
+  let prev = subtractRecurrence(current, freq)
+  while (
+    toIsoDateLocal(prev) !== toIsoDateLocal(current) &&
+    toIsoDateLocal(prev) >= monthStart
+  ) {
+    current = prev
+    prev = subtractRecurrence(current, freq)
+  }
+
   for (let i = 0; i < 600; i++) {
     const iso = toIsoDateLocal(current)
     if (definitive && iso > definitive) break
     if (iso > monthEnd) break
     tryAdd(iso)
-    const next = addRecurrence(current, ev.recurrenceFrequency)
+    const next = addRecurrence(current, freq)
     if (toIsoDateLocal(next) === iso) break
     current = next
   }
@@ -351,6 +354,19 @@ export async function repairEventExpenseChargeDates(): Promise<void> {
     if (!event.id) continue
     if (!event.cost && !event.received) continue
     await pruneDuplicateLinkedExpenses(event.id)
+
+    const linked = await db.expenses.where('eventId').equals(event.id).toArray()
+    const validCharges = new Set([
+      ...impegnoPaidChargesInCurrentMonth(event),
+      ...impegnoUpcomingChargesInCurrentMonth(event),
+    ])
+    for (const expense of linked) {
+      if (!expense.id || expense.amount === 0) continue
+      if (expense.date >= todayIso() && !validCharges.has(expense.date)) {
+        await db.expenses.delete(expense.id)
+      }
+    }
+
     const closed = closedPeriodChargeDate(event)
     if (closed <= todayIso()) {
       await ensurePeriodExpenseForEvent(event.id, event, closed)

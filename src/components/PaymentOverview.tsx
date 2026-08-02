@@ -12,7 +12,6 @@ import { formatAmount } from '../utils/format'
 import {
   computeMonthPaidTotal,
 } from '../utils/monthExpenseTotals'
-import { expenseInCurrentMonthWithEvents } from '../utils/monthFilter'
 import {
   sumByPaymentMethod,
 } from '../utils/paymentTotals'
@@ -57,17 +56,7 @@ export function PaymentOverview({
     [expenses, events],
   )
 
-  const monthExpensesForList = useMemo(() => {
-    let list = (expenses ?? []).filter((e) =>
-      expenseInCurrentMonthWithEvents(e, events ?? []),
-    )
-    if (filterMethod) {
-      list = list.filter(
-        (e) => (e.paymentMethod ?? 'altro') === filterMethod,
-      )
-    }
-    return list
-  }, [expenses, events, filterMethod])
+  const monthExpensesForList = expenses ?? []
 
   const showCardManager =
     filterMethod === null || filterMethod === 'carta'
@@ -87,6 +76,7 @@ export function PaymentOverview({
         <MonthExpenseOverviewList
           expenses={monthExpensesForList}
           events={events ?? []}
+          filterMethod={filterMethod}
         />
       </div>
 

@@ -25,6 +25,7 @@ export function ExpenseList({ onEdit, onOpenEvent }: ExpenseListProps) {
   const expenses = useDexieLiveQuery(
     () => db.expenses.orderBy('date').reverse().toArray(),
   )
+  const events = useDexieLiveQuery(() => db.events.toArray())
   const areas = useDexieLiveQuery(() => db.areas.toArray())
 
   const query = search.trim().toLowerCase()
@@ -96,6 +97,7 @@ export function ExpenseList({ onEdit, onOpenEvent }: ExpenseListProps) {
                   <MonthExpenseSummary
                     monthLabel={group.label}
                     expenses={group.items}
+                    events={events ?? []}
                     areas={areas ?? []}
                     onEdit={onEdit}
                     onOpenEvent={onOpenEvent}

@@ -1,6 +1,7 @@
 import type { Event, Note } from '../db'
 import { formatModifiedLong } from './format'
 import { countdownUrgency, daysUntil } from './countdown'
+import { impegnoScadenzaDate } from './eventExpenses'
 
 export type HomeDeadlineTone = 'today' | 'overdue' | 'soon' | 'default'
 
@@ -184,7 +185,7 @@ export type DateUrgency = ReturnType<typeof countdownUrgency>
 /** Etichetta breve per scadenze imminenti (liste, impegni, note) */
 export function deadlineLabel(iso: string): string {
   const days = daysUntil(iso)
-  if (days < 0) return `Scaduto ${Math.abs(days)} gg fa`
+  if (days < 0) return `Scaduto ${Math.abs(days)} giorni fa`
   if (days === 0) return 'Oggi'
   if (days === 1) return 'Domani'
   if (days <= 7) return `Tra ${days} giorni`
@@ -223,9 +224,12 @@ export function sortNotesByUrgency(a: Note, b: Note): number {
 }
 
 export function eventDeadlineIso(
-  event: Pick<Event, 'startDate' | 'endDate' | 'renewalDate'>,
+  event: Pick<
+    Event,
+    'startDate' | 'endDate' | 'renewalDate' | 'recurrenceFrequency'
+  >,
 ): string {
-  return event.renewalDate ?? event.endDate ?? event.startDate
+  return impegnoScadenzaDate(event)
 }
 
 /** Scadenza più vicina prima; voci senza scadenza in fondo. */

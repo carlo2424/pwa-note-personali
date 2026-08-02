@@ -1,11 +1,12 @@
 import { Wallet } from 'lucide-react'
+import { useMemo } from 'react'
 import type { Event, Expense } from '../db'
 import { ITEM_TYPE_STYLE } from '../constants/itemColors'
 import { formatAmount } from '../utils/format'
 import {
+  computeMonthUpcomingExpenses,
   expenseHasOccurred,
   sumOccurredPositiveExpenses,
-  upcomingFromExpenses,
 } from '../utils/monthExpenseTotals'
 import { ExpandableCard } from './ExpandableCard'
 import { ExpenseExpandableRow } from './ExpenseExpandableRow'
@@ -15,6 +16,7 @@ import { areaNameById } from '../utils/areas'
 interface MonthExpenseSummaryProps {
   monthLabel: string
   expenses: Expense[]
+  events?: Event[]
   areas: { id?: number; name: string }[]
   onEdit: (expense: Expense) => void
   onOpenEvent?: (event: Event) => void
@@ -29,6 +31,7 @@ interface MonthExpenseSummaryProps {
 export function MonthExpenseSummary({
   monthLabel,
   expenses,
+  events = [],
   areas,
   onEdit,
   onOpenEvent,
@@ -38,7 +41,10 @@ export function MonthExpenseSummary({
   nested = false,
   showTypeLabel = false,
 }: MonthExpenseSummaryProps) {
-  const upcoming = upcomingFromExpenses(expenses)
+  const upcoming = useMemo(
+    () => computeMonthUpcomingExpenses(expenses, events),
+    [expenses, events],
+  )
   const totalSpese = sumOccurredPositiveExpenses(expenses)
   const totalEntrate = expenses
     .filter((e) => e.amount < 0 && expenseHasOccurred(e))

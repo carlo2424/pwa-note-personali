@@ -291,6 +291,7 @@ export function HomeView({
             matchesAreaSelection(e, areaSelection, areaList) &&
             expenseInCurrentMonthWithEvents(e, events ?? []),
         ),
+        events ?? [],
       ),
     [expenses, events, areaSelection, areaList],
   )
@@ -334,6 +335,7 @@ export function HomeView({
             matchesAreaSelection(e, areaSelection, areaList) &&
             expenseInCurrentMonthWithEvents(e, events ?? []),
         ),
+        events ?? [],
       ),
     [expenses, events, areaSelection, areaList],
   )
@@ -583,8 +585,7 @@ export function HomeView({
   const impegnoSectionSubtitle = useMemo(() => {
     for (const row of pendingImpegni) {
       if (row.kind !== 'event') continue
-      const iso =
-        row.item.renewalDate ?? row.item.endDate ?? row.item.startDate
+      const iso = eventDeadlineIso(row.item)
       const label = deadlineLabel(iso)
       if (label) return label
     }
@@ -594,8 +595,7 @@ export function HomeView({
   const impegnoSectionUrgent = useMemo(() => {
     for (const row of pendingImpegni) {
       if (row.kind !== 'event') continue
-      const iso =
-        row.item.renewalDate ?? row.item.endDate ?? row.item.startDate
+      const iso = eventDeadlineIso(row.item)
       const u = countdownUrgency(iso)
       if (u === 'expired' || u === 'today' || u === 'soon') return true
     }
@@ -746,6 +746,7 @@ export function HomeView({
       showTypeLabel
       monthLabel={monthLabel}
       expenses={displayExpenses}
+      events={events ?? []}
       areas={areas ?? []}
       onEdit={onEditExpense}
       onOpenEvent={onOpenEventFromExpense}

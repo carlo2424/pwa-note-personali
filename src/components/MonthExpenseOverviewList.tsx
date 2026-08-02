@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Event, Expense } from '../db'
+import type { Event, Expense, PaymentMethod } from '../db'
 import {
   formatMonthExpenseOverviewLabel,
   listMonthPositiveExpenses,
@@ -8,6 +8,7 @@ import {
 interface MonthExpenseOverviewListProps {
   expenses: Expense[]
   events?: Event[]
+  filterMethod?: PaymentMethod | null
   className?: string
   /** Su sfondo rose-600 (tab Spese) o card chiara Home */
   variant?: 'dark' | 'light'
@@ -18,13 +19,14 @@ interface MonthExpenseOverviewListProps {
 export function MonthExpenseOverviewList({
   expenses,
   events = [],
+  filterMethod = null,
   className = '',
   variant = 'dark',
   maxHeight = false,
 }: MonthExpenseOverviewListProps) {
   const items = useMemo(
-    () => listMonthPositiveExpenses(expenses, events),
-    [expenses, events],
+    () => listMonthPositiveExpenses(expenses, events, filterMethod),
+    [expenses, events, filterMethod],
   )
 
   if (items.length === 0) return null
@@ -41,14 +43,14 @@ export function MonthExpenseOverviewList({
         variant === 'dark' ? 'border-rose-500/30' : 'border-rose-200/80'
       } ${maxHeight ? 'max-h-48 overflow-y-auto pr-0.5' : ''} ${className}`}
     >
-      {items.map(({ expense, occurred }) => (
+      {items.map(({ expense, occurred, chargeDate }) => (
         <p
-          key={expense.id ?? `${expense.date}-${expense.description}`}
+          key={`${expense.eventId ?? expense.id ?? expense.description}-${chargeDate}`}
           className={`text-[11px] font-medium leading-snug ${
             occurred ? paidClass : pendingClass
           }`}
         >
-          {formatMonthExpenseOverviewLabel(expense, occurred)}
+          {formatMonthExpenseOverviewLabel(expense, occurred, chargeDate)}
         </p>
       ))}
     </div>

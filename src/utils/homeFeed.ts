@@ -6,7 +6,9 @@ import {
   noteKeyDate,
 } from './homeSpotlight'
 import {
+  effectiveExpenseChargeDate,
   eventInHomeMonth,
+  eventMapById,
   expenseInHomeMonth,
   noteInHomeMonth,
 } from './monthFilter'
@@ -56,6 +58,12 @@ export function isHomeFeedQuiet(notes: Note[]): boolean {
 
 export function sortExpensesByDeadline<T extends Pick<Expense, 'date'>>(
   expenses: T[],
+  events: Event[] = [],
 ): T[] {
-  return [...expenses].sort((a, b) => a.date.localeCompare(b.date))
+  const eventMap = eventMapById(events)
+  return [...expenses].sort((a, b) =>
+    effectiveExpenseChargeDate(a, eventMap).localeCompare(
+      effectiveExpenseChargeDate(b, eventMap),
+    ),
+  )
 }

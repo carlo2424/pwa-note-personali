@@ -8,6 +8,7 @@ import { countdownLabel, countdownUrgency, isPastDue } from '../utils/countdown'
 import { toggleTask } from '../utils/eventTasks'
 import { archiveEvent } from '../utils/eventArchive'
 import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
+import { impegnoScadenzaDate } from '../utils/eventExpenses'
 import { recurrenceLabel, recurrenceShort } from '../utils/recurring'
 import { shareEvent } from '../utils/share'
 import { OVERDUE_ACCENT, taskAccentById } from '../constants/tasks'
@@ -69,6 +70,8 @@ export function EventDetailBody({
     : 'gap-2 rounded-xl py-2 text-sm'
   const icon = compact ? 'h-3 w-3' : 'h-4 w-4'
 
+  const deadlineIso = impegnoScadenzaDate(event)
+
   return (
     <div className={gap}>
       {event.labels.length > 0 && (
@@ -91,11 +94,11 @@ export function EventDetailBody({
         />
       )}
 
-      {event.renewalDate && (
+      {deadlineIso && (
         <div
-          className={`flex items-center gap-2 font-medium ${compact ? 'rounded-lg px-2 py-1.5 text-xs' : 'rounded-xl px-3 py-2 text-sm'} ${URGENCY_STYLE[countdownUrgency(event.renewalDate)]}`}
+          className={`flex items-center gap-2 font-medium ${compact ? 'rounded-lg px-2 py-1.5 text-xs' : 'rounded-xl px-3 py-2 text-sm'} ${URGENCY_STYLE[countdownUrgency(deadlineIso)]}`}
         >
-          <span>{countdownLabel(event.renewalDate)}</span>
+          <span>{countdownLabel(deadlineIso)}</span>
         </div>
       )}
 

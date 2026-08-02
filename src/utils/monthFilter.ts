@@ -1,6 +1,5 @@
 import type { Event, Expense, Note } from '../db'
 import { isNoteImpegno } from './impegno'
-import { eventChargeDate } from './eventExpenses'
 
 export function currentMonthBounds(): {
   startMs: number
@@ -83,15 +82,11 @@ export function eventMapById(events: Event[]): Map<number, Event> {
   return map
 }
 
-/** Data di addebito effettiva: per spese da impegno usa rinnovo/inizio impegno. */
+/** Data di addebito registrata: expense.date è la fonte per ogni riga spesa. */
 export function effectiveExpenseChargeDate(
-  expense: Pick<Expense, 'date' | 'eventId'>,
-  eventsById: Map<number, Event>,
+  expense: Pick<Expense, 'date'>,
+  _eventsById?: Map<number, Event>,
 ): string {
-  if (expense.eventId != null) {
-    const event = eventsById.get(expense.eventId)
-    if (event) return eventChargeDate(event)
-  }
   return expense.date
 }
 

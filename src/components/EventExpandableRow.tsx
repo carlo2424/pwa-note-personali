@@ -163,17 +163,28 @@ export function EventExpandableRow({
       badge={
         homeCard
           ? undefined
-          : event.renewalDate ? (
-          <span
-            className={`shrink-0 rounded-full font-medium ${URGENCY_BADGE[countdownUrgency(event.renewalDate)]} ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}
-          >
-            {countdownLabel(event.renewalDate)}
-          </span>
-        ) : todoCount > 0 ? (
-          <span className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
-            {todoCount} ✓
-          </span>
-        ) : undefined
+          : (() => {
+              const deadlineIso = impegnoScadenzaDate(event)
+              if (deadlineIso) {
+                return (
+                  <span
+                    className={`shrink-0 rounded-full font-medium ${URGENCY_BADGE[countdownUrgency(deadlineIso)]} ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}
+                  >
+                    {countdownLabel(deadlineIso)}
+                  </span>
+                )
+              }
+              if (todoCount > 0) {
+                return (
+                  <span
+                    className={`shrink-0 rounded-full bg-emerald-100 font-semibold text-emerald-700 ${compact ? 'px-1.5 py-px text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}
+                  >
+                    {todoCount} ✓
+                  </span>
+                )
+              }
+              return undefined
+            })()
       }
       trailing={
         homeCard
