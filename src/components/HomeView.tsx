@@ -25,8 +25,10 @@ import {
 } from '../utils/impegno'
 import {
   currentMonthBounds,
+  effectiveExpenseChargeDate,
   eventInHomeMonth,
-  expenseInCurrentMonth,
+  eventMapById,
+  expenseInCurrentMonthWithEvents,
   noteInHomeMonth,
 } from '../utils/monthFilter'
 import {
@@ -132,18 +134,31 @@ function itemDisplayTitle(
 
 function buildFutureMonthExpenseLines(
   expenses: Expense[],
+  events: Event[],
 ): { lines: HomeDeadlineLine[]; hiddenCount: number } {
   const today = todayIso()
   const upcoming = expenses
     .filter(
-      (e) => e.amount > 0 && expenseInCurrentMonth(e) && e.date > today,
+      (e) =>
+        e.amount > 0 &&
+        expenseInCurrentMonthWithEvents(e, events) &&
+        effectiveExpenseChargeDate(e, eventMapById(events)) > today,
     )
-    .sort((a, b) => a.date.localeCompare(b.date))
+    .sort((a, b) =>
+      effectiveExpenseChargeDate(a, eventMapById(events)).localeCompare(
+        effectiveExpenseChargeDate(b, eventMapById(events)),
+      ),
+    )
 
   return {
     lines: upcoming
       .slice(0, 3)
-      .map((e) => buildHomeDeadlineLine(sentenceCase(e.description), e.date)),
+      .map((e) =>
+        buildHomeDeadlineLine(
+          sentenceCase(e.description),
+          effectiveExpenseChargeDate(e, eventMapById(events)),
+        ),
+      ),
     hiddenCount: Math.max(0, upcoming.length - 3),
   }
 }
@@ -291,10 +306,12 @@ export function HomeView({
     () =>
       sortExpensesByDeadline(
         (expenses ?? []).filter(
-          (e) => matchesAreaSelection(e, areaSelection, areaList) && expenseInCurrentMonth(e),
+          (e) =>
+            matchesAreaSelection(e, areaSelection, areaList) &&
+            expenseInCurrentMonthWithEvents(e, events ?? []),
         ),
       ),
-    [expenses, areaSelection, areaList],
+    [expenses, events, areaSelection, areaList],
   )
 
   const areaEvents = useMemo(
@@ -334,10 +351,10 @@ export function HomeView({
         (expenses ?? []).filter(
           (e) =>
             matchesAreaSelection(e, areaSelection, areaList) &&
-            expenseInCurrentMonth(e),
+            expenseInCurrentMonthWithEvents(e, events ?? []),
         ),
       ),
-    [expenses, areaSelection, areaList],
+    [expenses, events, areaSelection, areaList],
   )
 
   const impegnoRows = useMemo((): ImpegnoRow[] => {
@@ -360,7 +377,9 @@ export function HomeView({
     const counts = new Map<number, number>()
     const noteList = (notes ?? []).filter((n) => noteInHomeMonth(n))
     const eventList = (events ?? []).filter((e) => eventInHomeMonth(e))
-    const expenseList = (expenses ?? []).filter((e) => expenseInCurrentMonth(e))
+    const expenseList = (expenses ?? []).filter((e) =>
+      expenseInCurrentMonthWithEvents(e, events ?? []),
+    )
     for (const area of areas ?? []) {
       if (!area.id) continue
       counts.set(
@@ -374,7 +393,9 @@ export function HomeView({
   const totalAreaItems = countDistinctAreaItems(
     (notes ?? []).filter((n) => noteInHomeMonth(n)),
     (events ?? []).filter((e) => eventInHomeMonth(e)),
-    (expenses ?? []).filter((e) => expenseInCurrentMonth(e)),
+    (expenses ?? []).filter((e) =>
+      expenseInCurrentMonthWithEvents(e, events ?? []),
+    ),
   )
 
   const displayImpegni = areaFilterActive ? areaImpegniRows : impegnoRows
@@ -556,8 +577,8 @@ export function HomeView({
   }, [checklistCount, homeChecklistItemCount, tasks, homeChecklists])
 
   const homeExpenseUpcoming = useMemo(
-    () => buildFutureMonthExpenseLines(expenses ?? []),
-    [expenses],
+    () => buildFutureMonthExpenseLines(expenses ?? [], events ?? []),
+    [expenses, events],
   )
 
   const noteSectionUrgent = useMemo(

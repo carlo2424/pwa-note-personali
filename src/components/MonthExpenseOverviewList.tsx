@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Expense } from '../db'
+import type { Event, Expense } from '../db'
 import {
   formatMonthExpenseOverviewLabel,
   listMonthPositiveExpenses,
@@ -7,6 +7,7 @@ import {
 
 interface MonthExpenseOverviewListProps {
   expenses: Expense[]
+  events?: Event[]
   className?: string
   /** Su sfondo rose-600 (tab Spese) o card chiara Home */
   variant?: 'dark' | 'light'
@@ -16,13 +17,14 @@ interface MonthExpenseOverviewListProps {
 /** Elenco voci spesa del mese nella card riepilogo (pagate barrate). */
 export function MonthExpenseOverviewList({
   expenses,
+  events = [],
   className = '',
   variant = 'dark',
   maxHeight = false,
 }: MonthExpenseOverviewListProps) {
   const items = useMemo(
-    () => listMonthPositiveExpenses(expenses),
-    [expenses],
+    () => listMonthPositiveExpenses(expenses, events),
+    [expenses, events],
   )
 
   if (items.length === 0) return null

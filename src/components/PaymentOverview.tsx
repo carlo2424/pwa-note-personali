@@ -12,7 +12,7 @@ import { formatAmount } from '../utils/format'
 import {
   computeMonthPaidTotal,
 } from '../utils/monthExpenseTotals'
-import { expenseInCurrentMonth } from '../utils/monthFilter'
+import { expenseInCurrentMonthWithEvents } from '../utils/monthFilter'
 import {
   sumByPaymentMethod,
 } from '../utils/paymentTotals'
@@ -58,14 +58,16 @@ export function PaymentOverview({
   )
 
   const monthExpensesForList = useMemo(() => {
-    let list = (expenses ?? []).filter(expenseInCurrentMonth)
+    let list = (expenses ?? []).filter((e) =>
+      expenseInCurrentMonthWithEvents(e, events ?? []),
+    )
     if (filterMethod) {
       list = list.filter(
         (e) => (e.paymentMethod ?? 'altro') === filterMethod,
       )
     }
     return list
-  }, [expenses, filterMethod])
+  }, [expenses, events, filterMethod])
 
   const showCardManager =
     filterMethod === null || filterMethod === 'carta'
@@ -82,7 +84,10 @@ export function PaymentOverview({
           Totale · {monthLabel}
         </p>
         <p className="text-2xl font-bold">{formatAmount(monthPaid)}</p>
-        <MonthExpenseOverviewList expenses={monthExpensesForList} />
+        <MonthExpenseOverviewList
+          expenses={monthExpensesForList}
+          events={events ?? []}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-2">

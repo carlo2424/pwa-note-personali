@@ -1,5 +1,6 @@
 import type { Event, Expense, Note } from '../db'
 import { isNoteImpegno } from './impegno'
+import { eventChargeDate } from './eventExpenses'
 
 export function currentMonthBounds(): {
   startMs: number
@@ -74,8 +75,37 @@ export function noteInHomeMonth(
   return true
 }
 
+export function eventMapById(events: Event[]): Map<number, Event> {
+  const map = new Map<number, Event>()
+  for (const event of events) {
+    if (event.id != null) map.set(event.id, event)
+  }
+  return map
+}
+
+/** Data di addebito effettiva: per spese da impegno usa rinnovo/inizio impegno. */
+export function effectiveExpenseChargeDate(
+  expense: Pick<Expense, 'date' | 'eventId'>,
+  eventsById: Map<number, Event>,
+): string {
+  if (expense.eventId != null) {
+    const event = eventsById.get(expense.eventId)
+    if (event) return eventChargeDate(event)
+  }
+  return expense.date
+}
+
 export function expenseInCurrentMonth(expense: Pick<Expense, 'date'>): boolean {
   return expenseInHomeMonth(expense)
+}
+
+export function expenseInCurrentMonthWithEvents(
+  expense: Pick<Expense, 'date' | 'eventId'>,
+  events: Event[],
+): boolean {
+  return isoInCurrentMonth(
+    effectiveExpenseChargeDate(expense, eventMapById(events)),
+  )
 }
 
 /** Spese in Home: solo data pagamento nel mese corrente. */

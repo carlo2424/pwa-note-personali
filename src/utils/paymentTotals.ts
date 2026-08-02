@@ -2,10 +2,12 @@ import type { Event, Expense, PaymentCard, PaymentMethod } from '../db'
 import { PAYMENT_METHODS } from '../constants/events'
 import { todayIso } from './countdown'
 import {
-  eventInCurrentMonth,
-  expenseInCurrentMonth,
+  effectiveExpenseChargeDate,
+  eventMapById,
+  isoInCurrentMonth,
 } from './monthFilter'
 import { eventChargeDate } from './eventExpenses'
+import { lastRecurrenceDueOnOrBeforeToday } from './impegnoDates'
 import { formatAmount } from './format'
 
 function resolvePaymentMethod(value?: string): PaymentMethod {
@@ -20,12 +22,20 @@ function resolvePaymentMethod(value?: string): PaymentMethod {
   return 'altro'
 }
 
-function expenseCountsInMonth(e: Expense): boolean {
-  return expenseInCurrentMonth(e) && e.date <= todayIso()
+function expenseCountsInMonth(e: Expense, eventsById: Map<number, Event>): boolean {
+  const charge = effectiveExpenseChargeDate(e, eventsById)
+  return isoInCurrentMonth(charge) && charge <= todayIso()
 }
 
 function eventCountsInMonth(ev: Event): boolean {
-  return eventInCurrentMonth(ev) && eventChargeDate(ev) <= todayIso()
+  const charge = eventChargeDate(ev)
+  if (isoInCurrentMonth(charge) && charge <= todayIso()) return true
+  if (!ev.recurrenceFrequency || !ev.startDate) return false
+  const lastDue = lastRecurrenceDueOnOrBeforeToday(
+    ev.startDate,
+    ev.recurrenceFrequency,
+  )
+  return lastDue != null && isoInCurrentMonth(lastDue) && lastDue <= todayIso()
 }
 
 function expenseAmount(expense: Pick<Expense, 'amount'>): number {
@@ -58,17 +68,22 @@ export function sumByPaymentMethod(
     altro: 0,
   }
 
+  const eventsById = eventMapById(events)
+  const linkedEventIds = new Set<number>()
+
   for (const e of expenses) {
     const amount = expenseAmount(e)
     if (amount <= 0) continue
-    if (monthOnly && !expenseCountsInMonth(e)) continue
+    if (monthOnly && !expenseCountsInMonth(e, eventsById)) continue
     const method = resolvePaymentMethod(e.paymentMethod)
     totals[method] += amount
+    if (monthOnly && e.eventId != null) linkedEventIds.add(e.eventId)
   }
 
   for (const ev of events) {
     const cost = Number(ev.cost)
     if (!Number.isFinite(cost) || cost <= 0) continue
+    if (ev.id != null && linkedEventIds.has(ev.id)) continue
     if (monthOnly && !eventCountsInMonth(ev)) continue
     const method = resolvePaymentMethod(ev.paymentMethod ?? 'carta')
     totals[method] += cost
@@ -87,6 +102,7 @@ export function cardBreakdowns(
   events: Event[],
   monthOnly: boolean,
 ): CardBreakdown[] {
+  const eventsById = eventMapById(events)
   return cards.map((card) => {
     if (!card.id) {
       return { card, spese: 0, eventi: 0, total: 0 }
@@ -96,7 +112,7 @@ export function cardBreakdowns(
         (e) =>
           e.cardId === card.id &&
           expenseAmount(e) > 0 &&
-          (!monthOnly || expenseCountsInMonth(e)),
+          (!monthOnly || expenseCountsInMonth(e, eventsById)),
       )
       .reduce((s, e) => s + expenseAmount(e), 0)
     const eventi = events
