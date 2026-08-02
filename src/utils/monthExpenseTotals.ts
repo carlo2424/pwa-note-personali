@@ -9,6 +9,7 @@ import {
   expenseInCurrentMonth,
   expenseInCurrentMonthWithEvents,
   isoInCurrentMonth,
+  periodOverlapsCurrentMonth,
 } from './monthFilter'
 
 export interface UpcomingMonthExpense {
@@ -67,13 +68,23 @@ function expenseAmount(expense: Pick<Expense, 'amount'>): number {
   return Number.isFinite(amount) ? amount : 0
 }
 
-function eventPaidChargeInCurrentMonth(ev: Event): string | null {
+export function impegnoPaidChargeInCurrentMonth(ev: Event): string | null {
   const cost = Number(ev.cost)
   if (!Number.isFinite(cost) || cost <= 0) return null
 
   const today = todayIso()
   const charge = eventChargeDate(ev)
   if (isoInCurrentMonth(charge) && charge <= today) return charge
+
+  if (
+    !ev.recurrenceFrequency &&
+    ev.startDate &&
+    ev.endDate &&
+    periodOverlapsCurrentMonth(ev.startDate, ev.endDate)
+  ) {
+    const due = ev.endDate
+    if (isoInCurrentMonth(due) && due <= today) return due
+  }
 
   if (!ev.recurrenceFrequency || !ev.startDate) return null
 
@@ -85,6 +96,10 @@ function eventPaidChargeInCurrentMonth(ev: Event): string | null {
     return lastDue
   }
   return null
+}
+
+function eventCountsAsMonthPaid(ev: Event): boolean {
+  return impegnoPaidChargeInCurrentMonth(ev) != null
 }
 
 function eventUpcomingChargeInCurrentMonth(ev: Event): string | null {
@@ -111,10 +126,6 @@ function eventUpcomingChargeInCurrentMonth(ev: Event): string | null {
     break
   }
   return null
-}
-
-function eventCountsAsMonthPaid(ev: Event): boolean {
-  return eventPaidChargeInCurrentMonth(ev) != null
 }
 
 /** Spese già avvenute nel mese corrente (data ≤ oggi, importi positivi). */

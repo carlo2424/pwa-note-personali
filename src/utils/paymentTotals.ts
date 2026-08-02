@@ -6,8 +6,7 @@ import {
   eventMapById,
   isoInCurrentMonth,
 } from './monthFilter'
-import { eventChargeDate } from './eventExpenses'
-import { lastRecurrenceDueOnOrBeforeToday } from './impegnoDates'
+import { impegnoPaidChargeInCurrentMonth } from './monthExpenseTotals'
 import { formatAmount } from './format'
 
 function resolvePaymentMethod(value?: string): PaymentMethod {
@@ -28,14 +27,7 @@ function expenseCountsInMonth(e: Expense, eventsById: Map<number, Event>): boole
 }
 
 function eventCountsInMonth(ev: Event): boolean {
-  const charge = eventChargeDate(ev)
-  if (isoInCurrentMonth(charge) && charge <= todayIso()) return true
-  if (!ev.recurrenceFrequency || !ev.startDate) return false
-  const lastDue = lastRecurrenceDueOnOrBeforeToday(
-    ev.startDate,
-    ev.recurrenceFrequency,
-  )
-  return lastDue != null && isoInCurrentMonth(lastDue) && lastDue <= todayIso()
+  return impegnoPaidChargeInCurrentMonth(ev) != null
 }
 
 function expenseAmount(expense: Pick<Expense, 'amount'>): number {

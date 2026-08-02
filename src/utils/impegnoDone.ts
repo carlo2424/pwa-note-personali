@@ -3,7 +3,7 @@ import { isPastDue, todayIso } from './countdown'
 import { addRecurrence, parseIsoDate, toIsoDateLocal, repairCorruptedRenewalPatch, computeNextRenewalDate } from './impegnoDates'
 import { isAutomatedPaymentMethod, eventRequiresManualDone } from './paymentMethod'
 import { isOverdueEvent } from './overdue'
-import { syncExpensesForEvent } from './eventExpenses'
+import { syncExpensesForEvent, ensurePeriodExpenseForEvent, closedPeriodChargeDate } from './eventExpenses'
 
 export { eventRequiresManualDone }
 
@@ -97,6 +97,14 @@ export async function markEventDone(event: Event): Promise<void> {
     return
   }
 
+  if (event.cost || event.received) {
+    await ensurePeriodExpenseForEvent(
+      event.id,
+      event,
+      closedPeriodChargeDate(event),
+    )
+  }
+
   if (
     event.recurrenceFrequency &&
     !isAutomatedPaymentMethod(event.paymentMethod) &&
@@ -146,6 +154,10 @@ export async function markEventDone(event: Event): Promise<void> {
     completedAt: now,
     updatedAt: now,
   })
+  const updated = await db.events.get(event.id)
+  if (updated && (updated.cost || updated.received)) {
+    await syncExpensesForEvent(event.id, updated)
+  }
 }
 
 export async function unmarkEventDone(event: Event): Promise<void> {
@@ -240,6 +252,13 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
         event.recurrenceFrequency,
       )
       if (renewalDate !== event.renewalDate) {
+        if (event.cost || event.received) {
+          await ensurePeriodExpenseForEvent(
+            event.id,
+            event,
+            closedPeriodChargeDate(event),
+          )
+        }
         await db.events.update(event.id, {
           renewalDate,
           completedAt: undefined,
@@ -259,6 +278,13 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
         event.recurrenceFrequency,
       )
       if (renewalDate !== event.renewalDate) {
+        if (event.cost || event.received) {
+          await ensurePeriodExpenseForEvent(
+            event.id,
+            event,
+            closedPeriodChargeDate(event),
+          )
+        }
         await db.events.update(event.id, {
           renewalDate,
           completedAt: undefined,
@@ -298,6 +324,13 @@ export async function syncAutomatedEventRenewal(event: Event): Promise<void> {
     !event.completedAt &&
     isPastDue(event.renewalDate ?? event.endDate)
   ) {
+    if (event.cost || event.received) {
+      await ensurePeriodExpenseForEvent(
+        event.id,
+        event,
+        closedPeriodChargeDate(event),
+      )
+    }
     await db.events.update(event.id, {
       completedAt: now,
       updatedAt: now,
