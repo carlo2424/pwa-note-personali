@@ -6,6 +6,10 @@ import {
 } from './eventExpenses'
 import { formatAmount, sentenceCase } from './format'
 import {
+  formatHomeDeadlineDate,
+  homeDeadlineWhenWord,
+} from './homeSpotlight'
+import {
   effectiveExpenseChargeDate,
   eventMapById,
   isoInCurrentMonth,
@@ -144,11 +148,19 @@ export function formatMonthIncomingOverviewLabel(
   item: MonthIncomingOverviewItem,
 ): string {
   const amount = formatAmount(item.amount)
-  if (item.occurred) return `${item.label} · +${amount}`
+  const date = formatHomeDeadlineDate(item.chargeDate)
+  const base = `${item.label} · +${amount}`
+  const when = homeDeadlineWhenWord(item.chargeDate)
+
+  if (item.occurred) {
+    return when ? `${base} · ${when} ${date}` : `${base} · ${date}`
+  }
+
   const days = daysUntil(item.chargeDate)
-  if (days <= 0) return `${item.label} · +${amount}`
+  if (days <= 0) return `${base} · ${date}`
   const giorni = days === 1 ? 'giorno' : 'giorni'
-  return `${item.label} · +${amount} tra ${days} ${giorni}`
+  const timing = when || `tra ${days} ${giorni}`
+  return `${base} · ${timing} · ${date}`
 }
 
 /** Prossimo addebito/incasso testuale in dettaglio impegno. */
