@@ -84,7 +84,11 @@ function listRecurrenceChargesInMonth(
   const results: string[] = []
   const seen = new Set<string>()
 
+  const scheduleStart = ev.startDate
+  if (!scheduleStart) return []
+
   const tryAdd = (iso: string) => {
+    if (iso < scheduleStart) return
     if (iso < monthStart || iso > monthEnd) return
     if (definitive && iso > definitive) return
     if (!test(iso) || seen.has(iso)) return
@@ -92,7 +96,7 @@ function listRecurrenceChargesInMonth(
     results.push(iso)
   }
 
-  // Griglia allineata al prossimo addebito (renewalDate), non al solo startDate.
+  // Griglia allineata al rinnovo ma mai prima della data inizio impegno.
   let current = parseIsoDate(anchor)
   const freq = ev.recurrenceFrequency
 
@@ -103,14 +107,28 @@ function listRecurrenceChargesInMonth(
   let prev = subtractRecurrence(current, freq)
   while (
     toIsoDateLocal(prev) !== toIsoDateLocal(current) &&
-    toIsoDateLocal(prev) >= monthStart
+    toIsoDateLocal(prev) >= monthStart &&
+    toIsoDateLocal(prev) >= scheduleStart
   ) {
     current = prev
     prev = subtractRecurrence(current, freq)
   }
 
+  while (toIsoDateLocal(current) < scheduleStart) {
+    const next = addRecurrence(current, freq)
+    if (toIsoDateLocal(next) === toIsoDateLocal(current)) break
+    current = next
+  }
+
+  while (toIsoDateLocal(current) < monthStart) {
+    const next = addRecurrence(current, freq)
+    if (toIsoDateLocal(next) === toIsoDateLocal(current)) break
+    current = next
+  }
+
   for (let i = 0; i < 600; i++) {
     const iso = toIsoDateLocal(current)
+    if (iso < scheduleStart) break
     if (definitive && iso > definitive) break
     if (iso > monthEnd) break
     tryAdd(iso)
