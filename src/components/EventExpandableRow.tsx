@@ -12,6 +12,10 @@ import {
   toggleEventDone,
 } from '../utils/impegnoDone'
 import { impegnoScadenzaDate } from '../utils/eventExpenses'
+import {
+  eventHasPayableCost,
+  eventHasReceivable,
+} from '../utils/impegnoMoney'
 import { recurrenceShort } from '../utils/recurring'
 import { summarizeText } from '../utils/textSummary'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -98,11 +102,17 @@ export function EventExpandableRow({
     title = event.title
     const line2Parts: string[] = []
     if (areaName) line2Parts.push(areaName)
-    if (event.cost != null && event.cost > 0) {
+    if (eventHasReceivable(event)) {
       line2Parts.push(
-        `−${formatAmount(event.cost)}${freqShort ? `/${freqShort}` : ''}`,
+        `+${formatAmount(event.received!)}${freqShort ? `/${freqShort}` : ''}`,
       )
-    } else if (freqShort) {
+    }
+    if (eventHasPayableCost(event)) {
+      line2Parts.push(
+        `−${formatAmount(event.cost!)}${freqShort ? `/${freqShort}` : ''}`,
+      )
+    }
+    if (!eventHasPayableCost(event) && !eventHasReceivable(event) && freqShort) {
       line2Parts.push(freqShort)
     }
     if (todoCount > 0) {
@@ -187,16 +197,32 @@ export function EventExpandableRow({
             })()
       }
       trailing={
-        homeCard
+        homeCard || (!eventHasReceivable(event) && !eventHasPayableCost(event))
           ? undefined
-          : event.cost != null ? (
-          <span className={`shrink-0 font-semibold text-rose-600 ${compact ? 'text-[10px]' : 'text-xs'}`}>
-            −{formatAmount(event.cost)}
-            {freqShort ? (
-              <span className="font-normal text-slate-400">/{freqShort}</span>
-            ) : null}
-          </span>
-        ) : undefined
+          : (
+          <div className="flex shrink-0 flex-col items-end gap-0.5">
+            {eventHasReceivable(event) && (
+              <span
+                className={`font-semibold text-emerald-600 ${compact ? 'text-[10px]' : 'text-xs'}`}
+              >
+                +{formatAmount(event.received!)}
+                {freqShort ? (
+                  <span className="font-normal text-slate-400">/{freqShort}</span>
+                ) : null}
+              </span>
+            )}
+            {eventHasPayableCost(event) && (
+              <span
+                className={`font-semibold text-rose-600 ${compact ? 'text-[10px]' : 'text-xs'}`}
+              >
+                −{formatAmount(event.cost!)}
+                {freqShort ? (
+                  <span className="font-normal text-slate-400">/{freqShort}</span>
+                ) : null}
+              </span>
+            )}
+          </div>
+        )
       }
     >
       <EventDetailBody

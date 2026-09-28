@@ -627,21 +627,30 @@ export function EventForm({ event, defaultAreaName, onSave, onClose }: EventForm
 
       {/* Pagamenti */}
       <div className="space-y-3 rounded-xl bg-slate-50 p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Costi e pagamenti
-        </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Costi e pagamenti
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Compila da pagare, da ricevere, o entrambi (stessa scadenza e metodo).
+          </p>
+        </div>
+        <div className="space-y-2 rounded-lg border border-rose-100 bg-white/90 p-3">
+          <p className="text-xs font-semibold text-rose-700">Da pagare</p>
           <div>
-            <label className="mb-1 block text-xs text-slate-600">Costo (€)</label>
+            <label className="mb-1 block text-xs text-slate-600">Importo (€)</label>
             <input type="text" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="9,99" className={inputClass} />
           </div>
+        </div>
+        <div className="space-y-2 rounded-lg border border-emerald-100 bg-white/90 p-3">
+          <p className="text-xs font-semibold text-emerald-700">Da ricevere</p>
           <div>
-            <label className="mb-1 block text-xs text-slate-600">Ricevuto (€)</label>
+            <label className="mb-1 block text-xs text-slate-600">Importo (€)</label>
             <input type="text" inputMode="decimal" value={received} onChange={(e) => setReceived(e.target.value)} placeholder="0,00" className={inputClass} />
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-xs text-slate-600">Metodo pagamento</label>
+          <label className="mb-1 block text-xs text-slate-600">Metodo di pagamento / incasso</label>
           <div className="flex flex-wrap gap-2">
             {PAYMENT_METHODS.map((m) => (
               <button

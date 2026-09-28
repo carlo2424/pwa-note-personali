@@ -3,7 +3,12 @@ import { db, type Event, type Note } from '../db'
 import { useDexieLiveQuery } from '../hooks/useDexieLiveQuery'
 import { areaNameById } from '../utils/areas'
 import { filterEventImpegni, filterNoteImpegni } from '../utils/impegno'
+import {
+  eventHasPayableCost,
+  eventHasReceivable,
+} from '../utils/impegnoMoney'
 import { EventExpandableRow } from './EventExpandableRow'
+import { IncomingOverview } from './IncomingOverview'
 import { NoteExpandableRow } from './NoteExpandableRow'
 import { SearchBar } from './SearchBar'
 
@@ -16,8 +21,17 @@ type ImpegnoRow =
   | { kind: 'event'; item: Event; sortKey: string }
   | { kind: 'note'; item: Note; sortKey: string }
 
+type MoneyFlowFilter = 'all' | 'pay' | 'receive'
+
+const FLOW_FILTERS: { id: MoneyFlowFilter; label: string }[] = [
+  { id: 'all', label: 'Tutti' },
+  { id: 'pay', label: 'Da pagare' },
+  { id: 'receive', label: 'Da ricevere' },
+]
+
 export function EventList({ onEdit, onEditNote }: EventListProps) {
   const [search, setSearch] = useState('')
+  const [flowFilter, setFlowFilter] = useState<MoneyFlowFilter>('all')
 
   const events = useDexieLiveQuery(
     () => db.events.orderBy('updatedAt').reverse().toArray(),
@@ -55,7 +69,15 @@ export function EventList({ onEdit, onEditNote }: EventListProps) {
   }, [events, notes])
 
   const query = search.trim().toLowerCase()
+
   const filtered = impegnoRows.filter((row) => {
+    if (flowFilter === 'pay') {
+      if (row.kind === 'note') return false
+      if (!eventHasPayableCost(row.item)) return false
+    } else if (flowFilter === 'receive') {
+      if (row.kind === 'note') return false
+      if (!eventHasReceivable(row.item)) return false
+    }
     if (!query) return true
     if (row.kind === 'event') {
       const e = row.item
@@ -91,18 +113,48 @@ export function EventList({ onEdit, onEditNote }: EventListProps) {
   }
 
   return (
-    <>
-      <div className="mb-4">
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-          placeholder="Cerca impegni..."
-        />
+    <div className="space-y-4">
+      <IncomingOverview />
+
+      <div className="flex flex-wrap gap-2">
+        {FLOW_FILTERS.map(({ id, label }) => {
+          const active = flowFilter === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setFlowFilter(id)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition active:scale-[0.98] ${
+                active
+                  ? id === 'receive'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : id === 'pay'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'bg-violet-600 text-white shadow-sm'
+                  : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+              }`}
+            >
+              {label}
+            </button>
+          )
+        })}
       </div>
+
+      <SearchBar
+        value={search}
+        onChange={setSearch}
+        placeholder="Cerca impegni..."
+      />
 
       {filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-slate-400">
-          Nessun risultato per &ldquo;{search}&rdquo;
+          {query
+            ? `Nessun risultato per "${search}"`
+            : flowFilter === 'receive'
+              ? 'Nessun impegno con importo da ricevere'
+              : flowFilter === 'pay'
+                ? 'Nessun impegno con costo da pagare'
+                : 'Nessun impegno'}
         </p>
       ) : (
         <ul className="space-y-2 pb-4">
@@ -134,6 +186,6 @@ export function EventList({ onEdit, onEditNote }: EventListProps) {
           })}
         </ul>
       )}
-    </>
+    </div>
   )
 }

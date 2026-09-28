@@ -9,6 +9,7 @@ import { toggleTask } from '../utils/eventTasks'
 import { archiveEvent } from '../utils/eventArchive'
 import { formatAmount, formatIsoDate, sentenceCase } from '../utils/format'
 import { impegnoScadenzaDate } from '../utils/eventExpenses'
+import { impegnoRenewalFieldLabel } from '../utils/monthIncomeTotals'
 import { recurrenceLabel, recurrenceShort } from '../utils/recurring'
 import { shareEvent } from '../utils/share'
 import { OVERDUE_ACCENT, taskAccentById } from '../constants/tasks'
@@ -135,7 +136,7 @@ export function EventDetailBody({
         )}
         {event.renewalDate && (
           <div className="flex justify-between">
-            <span className="text-slate-500">Prossimo addebito</span>
+            <span className="text-slate-500">{impegnoRenewalFieldLabel(event)}</span>
             <span className="font-medium text-slate-800">
               {formatIsoDate(event.renewalDate)}
             </span>
@@ -160,7 +161,7 @@ export function EventDetailBody({
           )}
           {event.received != null && (
             <div className="flex justify-between">
-              <span className="text-slate-500">Ricevuto</span>
+              <span className="text-slate-500">Da ricevere</span>
               <span className="font-semibold text-emerald-600">
                 +{formatAmount(event.received)}
               </span>
