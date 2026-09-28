@@ -8,6 +8,7 @@ import {
 } from '../utils/monthFilter'
 import { todayIso } from '../utils/countdown'
 import { MonthExpenseSummary } from './MonthExpenseSummary'
+import { IncomingOverview } from './IncomingOverview'
 import { PaymentOverview } from './PaymentOverview'
 import { SearchBar } from './SearchBar'
 
@@ -62,6 +63,8 @@ export function ExpenseList({ onEdit, onOpenEvent }: ExpenseListProps) {
         filterMethod={methodFilter}
         onFilterMethod={setMethodFilter}
       />
+
+      {!methodFilter && <IncomingOverview />}
 
       {methodFilter && (
         <p className="text-center text-xs text-slate-500">

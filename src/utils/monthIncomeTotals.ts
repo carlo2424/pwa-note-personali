@@ -126,11 +126,11 @@ export function listMonthIncomingOverviewItems(
   }
 
   for (const expense of expenses) {
-    if (expense.eventId != null) continue
     const amount = expenseIncomeAmount(expense)
     if (amount <= 0) continue
     const charge = effectiveExpenseChargeDate(expense, eventMap)
-    tryAdd(expense.description, amount, charge)
+    const label = expense.description.replace(/\s*\(ricevuto\)\s*$/i, '').trim()
+    tryAdd(label || expense.description, amount, charge, expense.eventId)
   }
 
   return items.sort(

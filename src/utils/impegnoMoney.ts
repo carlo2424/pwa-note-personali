@@ -14,6 +14,13 @@ export function eventHasReceivable(
   return Number.isFinite(received) && received > 0
 }
 
+/** Impegno con almeno un importo collegato a scadenze (uscita o entrata). */
+export function impegnoHasChargeSchedule(
+  event: Pick<Event, 'cost' | 'received'>,
+): boolean {
+  return eventHasPayableCost(event) || eventHasReceivable(event)
+}
+
 export function eventMoneyFlow(
   event: Pick<Event, 'cost' | 'received'>,
 ): 'pay' | 'receive' | 'both' | 'none' {

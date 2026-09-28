@@ -12,7 +12,7 @@ import {
 import { eventHasReceivable } from '../utils/impegnoMoney'
 import { MonthIncomingOverviewList } from './MonthIncomingOverviewList'
 
-/** Riepilogo incassi del mese in tab Impegni */
+/** Riepilogo incassi del mese (tab Impegni e Spese) */
 export function IncomingOverview() {
   const { label: monthLabel } = currentMonthBounds()
   const expenses = useDexieLiveQuery(() => db.expenses.toArray())
@@ -28,14 +28,14 @@ export function IncomingOverview() {
     [expenses, events],
   )
 
-  if (expenses === undefined || events === undefined) {
-    return null
-  }
-
   const incomingItems = useMemo(
     () => listMonthIncomingOverviewItems(expenses ?? [], events ?? []),
     [expenses, events],
   )
+
+  if (expenses === undefined || events === undefined) {
+    return null
+  }
 
   const showCard =
     (events ?? []).some(eventHasReceivable) ||

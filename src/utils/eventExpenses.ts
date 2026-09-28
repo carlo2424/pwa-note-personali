@@ -1,5 +1,6 @@
 import { db, type Event } from '../db'
 import { todayIso } from './countdown'
+import { impegnoHasChargeSchedule } from './impegnoMoney'
 import { isoInCurrentMonth } from './monthFilter'
 import {
   addRecurrence,
@@ -124,8 +125,7 @@ function listRecurrenceChargesInMonth(
 
 /** Prossimo addebito nel mese corrente (fine definitiva ancora in vigore). */
 export function impegnoPaidChargesInCurrentMonth(ev: Event): string[] {
-  const cost = Number(ev.cost)
-  if (!Number.isFinite(cost) || cost <= 0) return []
+  if (!impegnoHasChargeSchedule(ev)) return []
 
   const today = todayIso()
   const definitive = impegnoDefinitiveEndDate(ev)
@@ -150,8 +150,7 @@ export function impegnoPaidChargeInCurrentMonth(ev: Event): string | null {
 
 /** Tutti gli addebiti futuri nel mese corrente (fine definitiva ancora in vigore). */
 export function impegnoUpcomingChargesInCurrentMonth(ev: Event): string[] {
-  const cost = Number(ev.cost)
-  if (!Number.isFinite(cost) || cost <= 0) return []
+  if (!impegnoHasChargeSchedule(ev)) return []
   if (!isImpegnoCommitmentActive(ev)) return []
 
   const today = todayIso()
