@@ -29,39 +29,14 @@ function expenseIncomeAmount(expense: Pick<Expense, 'amount'>): number {
   return Math.abs(n)
 }
 
-/** Incassi già avvenuti nel mese corrente (da impegni + entrate manuali). */
+/** Incassi già avvenuti nel mese corrente (allineato all'elenco in card verde). */
 export function computeMonthReceivedPaidTotal(
   expenses: Expense[],
   events: Event[] = [],
 ): number {
-  const today = todayIso()
-  const eventMap = eventMapById(events)
-  let sum = 0
-  const counted = new Set<string>()
-
-  for (const expense of expenses) {
-    const amount = expenseIncomeAmount(expense)
-    if (amount <= 0) continue
-    const charge = effectiveExpenseChargeDate(expense, eventMap)
-    if (!isoInCurrentMonth(charge) || charge > today) continue
-    sum += amount
-    if (expense.eventId != null) {
-      counted.add(incomeDedupeKey(expense.eventId, charge))
-    }
-  }
-
-  for (const ev of events) {
-    const amount = receivedAmount(ev)
-    if (!ev.id || amount <= 0) continue
-    for (const charge of impegnoPaidChargesInCurrentMonth(ev)) {
-      const key = incomeDedupeKey(ev.id, charge)
-      if (counted.has(key)) continue
-      counted.add(key)
-      sum += amount
-    }
-  }
-
-  return sum
+  return listMonthIncomingOverviewItems(expenses, events)
+    .filter((item) => item.occurred)
+    .reduce((sum, item) => sum + item.amount, 0)
 }
 
 /** Incassi previsti nel mese corrente (data futura). */
